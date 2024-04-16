@@ -9,11 +9,13 @@
 @interface StreamConfiguration : NSObject
 
 @property NSString* host;
+@property unsigned short httpsPort;
 @property NSString* appVersion;
 @property NSString* gfeVersion;
 @property NSString* appID;
 @property NSString* appName;
 @property NSString* rtspSessionUrl;
+@property int serverCodecModeSupport;
 @property int width;
 @property int height;
 @property int frameRate;
@@ -25,9 +27,8 @@
 @property BOOL playAudioOnPC;
 @property BOOL swapABXYButtons;
 @property int audioConfiguration;
-@property BOOL enableHdr;
+@property int supportedVideoFormats;
 @property BOOL multiController;
-@property BOOL allowHevc;
 @property BOOL useFramePacing;
 @property NSData* serverCert;
 

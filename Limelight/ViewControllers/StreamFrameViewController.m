@@ -104,7 +104,7 @@
     [_spinner startAnimating];
     _spinner.center = CGPointMake(self.view.frame.size.width / 2, self.view.frame.size.height / 2 - _stageLabel.frame.size.height - _spinner.frame.size.height);
     
-    _controllerSupport = [[ControllerSupport alloc] initWithConfig:self.streamConfig presenceDelegate:self];
+    _controllerSupport = [[ControllerSupport alloc] initWithConfig:self.streamConfig delegate:self];
     _inactivityTimer = nil;
     
     _streamView = [[StreamView alloc] initWithFrame:self.view.frame];
@@ -377,6 +377,8 @@
         
         [self->_streamView showOnScreenControls];
         
+        [self->_controllerSupport connectionEstablished];
+        
         if (self->_settings.statsOverlay) {
             self->_statsUpdateTimer = [NSTimer scheduledTimerWithTimeInterval:1.0f
                                                                        target:self
@@ -437,9 +439,21 @@
                     break;
                     
                 default:
+                {
+                    NSString* errorString;
+                    if (abs(errorCode) > 1000) {
+                        // We'll assume large errors are hex values
+                        errorString = [NSString stringWithFormat:@"%08X", (uint32_t)errorCode];
+                    }
+                    else {
+                        // Smaller values will just be printed as decimal (probably errno.h values)
+                        errorString = [NSString stringWithFormat:@"%d", errorCode];
+                    }
+                    
                     title = @"Connection Terminated";
-                    message = @"The connection was terminated";
+                    message = [NSString stringWithFormat: @"The connection was terminated\n\nError code: %@", errorString];
                     break;
+                }
             }
         }
         
@@ -524,6 +538,24 @@
     Log(LOG_I, @"Rumble on gamepad %d: %04x %04x", controllerNumber, lowFreqMotor, highFreqMotor);
     
     [_controllerSupport rumble:controllerNumber lowFreqMotor:lowFreqMotor highFreqMotor:highFreqMotor];
+}
+
+- (void) rumbleTriggers:(uint16_t)controllerNumber leftTrigger:(uint16_t)leftTrigger rightTrigger:(uint16_t)rightTrigger {
+    Log(LOG_I, @"Trigger rumble on gamepad %d: %04x %04x", controllerNumber, leftTrigger, rightTrigger);
+    
+    [_controllerSupport rumbleTriggers:controllerNumber leftTrigger:leftTrigger rightTrigger:rightTrigger];
+}
+
+- (void) setMotionEventState:(uint16_t)controllerNumber motionType:(uint8_t)motionType reportRateHz:(uint16_t)reportRateHz {
+    Log(LOG_I, @"Set motion state on gamepad %d: %02x %u Hz", controllerNumber, motionType, reportRateHz);
+    
+    [_controllerSupport setMotionEventState:controllerNumber motionType:motionType reportRateHz:reportRateHz];
+}
+
+- (void) setControllerLed:(uint16_t)controllerNumber r:(uint8_t)r g:(uint8_t)g b:(uint8_t)b {
+    Log(LOG_I, @"Set controller LED on gamepad %d: l%02x%02x%02x", controllerNumber, r, g, b);
+    
+    [_controllerSupport setControllerLed:controllerNumber r:r g:g b:b];
 }
 
 - (void)connectionStatusUpdate:(int)status {
@@ -613,6 +645,12 @@
         [self setNeedsUpdateOfPrefersPointerLocked];
     }
 #endif
+}
+
+- (void) streamExitRequested {
+    Log(LOG_I, @"Gamepad combo requested stream exit");
+    
+    [self returnToMainFrame];
 }
 
 - (void)userInteractionBegan {

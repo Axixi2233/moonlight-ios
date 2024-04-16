@@ -75,6 +75,8 @@
 				<string>20 Mbps</string>
 				<string>25 Mbps</string>
 				<string>50 Mbps</string>
+				<string>70 Mbps</string>
+				<string>80 Mbps</string>
 				<string>100 Mbps</string>
 				<string>150 Mbps</string>
 			</array>
@@ -88,6 +90,8 @@
 				<string>20000</string>
 				<string>25000</string>
 				<string>50000</string>
+				<string>70000</string>
+				<string>80000</string>
 				<string>100000</string>
 				<string>150000</string>
 			</array>
@@ -184,13 +188,25 @@
 		</dict>
 		<dict>
 			<key>Type</key>
-			<string>PSToggleSwitchSpecifier</string>
+			<string>PSMultiValueSpecifier</string>
 			<key>Title</key>
-			<string>Use HEVC Codec</string>
+			<string>Preferred Codec</string>
 			<key>Key</key>
-			<string>useHevc2</string>
+			<string>preferredCodec</string>
 			<key>DefaultValue</key>
-			<true/>
+			<string>0</string>
+			<key>Values</key>
+			<array>
+				<string>0</string>
+				<string>1</string>
+				<string>2</string>
+			</array>
+			<key>Titles</key>
+			<array>
+				<string>Auto</string>
+				<string>H.264</string>
+				<string>HEVC</string>
+			</array>
 		</dict>
 		<dict>
 			<key>Type</key>

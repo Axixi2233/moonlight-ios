@@ -64,7 +64,7 @@ static NSMutableSet* hostList;
     // failure callback could be invoked.
     dispatch_sync(dispatch_get_main_queue(), ^{
         self->_pairAlert = [UIAlertController alertControllerWithTitle:@"Pairing"
-                                                               message:[NSString stringWithFormat:@"Enter the following PIN on the host machine: %@", PIN]
+                                                               message:[NSString stringWithFormat:@"Enter the following PIN on the host machine: %@\n\nIf your host PC is running Sunshine, navigate to the Sunshine web UI to enter the PIN.", PIN]
                                                         preferredStyle:UIAlertControllerStyleAlert];
         [self->_pairAlert addAction:[UIAlertAction actionWithTitle:@"Cancel" style:UIAlertActionStyleDestructive handler:^(UIAlertAction* action) {
             self->_pairAlert = nil;
@@ -168,7 +168,7 @@ static NSMutableSet* hostList;
         // Exempt this host from discovery while handling the applist query
         [self->_discMan pauseDiscoveryForHost:host];
         
-        AppListResponse* appListResp = [ConnectionHelper getAppListForHostWithHostIP:host.activeAddress serverCert:host.serverCert uniqueID:self->_uniqueId];
+        AppListResponse* appListResp = [ConnectionHelper getAppListForHost:host];
         
         [self->_discMan resumeDiscoveryForHost:host];
 
@@ -373,7 +373,7 @@ static NSMutableSet* hostList;
                 return;
             }
             
-            HttpManager* hMan = [[HttpManager alloc] initWithHost:host.activeAddress uniqueId:self->_uniqueId serverCert:host.serverCert];
+            HttpManager* hMan = [[HttpManager alloc] initWithHost:host];
             ServerInfoResponse* serverInfoResp = [[ServerInfoResponse alloc] init];
             
             // Exempt this host from discovery while handling the serverinfo request
@@ -492,6 +492,14 @@ static NSMutableSet* hostList;
             self->_showHiddenApps = YES;
             [self hostClicked:host view:view];
         }]];
+        
+#if !TARGET_OS_TV
+        if (host.isNvidiaServerSoftware) {
+            [longClickAlert addAction:[UIAlertAction actionWithTitle:@"NVIDIA GameStream End-of-Service" style:UIAlertActionStyleDefault handler:^(UIAlertAction* action){
+                [Utils launchUrl:@"https://github.com/moonlight-stream/moonlight-docs/wiki/NVIDIA-GameStream-End-Of-Service-Announcement-FAQ"];
+            }]];
+        }
+#endif
     }
     [longClickAlert addAction:[UIAlertAction actionWithTitle:@"Test Network" style:UIAlertActionStyleDefault handler:^(UIAlertAction* action) {
         [self showLoadingFrame:^{
@@ -524,8 +532,11 @@ static NSMutableSet* hostList;
     }]];
 #if !TARGET_OS_TV
     if (host.state != StateOnline) {
+        [longClickAlert addAction:[UIAlertAction actionWithTitle:@"NVIDIA GameStream End-of-Service" style:UIAlertActionStyleDefault handler:^(UIAlertAction* action){
+            [Utils launchUrl:@"https://github.com/moonlight-stream/moonlight-docs/wiki/NVIDIA-GameStream-End-Of-Service-Announcement-FAQ"];
+        }]];
         [longClickAlert addAction:[UIAlertAction actionWithTitle:@"Connection Help" style:UIAlertActionStyleDefault handler:^(UIAlertAction* action){
-            [[UIApplication sharedApplication] openURL:[NSURL URLWithString:@"https://github.com/moonlight-stream/moonlight-docs/wiki/Troubleshooting"]];
+            [Utils launchUrl:@"https://github.com/moonlight-stream/moonlight-docs/wiki/Troubleshooting"];
         }]];
     }
 #endif
@@ -593,6 +604,7 @@ static NSMutableSet* hostList;
 - (void) prepareToStreamApp:(TemporaryApp *)app {
     _streamConfig = [[StreamConfiguration alloc] init];
     _streamConfig.host = app.host.activeAddress;
+    _streamConfig.httpsPort = app.host.httpsPort;
     _streamConfig.appID = app.id;
     _streamConfig.appName = app.name;
     _streamConfig.serverCert = app.host.serverCert;
@@ -625,7 +637,6 @@ static NSMutableSet* hostList;
     _streamConfig.bitRate = [streamSettings.bitrate intValue];
     _streamConfig.optimizeGameSettings = streamSettings.optimizeGames;
     _streamConfig.playAudioOnPC = streamSettings.playAudioOnPC;
-    _streamConfig.allowHevc = streamSettings.useHevc;
     _streamConfig.useFramePacing = streamSettings.useFramePacing;
     _streamConfig.swapABXYButtons = streamSettings.swapABXYButtons;
     
@@ -649,18 +660,46 @@ static NSMutableSet* hostList;
         _streamConfig.audioConfiguration = AUDIO_CONFIGURATION_STEREO;
     }
     
-    // HDR requires HDR10 display and HEVC Main10 decoder on the client.
-    // It additionally requires an HEVC Main10 encoder on the server (GTX 1000+).
-    //
-    // It should also be a user preference, since some games may require higher peak
-    // brightness than the iOS device can support to look correct in HDR mode.
-    if (@available(iOS 11.3, tvOS 11.2, *)) {
-        _streamConfig.enableHdr =
-            (app.host.serverCodecModeSupport & 0x200) != 0 && // HEVC Main10 encoding on host PC GPU
-            VTIsHardwareDecodeSupported(kCMVideoCodecType_HEVC) && // Decoder supported
-            (AVPlayer.availableHDRModes & AVPlayerHDRModeHDR10) != 0 && // Display supported
-            streamSettings.enableHdr; // User wants it enabled
+    _streamConfig.serverCodecModeSupport = app.host.serverCodecModeSupport;
+    
+    switch (streamSettings.preferredCodec) {
+        case CODEC_PREF_AV1:
+#if defined(__IPHONE_16_0) || defined(__TVOS_16_0)
+            if (VTIsHardwareDecodeSupported(kCMVideoCodecType_AV1)) {
+                _streamConfig.supportedVideoFormats |= VIDEO_FORMAT_AV1_MAIN8;
+            }
+#endif
+            // Fall-through
+            
+        case CODEC_PREF_AUTO:
+        case CODEC_PREF_HEVC:
+            if (VTIsHardwareDecodeSupported(kCMVideoCodecType_HEVC)) {
+                _streamConfig.supportedVideoFormats |= VIDEO_FORMAT_H265;
+            }
+            // Fall-through
+            
+        case CODEC_PREF_H264:
+            _streamConfig.supportedVideoFormats |= VIDEO_FORMAT_H264;
+            break;
     }
+    
+    // HEVC is supported if the user wants it (or it's required by the chosen resolution) and the SoC supports it
+    if ((_streamConfig.width > 4096 || _streamConfig.height > 4096 || streamSettings.enableHdr) && VTIsHardwareDecodeSupported(kCMVideoCodecType_HEVC)) {
+        _streamConfig.supportedVideoFormats |= VIDEO_FORMAT_H265;
+        
+        // HEVC Main10 is supported if the user wants it and the display supports it
+        if (streamSettings.enableHdr && (AVPlayer.availableHDRModes & AVPlayerHDRModeHDR10) != 0) {
+            _streamConfig.supportedVideoFormats |= VIDEO_FORMAT_H265_MAIN10;
+        }
+    }
+    
+#if defined(__IPHONE_16_0) || defined(__TVOS_16_0)
+    // Add the AV1 Main10 format if AV1 and HDR are both enabled and supported
+    if ((_streamConfig.supportedVideoFormats & VIDEO_FORMAT_MASK_AV1) && streamSettings.enableHdr &&
+        VTIsHardwareDecodeSupported(kCMVideoCodecType_AV1) && (AVPlayer.availableHDRModes & AVPlayerHDRModeHDR10) != 0) {
+        _streamConfig.supportedVideoFormats |= VIDEO_FORMAT_AV1_MAIN10;
+    }
+#endif
 }
 
 - (void)appLongClicked:(TemporaryApp *)app view:(UIView *)view {
@@ -718,7 +757,7 @@ static NSMutableSet* hostList;
                                         Log(LOG_I, @"Quitting application: %@", currentApp.name);
                                         [self showLoadingFrame: ^{
                                             dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
-                                                HttpManager* hMan = [[HttpManager alloc] initWithHost:app.host.activeAddress uniqueId:self->_uniqueId serverCert:app.host.serverCert];
+                                                HttpManager* hMan = [[HttpManager alloc] initWithHost:app.host];
                                                 HttpResponse* quitResponse = [[HttpResponse alloc] init];
                                                 HttpRequest* quitRequest = [HttpRequest requestForResponse: quitResponse withUrlRequest:[hMan newQuitAppRequest]];
                                                 
