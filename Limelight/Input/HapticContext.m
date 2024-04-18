@@ -7,6 +7,8 @@
 //
 
 #import "HapticContext.h"
+#import "TemporarySettings.h"
+#import "DataManager.h"
 
 @import CoreHaptics;
 @import GameController;
@@ -84,18 +86,25 @@
 }
 
 -(id) initWithGamepad:(GCController*)gamepad locality:(GCHapticsLocality)locality API_AVAILABLE(ios(14.0), tvos(14.0)) {
-    if (gamepad.haptics == nil) {
-        Log(LOG_W, @"Controller %d does not support haptics", gamepad.playerIndex);
-        return nil;
+    DataManager* dataMan = [[DataManager alloc] init];
+    TemporarySettings* currentSettings = [dataMan getSettings];
+    //增加控制器不支持震动 手机震动
+    if(currentSettings.rumblePhone){
+        NSError *error = nil;
+        _hapticEngine = [[CHHapticEngine alloc] initAndReturnError:&error];
+        Log(LOG_W, @"Controller %d 强制启用iPhone震动", gamepad.playerIndex);
+    }else{
+        if (gamepad.haptics == nil) {
+            Log(LOG_W, @"Controller %d does not support haptics", gamepad.playerIndex);
+            return nil;
+        }
+        if (![[gamepad.haptics supportedLocalities] containsObject:locality]) {
+            Log(LOG_W, @"Controller %d does not support haptic locality: %@", gamepad.playerIndex, locality);
+            return nil;
+        }
+        _hapticEngine = [gamepad.haptics createEngineWithLocality:locality];
     }
-    
-    if (![[gamepad.haptics supportedLocalities] containsObject:locality]) {
-        Log(LOG_W, @"Controller %d does not support haptic locality: %@", gamepad.playerIndex, locality);
-        return nil;
-    }
-    
     _playerIndex = gamepad.playerIndex;
-    _hapticEngine = [gamepad.haptics createEngineWithLocality:locality];
     
     NSError* error;
     [_hapticEngine startAndReturnError:&error];
