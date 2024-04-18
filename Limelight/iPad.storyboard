@@ -405,9 +405,10 @@
                                                     <constraint firstAttribute="height" constant="50" id="1Yj-1d-YRM"/>
                                                     <constraint firstAttribute="width" constant="50" id="chA-lW-DGW"/>
                                                 </constraints>
+                                                <fontDescription key="fontDescription" type="system" pointSize="18"/>
                                                 <color key="tintColor" red="0.6705882353" green="0.61568627450000002" blue="1" alpha="1" colorSpace="custom" customColorSpace="sRGB"/>
                                                 <inset key="imageEdgeInsets" minX="0.0" minY="0.0" maxX="2.2250738585072014e-308" maxY="0.0"/>
-                                                <state key="normal" image="Trash"/>
+                                                <state key="normal" title="删除"/>
                                                 <connections>
                                                     <action selector="trashCanTapped:" destination="YXP-lQ-L2x" eventType="touchUpInside" id="a2y-Ot-4hb"/>
                                                 </connections>
@@ -418,9 +419,10 @@
                                                     <constraint firstAttribute="width" constant="50" id="KOh-Rb-O2T"/>
                                                     <constraint firstAttribute="height" constant="50" id="TpX-sS-OlW"/>
                                                 </constraints>
+                                                <fontDescription key="fontDescription" type="system" pointSize="18"/>
                                                 <color key="tintColor" red="0.6705882353" green="0.61568627450000002" blue="1" alpha="1" colorSpace="custom" customColorSpace="sRGB"/>
                                                 <inset key="imageEdgeInsets" minX="0.0" minY="0.0" maxX="2.2250738585072014e-308" maxY="0.0"/>
-                                                <state key="normal" image="ArrowBackward"/>
+                                                <state key="normal" title="撤销"/>
                                                 <connections>
                                                     <action selector="undoTapped:" destination="YXP-lQ-L2x" eventType="touchUpInside" id="M2Y-xv-i1r"/>
                                                 </connections>
@@ -437,9 +439,10 @@
                                                     <constraint firstAttribute="height" constant="50" id="9lg-Os-MX3"/>
                                                     <constraint firstAttribute="width" constant="50" id="Vxs-b6-lmy"/>
                                                 </constraints>
+                                                <fontDescription key="fontDescription" type="system" pointSize="18"/>
                                                 <color key="tintColor" red="0.6705882353" green="0.61568627450000002" blue="1" alpha="1" colorSpace="custom" customColorSpace="sRGB"/>
                                                 <inset key="imageEdgeInsets" minX="0.0" minY="0.0" maxX="2.2250738585072014e-308" maxY="0.0"/>
-                                                <state key="normal" image="SquareAndArrowDown"/>
+                                                <state key="normal" title="保存"/>
                                                 <connections>
                                                     <action selector="saveTapped:" destination="YXP-lQ-L2x" eventType="touchUpInside" id="7ZN-jc-WxC"/>
                                                 </connections>
@@ -450,9 +453,10 @@
                                                     <constraint firstAttribute="width" constant="50" id="Yde-A0-dwd"/>
                                                     <constraint firstAttribute="height" constant="50" id="oFb-7k-XBI"/>
                                                 </constraints>
+                                                <fontDescription key="fontDescription" type="system" pointSize="18"/>
                                                 <color key="tintColor" red="0.6705882353" green="0.61568627450000002" blue="1" alpha="1" colorSpace="custom" customColorSpace="sRGB"/>
                                                 <inset key="imageEdgeInsets" minX="0.0" minY="0.0" maxX="2.2250738585072014e-308" maxY="0.0"/>
-                                                <state key="normal" image="SquaresArrowUp"/>
+                                                <state key="normal" title="加载"/>
                                                 <connections>
                                                     <action selector="loadTapped:" destination="YXP-lQ-L2x" eventType="touchUpInside" id="Lkl-YC-ZQS"/>
                                                 </connections>
@@ -493,13 +497,12 @@
                                     <constraint firstItem="B2M-kv-L0a" firstAttribute="top" secondItem="opF-ga-G7E" secondAttribute="bottom" id="n26-ff-PXi"/>
                                 </constraints>
                             </view>
-                            <button opaque="NO" contentMode="scaleToFill" contentHorizontalAlignment="center" contentVerticalAlignment="center" buttonType="system" lineBreakMode="middleTruncation" translatesAutoresizingMaskIntoConstraints="NO" id="0dc-Qb-Sdw">
-                                <rect key="frame" x="30" y="29" width="41" height="56"/>
+                            <button opaque="NO" contentMode="scaleToFill" misplaced="YES" contentHorizontalAlignment="center" contentVerticalAlignment="center" buttonType="system" lineBreakMode="middleTruncation" translatesAutoresizingMaskIntoConstraints="NO" id="0dc-Qb-Sdw">
+                                <rect key="frame" x="30" y="30" width="41" height="40"/>
+                                <fontDescription key="fontDescription" type="system" pointSize="18"/>
                                 <color key="tintColor" red="0.6705882353" green="0.61568627450000002" blue="1" alpha="1" colorSpace="custom" customColorSpace="sRGB"/>
-                                <state key="normal" title="Button"/>
-                                <buttonConfiguration key="configuration" style="plain" title="x">
-                                    <fontDescription key="titleFontDescription" type="system" pointSize="35"/>
-                                </buttonConfiguration>
+                                <inset key="imageEdgeInsets" minX="0.0" minY="0.0" maxX="2.2250738585072014e-308" maxY="0.0"/>
+                                <state key="normal" title="关闭"/>
                                 <connections>
                                     <action selector="closeTapped:" destination="YXP-lQ-L2x" eventType="touchUpInside" id="gCh-KV-p80"/>
                                 </connections>
@@ -550,13 +553,13 @@
                                     <constraint firstAttribute="height" constant="44" id="bZp-d6-TXA"/>
                                 </constraints>
                                 <items>
-                                    <navigationItem title="On Screen Controller Profiles" id="npO-qK-e65">
-                                        <barButtonItem key="leftBarButtonItem" systemItem="cancel" id="AVW-rN-Tso">
+                                    <navigationItem title="配置布局方案" id="npO-qK-e65">
+                                        <barButtonItem key="leftBarButtonItem" title="取消" id="AVW-rN-Tso">
                                             <connections>
                                                 <action selector="cancelTapped:" destination="hVe-cU-sXy" id="gT5-H5-tCa"/>
                                             </connections>
                                         </barButtonItem>
-                                        <barButtonItem key="rightBarButtonItem" title="Load" style="plain" id="n1W-ot-Ebz">
+                                        <barButtonItem key="rightBarButtonItem" title="应用" style="plain" id="n1W-ot-Ebz">
                                             <connections>
                                                 <action selector="loadTapped:" destination="hVe-cU-sXy" id="Mvk-6f-3Mi"/>
                                             </connections>
@@ -675,11 +678,7 @@
         </scene>
     </scenes>
     <resources>
-        <image name="ArrowBackward" width="40" height="40"/>
         <image name="ChevronCompactUp" width="35" height="10"/>
-        <image name="SquareAndArrowDown" width="40" height="40"/>
-        <image name="SquaresArrowUp" width="40" height="40"/>
-        <image name="Trash" width="40" height="40"/>
         <systemColor name="systemBackgroundColor">
             <color white="1" alpha="1" colorSpace="custom" customColorSpace="genericGamma22GrayColorSpace"/>
         </systemColor>

@@ -96,7 +96,7 @@ const double NAV_BAR_HEIGHT = 50;
     if ([[[profiles objectAtIndex:indexPath.row] name] isEqualToString:@"Default"]) {   // if user is attempting to delete the 'Default' profile then show a pop up telling user they can't do that and return out of this method
         UIAlertController *alertController = [UIAlertController alertControllerWithTitle: [NSString stringWithFormat:@""] message: @"Deleting the 'Default' profile is not allowed" preferredStyle:UIAlertControllerStyleAlert];
         
-        [alertController addAction:[UIAlertAction actionWithTitle:@"Ok" style:UIAlertActionStyleDefault handler:^(UIAlertAction *action) {
+        [alertController addAction:[UIAlertAction actionWithTitle:@"OK" style:UIAlertActionStyleDefault handler:^(UIAlertAction *action) {
             [alertController dismissViewControllerAnimated:NO completion:nil];
         }]];
         [self presentViewController:alertController animated:YES completion:nil];

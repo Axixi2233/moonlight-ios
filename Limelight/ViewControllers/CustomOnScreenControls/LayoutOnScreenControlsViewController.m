@@ -160,9 +160,9 @@
 }
 
 - (IBAction) trashCanTapped:(id)sender {
-    UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"Delete Buttons Here" message:@"Drag and drop buttons onto this trash can to remove them from the interface" preferredStyle:UIAlertControllerStyleAlert];
+    UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"提示" message:@"将按钮拖放到“删除按钮”上以将其从界面中删除" preferredStyle:UIAlertControllerStyleAlert];
 
-    UIAlertAction *ok = [UIAlertAction actionWithTitle:@"Ok" style:UIAlertActionStyleDefault handler:nil];
+    UIAlertAction *ok = [UIAlertAction actionWithTitle:@"OK" style:UIAlertActionStyleDefault handler:nil];
     [alert addAction:ok];
     [self presentViewController:alert animated:YES completion:nil];
 }
@@ -198,8 +198,8 @@
         [self OSCLayoutChanged]; // will fade the undo button in or out depending on whether there are any further changes to undo
     }
     else {  // there are no changes to undo. let user know there are no changes to undo
-        UIAlertController * savedAlertController = [UIAlertController alertControllerWithTitle: [NSString stringWithFormat:@"Nothing to Undo"] message: @"There are no changes to undo" preferredStyle:UIAlertControllerStyleAlert];
-        [savedAlertController addAction:[UIAlertAction actionWithTitle:@"Ok" style:UIAlertActionStyleDefault handler:^(UIAlertAction *action) {
+        UIAlertController * savedAlertController = [UIAlertController alertControllerWithTitle: [NSString stringWithFormat:@"提示"] message: @"没有可撤销的项" preferredStyle:UIAlertControllerStyleAlert];
+        [savedAlertController addAction:[UIAlertAction actionWithTitle:@"OK" style:UIAlertActionStyleDefault handler:^(UIAlertAction *action) {
             [savedAlertController dismissViewControllerAnimated:NO completion:nil];
         }]];
         [self presentViewController:savedAlertController animated:YES completion:nil];
@@ -208,22 +208,22 @@
 
 /* show pop up notification that lets users choose to save the current OSC layout configuration as a profile they can load when they want. User can also choose to cancel out of this pop up */
 - (IBAction) saveTapped:(id)sender {
-    UIAlertController * inputNameAlertController = [UIAlertController alertControllerWithTitle: @"Enter the name you want to save this controller profile as" message: @"" preferredStyle:UIAlertControllerStyleAlert];
+    UIAlertController * inputNameAlertController = [UIAlertController alertControllerWithTitle: @"输入配置文件名称保存" message: @"" preferredStyle:UIAlertControllerStyleAlert];
     [inputNameAlertController addTextFieldWithConfigurationHandler:^(UITextField *textField) {  // pop up notification with text field where user can enter the text they wish to name their OSC layout profile
         textField.placeholder = @"name";
         textField.textColor = [UIColor lightGrayColor];
         textField.clearButtonMode = UITextFieldViewModeWhileEditing;
         textField.borderStyle = UITextBorderStyleNone;
     }];
-    [inputNameAlertController addAction:[UIAlertAction actionWithTitle:@"Save" style:UIAlertActionStyleDefault handler:^(UIAlertAction *action) {   // add save button to allow user to save the on screen controller configuration
+    [inputNameAlertController addAction:[UIAlertAction actionWithTitle:@"保存" style:UIAlertActionStyleDefault handler:^(UIAlertAction *action) {   // add save button to allow user to save the on screen controller configuration
         NSArray *textFields = inputNameAlertController.textFields;
         UITextField *nameField = textFields[0];
         NSString *enteredProfileName = nameField.text;
         
         if ([enteredProfileName isEqualToString:@"Default"]) {  // don't let user user overwrite the 'Default' profile
-            UIAlertController *alertController = [UIAlertController alertControllerWithTitle: [NSString stringWithFormat:@""] message: [NSString stringWithFormat:@"Saving over the 'Default' profile is not allowed"] preferredStyle:UIAlertControllerStyleAlert];
+            UIAlertController *alertController = [UIAlertController alertControllerWithTitle: [NSString stringWithFormat:@""] message: [NSString stringWithFormat:@"不允许保存“默认”配置文件"] preferredStyle:UIAlertControllerStyleAlert];
             
-            [alertController addAction:[UIAlertAction actionWithTitle:@"Ok" style:UIAlertActionStyleDefault handler:^(UIAlertAction *action) {
+            [alertController addAction:[UIAlertAction actionWithTitle:@"OK" style:UIAlertActionStyleDefault handler:^(UIAlertAction *action) {
                 [alertController dismissViewControllerAnimated:NO completion:^{
                     [self presentViewController:inputNameAlertController animated:YES completion:nil];
                 }];
@@ -231,9 +231,9 @@
             [self presentViewController:alertController animated:YES completion:nil];
         }
         else if ([enteredProfileName length] == 0) {    // if user entered no text and taps the 'Save' button let them know they can't do that
-            UIAlertController * savedAlertController = [UIAlertController alertControllerWithTitle: [NSString stringWithFormat:@""] message: [NSString stringWithFormat:@"Profile name cannot be blank!"] preferredStyle:UIAlertControllerStyleAlert];
+            UIAlertController * savedAlertController = [UIAlertController alertControllerWithTitle: [NSString stringWithFormat:@""] message: [NSString stringWithFormat:@"配置名不能为空！"] preferredStyle:UIAlertControllerStyleAlert];
             
-            [savedAlertController addAction:[UIAlertAction actionWithTitle:@"Ok" style:UIAlertActionStyleDefault handler:^(UIAlertAction *action) { // show pop up notification letting user know they must enter a name in the text field if they wish to save the controller profile
+            [savedAlertController addAction:[UIAlertAction actionWithTitle:@"OK" style:UIAlertActionStyleDefault handler:^(UIAlertAction *action) { // show pop up notification letting user know they must enter a name in the text field if they wish to save the controller profile
                 
                 [savedAlertController dismissViewControllerAnimated:NO completion:^{
                     [self presentViewController:inputNameAlertController animated:YES completion:nil];
@@ -242,13 +242,13 @@
             [self presentViewController:savedAlertController animated:YES completion:nil];
         }
         else if ([self->profilesManager profileNameAlreadyExist:enteredProfileName] == YES) {  // if the entered profile name already exists then let the user know. Offer to allow them to overwrite the existing profile
-            UIAlertController * savedAlertController = [UIAlertController alertControllerWithTitle: [NSString stringWithFormat:@""] message: [NSString stringWithFormat:@"Another profile with the name '%@' already exists! Do you want to overwrite it?", enteredProfileName] preferredStyle:UIAlertControllerStyleAlert];
+            UIAlertController * savedAlertController = [UIAlertController alertControllerWithTitle: [NSString stringWithFormat:@""] message: [NSString stringWithFormat:@"此名称的配置 '%@' 已存在，是否覆盖?", enteredProfileName] preferredStyle:UIAlertControllerStyleAlert];
             
-            [savedAlertController addAction:[UIAlertAction actionWithTitle:@"Yes" style:UIAlertActionStyleDefault handler:^(UIAlertAction *action) {    // overwrite existing profile
+            [savedAlertController addAction:[UIAlertAction actionWithTitle:@"是" style:UIAlertActionStyleDefault handler:^(UIAlertAction *action) {    // overwrite existing profile
                 [self->profilesManager saveProfileWithName: enteredProfileName andButtonLayers:self.layoutOSC.OSCButtonLayers];
             }]];
             
-            [savedAlertController addAction:[UIAlertAction actionWithTitle:@"No" style:UIAlertActionStyleDefault handler:^(UIAlertAction *action) { // don't overwrite the existing profile
+            [savedAlertController addAction:[UIAlertAction actionWithTitle:@"否" style:UIAlertActionStyleDefault handler:^(UIAlertAction *action) { // don't overwrite the existing profile
                 [savedAlertController dismissViewControllerAnimated:NO completion:nil];
             }]];
             [self presentViewController:savedAlertController animated:YES completion:nil];
@@ -257,15 +257,15 @@
             [self->profilesManager saveProfileWithName: enteredProfileName andButtonLayers:self.layoutOSC.OSCButtonLayers];
             [self->profilesManager setProfileToSelected: enteredProfileName];
             
-            UIAlertController * savedAlertController = [UIAlertController alertControllerWithTitle: [NSString stringWithFormat:@""] message: [NSString stringWithFormat:@"%@ profile saved and set as your active in-game controller profile layout", enteredProfileName] preferredStyle:UIAlertControllerStyleAlert];  // Let user know this profile has been saved and is now the selected controller layout
+            UIAlertController * savedAlertController = [UIAlertController alertControllerWithTitle: [NSString stringWithFormat:@""] message: [NSString stringWithFormat:@"%@ 配置文件已保存并设置为游戏内控制器配置文件布局", enteredProfileName] preferredStyle:UIAlertControllerStyleAlert];  // Let user know this profile has been saved and is now the selected controller layout
             
-            [savedAlertController addAction:[UIAlertAction actionWithTitle:@"Ok" style:UIAlertActionStyleDefault handler:^(UIAlertAction *action) {
+            [savedAlertController addAction:[UIAlertAction actionWithTitle:@"OK" style:UIAlertActionStyleDefault handler:^(UIAlertAction *action) {
                 [savedAlertController dismissViewControllerAnimated:NO completion:nil];
             }]];
             [self presentViewController:savedAlertController animated:YES completion:nil];
         }
     }]];
-    [inputNameAlertController addAction:[UIAlertAction actionWithTitle:@"Cancel" style:UIAlertActionStyleDefault handler:^(UIAlertAction *action) { // adds a button that allows user to decline the option to save the controller layout they currently see on screen
+    [inputNameAlertController addAction:[UIAlertAction actionWithTitle:@"取消" style:UIAlertActionStyleDefault handler:^(UIAlertAction *action) { // adds a button that allows user to decline the option to save the controller layout they currently see on screen
         [inputNameAlertController dismissViewControllerAnimated:NO completion:nil];
     }]];
     [self presentViewController:inputNameAlertController animated:YES completion:nil];

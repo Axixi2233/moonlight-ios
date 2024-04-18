@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <document type="com.apple.InterfaceBuilder3.CocoaTouch.Storyboard.XIB" version="3.0" toolsVersion="22505" targetRuntime="iOS.CocoaTouch" propertyAccessControl="none" useAutolayout="YES" colorMatched="YES" initialViewController="DL0-L5-LOv">
-    <device id="retina6_1" orientation="portrait" appearance="light"/>
+    <device id="retina6_1" orientation="landscape" appearance="light"/>
     <dependencies>
         <deployment identifier="iOS"/>
         <plugIn identifier="com.apple.InterfaceBuilder.IBCocoaTouchPlugin" version="22504"/>
@@ -13,7 +13,7 @@
             <objects>
                 <viewController id="dgh-JZ-Q7z" customClass="MainFrameViewController" sceneMemberID="viewController">
                     <collectionView key="view" clipsSubviews="YES" multipleTouchEnabled="YES" contentMode="scaleToFill" dataMode="prototypes" id="Rtu-AT-Alw" customClass="AppCollectionView">
-                        <rect key="frame" x="0.0" y="0.0" width="414" height="804"/>
+                        <rect key="frame" x="0.0" y="0.0" width="896" height="370"/>
                         <autoresizingMask key="autoresizingMask" widthSizable="YES" heightSizable="YES"/>
                         <color key="backgroundColor" red="0.3333333432674408" green="0.3333333432674408" blue="0.3333333432674408" alpha="1" colorSpace="custom" customColorSpace="sRGB"/>
                         <collectionViewFlowLayout key="collectionViewLayout" minimumLineSpacing="15" minimumInteritemSpacing="15" id="YcZ-cR-3tK">
@@ -61,7 +61,7 @@
                         <viewControllerLayoutGuide type="bottom" id="iBq-4E-Dbr"/>
                     </layoutGuides>
                     <view key="view" contentMode="scaleToFill" id="Usg-e0-g4a">
-                        <rect key="frame" x="0.0" y="0.0" width="414" height="896"/>
+                        <rect key="frame" x="0.0" y="0.0" width="896" height="414"/>
                         <autoresizingMask key="autoresizingMask" widthSizable="YES" heightSizable="YES"/>
                         <color key="backgroundColor" red="1" green="1" blue="1" alpha="1" colorSpace="custom" customColorSpace="sRGB"/>
                     </view>
@@ -190,23 +190,6 @@
                                 <color key="textColor" red="0.93902439019999995" green="0.9625305918" blue="1" alpha="1" colorSpace="custom" customColorSpace="sRGB"/>
                                 <nil key="highlightedColor"/>
                             </label>
-                            <label opaque="NO" userInteractionEnabled="NO" contentMode="left" horizontalHuggingPriority="251" verticalHuggingPriority="251" fixedFrame="YES" text="Statistics Overlay" textAlignment="natural" lineBreakMode="tailTruncation" baselineAdjustment="alignBaselines" adjustsFontSizeToFit="NO" translatesAutoresizingMaskIntoConstraints="NO" id="WtB-ib-ZDj">
-                                <rect key="frame" x="20" y="950" width="186" height="21"/>
-                                <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMaxY="YES"/>
-                                <fontDescription key="fontDescription" type="boldSystem" pointSize="17"/>
-                                <color key="textColor" red="0.93902439019999995" green="0.9625305918" blue="1" alpha="1" colorSpace="custom" customColorSpace="sRGB"/>
-                                <nil key="highlightedColor"/>
-                            </label>
-                            <segmentedControl opaque="NO" contentMode="scaleToFill" fixedFrame="YES" contentHorizontalAlignment="left" contentVerticalAlignment="top" segmentControlStyle="plain" selectedSegmentIndex="0" translatesAutoresizingMaskIntoConstraints="NO" id="rdz-eg-2oR" userLabel="Statistics Overlay Selector">
-                                <rect key="frame" x="16" y="943" width="450" height="28"/>
-                                <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMaxY="YES"/>
-                                <segments>
-                                    <segment title="No"/>
-                                    <segment title="Yes"/>
-                                </segments>
-                                <color key="tintColor" red="0.6716768742" green="0.61711704730000005" blue="0.99902987480000005" alpha="1" colorSpace="custom" customColorSpace="sRGB"/>
-                                <color key="selectedSegmentTintColor" red="0.6716768742" green="0.61711704730000005" blue="0.99902987480000005" alpha="1" colorSpace="custom" customColorSpace="sRGB"/>
-                            </segmentedControl>
                             <segmentedControl opaque="NO" contentMode="scaleToFill" fixedFrame="YES" contentHorizontalAlignment="left" contentVerticalAlignment="top" segmentControlStyle="plain" selectedSegmentIndex="1" translatesAutoresizingMaskIntoConstraints="NO" id="Gob-Lu-b1y" userLabel="Optimize Settings Selector">
                                 <rect key="frame" x="20" y="430" width="450" height="28"/>
                                 <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMaxY="YES"/>
@@ -336,15 +319,32 @@
                                 <color key="tintColor" red="0.6716768742" green="0.61711704730000005" blue="0.99902987480000005" alpha="1" colorSpace="custom" customColorSpace="sRGB"/>
                                 <color key="selectedSegmentTintColor" red="0.6716768742" green="0.61711704730000005" blue="0.99902987480000005" alpha="1" colorSpace="custom" customColorSpace="sRGB"/>
                             </segmentedControl>
+                            <label opaque="NO" userInteractionEnabled="NO" contentMode="left" horizontalHuggingPriority="251" verticalHuggingPriority="251" fixedFrame="YES" text="Statistics Overlay" textAlignment="natural" lineBreakMode="tailTruncation" baselineAdjustment="alignBaselines" adjustsFontSizeToFit="NO" translatesAutoresizingMaskIntoConstraints="NO" id="WtB-ib-ZDj">
+                                <rect key="frame" x="20" y="908" width="186" height="21"/>
+                                <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMaxY="YES"/>
+                                <fontDescription key="fontDescription" type="boldSystem" pointSize="17"/>
+                                <color key="textColor" red="0.93902439019999995" green="0.9625305918" blue="1" alpha="1" colorSpace="custom" customColorSpace="sRGB"/>
+                                <nil key="highlightedColor"/>
+                            </label>
+                            <segmentedControl opaque="NO" contentMode="scaleToFill" fixedFrame="YES" contentHorizontalAlignment="left" contentVerticalAlignment="top" segmentControlStyle="plain" selectedSegmentIndex="0" translatesAutoresizingMaskIntoConstraints="NO" id="rdz-eg-2oR" userLabel="Statistics Overlay Selector">
+                                <rect key="frame" x="16" y="938" width="450" height="28"/>
+                                <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMaxY="YES"/>
+                                <segments>
+                                    <segment title="No"/>
+                                    <segment title="Yes"/>
+                                </segments>
+                                <color key="tintColor" red="0.6716768742" green="0.61711704730000005" blue="0.99902987480000005" alpha="1" colorSpace="custom" customColorSpace="sRGB"/>
+                                <color key="selectedSegmentTintColor" red="0.6716768742" green="0.61711704730000005" blue="0.99902987480000005" alpha="1" colorSpace="custom" customColorSpace="sRGB"/>
+                            </segmentedControl>
                             <label opaque="NO" userInteractionEnabled="NO" contentMode="left" horizontalHuggingPriority="251" verticalHuggingPriority="251" fixedFrame="YES" text="使用iPhone震动" textAlignment="natural" lineBreakMode="tailTruncation" baselineAdjustment="alignBaselines" adjustsFontSizeToFit="NO" translatesAutoresizingMaskIntoConstraints="NO" id="Koh-no-vpX">
-                                <rect key="frame" x="20" y="930" width="208" height="21"/>
+                                <rect key="frame" x="20" y="968" width="208" height="21"/>
                                 <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMaxY="YES"/>
                                 <fontDescription key="fontDescription" type="boldSystem" pointSize="17"/>
                                 <color key="textColor" red="0.93902439019999995" green="0.9625305918" blue="1" alpha="1" colorSpace="custom" customColorSpace="sRGB"/>
                                 <nil key="highlightedColor"/>
                             </label>
                             <segmentedControl opaque="NO" contentMode="scaleToFill" fixedFrame="YES" contentHorizontalAlignment="left" contentVerticalAlignment="top" segmentControlStyle="plain" selectedSegmentIndex="0" translatesAutoresizingMaskIntoConstraints="NO" id="u0Z-iC-J9i" userLabel="iPhone Rumble selector">
-                                <rect key="frame" x="16" y="958" width="450" height="28"/>
+                                <rect key="frame" x="16" y="998" width="450" height="28"/>
                                 <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMaxY="YES"/>
                                 <segments>
                                     <segment title="NO"/>
@@ -354,14 +354,14 @@
                                 <color key="selectedSegmentTintColor" red="0.6716768742" green="0.61711704730000005" blue="0.99902987480000005" alpha="1" colorSpace="custom" customColorSpace="sRGB"/>
                             </segmentedControl>
                             <label opaque="NO" userInteractionEnabled="NO" contentMode="left" horizontalHuggingPriority="251" verticalHuggingPriority="251" fixedFrame="YES" text="多点触控（切换到Touchscreen）" textAlignment="natural" lineBreakMode="tailTruncation" baselineAdjustment="alignBaselines" adjustsFontSizeToFit="NO" translatesAutoresizingMaskIntoConstraints="NO" id="KCf-Pg-p0w">
-                                <rect key="frame" x="20" y="998" width="208" height="21"/>
+                                <rect key="frame" x="20" y="1028" width="260" height="21"/>
                                 <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMaxY="YES"/>
                                 <fontDescription key="fontDescription" type="boldSystem" pointSize="17"/>
                                 <color key="textColor" red="0.93902439019999995" green="0.9625305918" blue="1" alpha="1" colorSpace="custom" customColorSpace="sRGB"/>
                                 <nil key="highlightedColor"/>
                             </label>
                             <segmentedControl opaque="NO" contentMode="scaleToFill" fixedFrame="YES" contentHorizontalAlignment="left" contentVerticalAlignment="top" segmentControlStyle="plain" selectedSegmentIndex="0" translatesAutoresizingMaskIntoConstraints="NO" id="QQm-Du-EW2" userLabel="multiTouchScreen selector">
-                                <rect key="frame" x="16" y="1026" width="450" height="28"/>
+                                <rect key="frame" x="16" y="1058" width="450" height="28"/>
                                 <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMaxY="YES"/>
                                 <segments>
                                     <segment title="NO"/>
@@ -371,14 +371,14 @@
                                 <color key="selectedSegmentTintColor" red="0.6716768742" green="0.61711704730000005" blue="0.99902987480000005" alpha="1" colorSpace="custom" customColorSpace="sRGB"/>
                             </segmentedControl>
                             <label opaque="NO" userInteractionEnabled="NO" contentMode="left" horizontalHuggingPriority="251" verticalHuggingPriority="251" fixedFrame="YES" text="外接显示器模式" textAlignment="natural" lineBreakMode="tailTruncation" baselineAdjustment="alignBaselines" adjustsFontSizeToFit="NO" translatesAutoresizingMaskIntoConstraints="NO" id="hWl-Ne-8yq">
-                                <rect key="frame" x="20" y="1066" width="208" height="21"/>
+                                <rect key="frame" x="20" y="1088" width="208" height="21"/>
                                 <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMaxY="YES"/>
                                 <fontDescription key="fontDescription" type="boldSystem" pointSize="17"/>
                                 <color key="textColor" red="0.93902439019999995" green="0.9625305918" blue="1" alpha="1" colorSpace="custom" customColorSpace="sRGB"/>
                                 <nil key="highlightedColor"/>
                             </label>
                             <segmentedControl opaque="NO" contentMode="scaleToFill" fixedFrame="YES" contentHorizontalAlignment="left" contentVerticalAlignment="top" segmentControlStyle="plain" selectedSegmentIndex="0" translatesAutoresizingMaskIntoConstraints="NO" id="rY3-it-8en" userLabel="externalMonitor selector">
-                                <rect key="frame" x="16" y="1094" width="450" height="28"/>
+                                <rect key="frame" x="16" y="1118" width="450" height="28"/>
                                 <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMaxY="YES"/>
                                 <segments>
                                     <segment title="NO"/>
@@ -416,7 +416,7 @@
                 </viewController>
                 <placeholder placeholderIdentifier="IBFirstResponder" id="RWc-Km-KG5" userLabel="First Responder" sceneMemberID="firstResponder"/>
             </objects>
-            <point key="canvasLocation" x="535" y="1487"/>
+            <point key="canvasLocation" x="534.78260869565224" y="1486.6071428571429"/>
         </scene>
         <!--Layout On Screen Controls View Controller-->
         <scene sceneID="12Q-19-wOu">
@@ -427,14 +427,14 @@
                         <viewControllerLayoutGuide type="bottom" id="vqH-XO-KOV"/>
                     </layoutGuides>
                     <view key="view" contentMode="scaleToFill" id="qLt-go-aMf">
-                        <rect key="frame" x="0.0" y="0.0" width="414" height="896"/>
+                        <rect key="frame" x="0.0" y="0.0" width="896" height="414"/>
                         <autoresizingMask key="autoresizingMask" widthSizable="YES" heightSizable="YES"/>
                         <subviews>
                             <view alpha="0.75" contentMode="scaleToFill" translatesAutoresizingMaskIntoConstraints="NO" id="Wzt-tm-tiU" customClass="ToolBarContainerView">
-                                <rect key="frame" x="0.0" y="0.0" width="414" height="50"/>
+                                <rect key="frame" x="0.0" y="0.0" width="896" height="50"/>
                                 <subviews>
                                     <stackView opaque="NO" contentMode="scaleAspectFill" alignment="center" spacing="70" translatesAutoresizingMaskIntoConstraints="NO" id="bg4-Wl-MSl">
-                                        <rect key="frame" x="-58" y="0.0" width="530" height="50"/>
+                                        <rect key="frame" x="183" y="0.0" width="530" height="50"/>
                                         <subviews>
                                             <button opaque="NO" tag="20" contentMode="scaleToFill" contentHorizontalAlignment="center" contentVerticalAlignment="center" lineBreakMode="middleTruncation" translatesAutoresizingMaskIntoConstraints="NO" id="jfa-1m-Wpy" userLabel="Trash">
                                                 <rect key="frame" x="0.0" y="0.0" width="50" height="50"/>
@@ -444,8 +444,8 @@
                                                 </constraints>
                                                 <color key="tintColor" red="0.6705882353" green="0.61711704730000005" blue="0.99902987480000005" alpha="1" colorSpace="custom" customColorSpace="sRGB"/>
                                                 <inset key="imageEdgeInsets" minX="0.0" minY="0.0" maxX="2.2250738585072014e-308" maxY="0.0"/>
-                                                <state key="normal" image="Trash">
-                                                    <preferredSymbolConfiguration key="preferredSymbolConfiguration" configurationType="pointSize" pointSize="64"/>
+                                                <state key="normal" title="删除">
+                                                    <color key="titleColor" red="0.64438396689999999" green="0.60211223359999999" blue="0.8937434554" alpha="1" colorSpace="custom" customColorSpace="sRGB"/>
                                                 </state>
                                                 <connections>
                                                     <action selector="trashCanTapped:" destination="Uax-cc-nDz" eventType="touchUpInside" id="qs5-qK-ahS"/>
@@ -459,8 +459,8 @@
                                                 </constraints>
                                                 <color key="tintColor" red="0.6705882353" green="0.61568627450000002" blue="1" alpha="1" colorSpace="custom" customColorSpace="sRGB"/>
                                                 <inset key="imageEdgeInsets" minX="0.0" minY="0.0" maxX="2.2250738585072014e-308" maxY="0.0"/>
-                                                <state key="normal" image="ArrowBackward">
-                                                    <preferredSymbolConfiguration key="preferredSymbolConfiguration" configurationType="pointSize" pointSize="64"/>
+                                                <state key="normal" title="撤销">
+                                                    <color key="titleColor" red="0.64438396689999999" green="0.60211223359999999" blue="0.8937434554" alpha="1" colorSpace="custom" customColorSpace="sRGB"/>
                                                 </state>
                                                 <connections>
                                                     <action selector="undoTapped:" destination="Uax-cc-nDz" eventType="touchUpInside" id="3nt-vO-1FK"/>
@@ -478,9 +478,7 @@
                                                 <fontDescription key="fontDescription" type="system" pointSize="18"/>
                                                 <color key="tintColor" red="0.6705882353" green="0.61568627450000002" blue="1" alpha="1" colorSpace="custom" customColorSpace="sRGB"/>
                                                 <inset key="imageEdgeInsets" minX="0.0" minY="0.0" maxX="2.2250738585072014e-308" maxY="0.0"/>
-                                                <state key="normal" image="SquareAndArrowDown">
-                                                    <preferredSymbolConfiguration key="preferredSymbolConfiguration" configurationType="pointSize" pointSize="64"/>
-                                                </state>
+                                                <state key="normal" title="保存"/>
                                                 <connections>
                                                     <action selector="saveTapped:" destination="Uax-cc-nDz" eventType="touchUpInside" id="Qce-VU-znX"/>
                                                 </connections>
@@ -491,11 +489,10 @@
                                                     <constraint firstAttribute="height" constant="50" id="O5z-qo-LSW"/>
                                                     <constraint firstAttribute="width" constant="50" id="rNi-A9-7N6"/>
                                                 </constraints>
+                                                <fontDescription key="fontDescription" type="system" pointSize="18"/>
                                                 <color key="tintColor" red="0.6705882353" green="0.61568627450000002" blue="1" alpha="1" colorSpace="custom" customColorSpace="sRGB"/>
                                                 <inset key="imageEdgeInsets" minX="0.0" minY="0.0" maxX="2.2250738585072014e-308" maxY="0.0"/>
-                                                <state key="normal" image="SquaresArrowUp">
-                                                    <preferredSymbolConfiguration key="preferredSymbolConfiguration" configurationType="pointSize" pointSize="64"/>
-                                                </state>
+                                                <state key="normal" title="加载"/>
                                                 <connections>
                                                     <action selector="loadTapped:" destination="Uax-cc-nDz" eventType="touchUpInside" id="7yr-cC-91S"/>
                                                 </connections>
@@ -506,7 +503,7 @@
                                         </constraints>
                                     </stackView>
                                     <view alpha="0.90000000000000002" contentMode="scaleToFill" translatesAutoresizingMaskIntoConstraints="NO" id="VOd-OY-x7s" userLabel="Chevron View">
-                                        <rect key="frame" x="181" y="50" width="52" height="25"/>
+                                        <rect key="frame" x="422" y="50" width="52" height="25"/>
                                         <subviews>
                                             <imageView clipsSubviews="YES" contentMode="center" horizontalHuggingPriority="251" verticalHuggingPriority="251" image="ChevronCompactUp" translatesAutoresizingMaskIntoConstraints="NO" id="JIU-0y-IHy">
                                                 <rect key="frame" x="0.0" y="0.0" width="52" height="25"/>
@@ -534,11 +531,11 @@
                                 </constraints>
                             </view>
                             <button opaque="NO" tag="40" contentMode="scaleToFill" contentHorizontalAlignment="center" contentVerticalAlignment="center" buttonType="system" lineBreakMode="middleTruncation" translatesAutoresizingMaskIntoConstraints="NO" id="cRZ-7v-e7c">
-                                <rect key="frame" x="25" y="5" width="30" height="47"/>
-                                <fontDescription key="fontDescription" name="ArialRoundedMTBold" family="Arial Rounded MT Bold" pointSize="30"/>
+                                <rect key="frame" x="25" y="5" width="37" height="34"/>
+                                <fontDescription key="fontDescription" type="system" pointSize="18"/>
                                 <color key="tintColor" red="0.6705882353" green="0.61568627450000002" blue="1" alpha="1" colorSpace="custom" customColorSpace="sRGB"/>
                                 <inset key="imageEdgeInsets" minX="0.0" minY="0.0" maxX="2.2250738585072014e-308" maxY="0.0"/>
-                                <state key="normal" title="x"/>
+                                <state key="normal" title="关闭"/>
                                 <connections>
                                     <action selector="closeTapped:" destination="Uax-cc-nDz" eventType="touchUpInside" id="8rt-nE-yf1"/>
                                 </connections>
@@ -576,27 +573,27 @@
                         <viewControllerLayoutGuide type="bottom" id="BBd-il-6dy"/>
                     </layoutGuides>
                     <view key="view" contentMode="scaleToFill" id="7gC-Aq-O0x">
-                        <rect key="frame" x="0.0" y="0.0" width="414" height="896"/>
+                        <rect key="frame" x="0.0" y="0.0" width="896" height="414"/>
                         <autoresizingMask key="autoresizingMask" widthSizable="YES" heightSizable="YES"/>
                         <subviews>
                             <tableView clipsSubviews="YES" contentMode="scaleToFill" alwaysBounceVertical="YES" dataMode="prototypes" style="plain" separatorStyle="default" rowHeight="-1" estimatedRowHeight="-1" sectionHeaderHeight="-1" estimatedSectionHeaderHeight="-1" sectionFooterHeight="-1" estimatedSectionFooterHeight="-1" translatesAutoresizingMaskIntoConstraints="NO" id="ez3-kV-Srk">
-                                <rect key="frame" x="0.0" y="48" width="414" height="848"/>
+                                <rect key="frame" x="0.0" y="0.0" width="896" height="414"/>
                                 <color key="backgroundColor" red="0.1215686275" green="0.12941176469999999" blue="0.14117647059999999" alpha="1" colorSpace="custom" customColorSpace="sRGB"/>
                                 <color key="sectionIndexBackgroundColor" white="1" alpha="1" colorSpace="custom" customColorSpace="genericGamma22GrayColorSpace"/>
                             </tableView>
                             <navigationBar contentMode="scaleToFill" translatesAutoresizingMaskIntoConstraints="NO" id="KVR-Ly-40f">
-                                <rect key="frame" x="0.0" y="48" width="414" height="44"/>
+                                <rect key="frame" x="0.0" y="0.0" width="896" height="44"/>
                                 <constraints>
                                     <constraint firstAttribute="height" constant="44" id="TsX-5e-gco"/>
                                 </constraints>
                                 <items>
-                                    <navigationItem title="On Screen Controller Profiles" id="epN-zZ-lvG">
-                                        <barButtonItem key="leftBarButtonItem" systemItem="cancel" id="FRj-P0-wAo">
+                                    <navigationItem title="配置布局方案" id="epN-zZ-lvG">
+                                        <barButtonItem key="leftBarButtonItem" title="取消" id="FRj-P0-wAo">
                                             <connections>
                                                 <action selector="cancelTapped:" destination="K3X-30-gSc" id="uUd-7j-Hg6"/>
                                             </connections>
                                         </barButtonItem>
-                                        <barButtonItem key="rightBarButtonItem" title="Load" style="plain" id="5jM-Ee-UPo">
+                                        <barButtonItem key="rightBarButtonItem" title="应用" style="plain" id="5jM-Ee-UPo">
                                             <connections>
                                                 <action selector="loadTapped:" destination="K3X-30-gSc" id="cSA-Il-Y1v"/>
                                             </connections>
@@ -629,7 +626,7 @@
             <objects>
                 <navigationController id="ftZ-kC-fxI" sceneMemberID="viewController">
                     <navigationBar key="navigationBar" contentMode="scaleToFill" barStyle="black" translucent="NO" id="0ZA-Ec-QgD">
-                        <rect key="frame" x="0.0" y="48" width="414" height="44"/>
+                        <rect key="frame" x="0.0" y="0.0" width="896" height="44"/>
                         <autoresizingMask key="autoresizingMask"/>
                         <color key="backgroundColor" red="0.66666668653488159" green="0.66666668653488159" blue="0.66666668653488159" alpha="1" colorSpace="custom" customColorSpace="sRGB"/>
                         <color key="barTintColor" red="0.66666668653488159" green="0.66666668653488159" blue="0.66666668653488159" alpha="1" colorSpace="custom" customColorSpace="sRGB"/>
@@ -654,7 +651,7 @@
                         <viewControllerLayoutGuide type="bottom" id="kcN-yf-dtN"/>
                     </layoutGuides>
                     <view key="view" multipleTouchEnabled="YES" contentMode="scaleToFill" id="p4u-yn-VXk">
-                        <rect key="frame" x="0.0" y="0.0" width="414" height="896"/>
+                        <rect key="frame" x="0.0" y="0.0" width="896" height="414"/>
                         <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMaxY="YES"/>
                         <color key="backgroundColor" red="0.3333357871" green="0.33332890269999998" blue="0.33333355190000002" alpha="1" colorSpace="custom" customColorSpace="displayP3"/>
                     </view>
@@ -676,11 +673,11 @@
                         <viewControllerLayoutGuide type="bottom" id="hby-2y-jAk"/>
                     </layoutGuides>
                     <view key="view" opaque="NO" clearsContextBeforeDrawing="NO" contentMode="center" id="nSw-dc-mi4">
-                        <rect key="frame" x="0.0" y="0.0" width="414" height="896"/>
+                        <rect key="frame" x="0.0" y="0.0" width="896" height="414"/>
                         <autoresizingMask key="autoresizingMask" widthSizable="YES" heightSizable="YES"/>
                         <subviews>
                             <activityIndicatorView opaque="NO" contentMode="scaleToFill" horizontalHuggingPriority="750" verticalHuggingPriority="750" fixedFrame="YES" animating="YES" style="whiteLarge" translatesAutoresizingMaskIntoConstraints="NO" id="oNu-Gu-QeM">
-                                <rect key="frame" x="266" y="413" width="37" height="33"/>
+                                <rect key="frame" x="266" y="182" width="37" height="33"/>
                                 <autoresizingMask key="autoresizingMask" flexibleMinY="YES" flexibleMaxY="YES"/>
                             </activityIndicatorView>
                         </subviews>
@@ -696,11 +693,7 @@
         </scene>
     </scenes>
     <resources>
-        <image name="ArrowBackward" width="40" height="40"/>
         <image name="ChevronCompactUp" width="35" height="10"/>
-        <image name="SquareAndArrowDown" width="40" height="40"/>
-        <image name="SquaresArrowUp" width="40" height="40"/>
-        <image name="Trash" width="40" height="40"/>
         <systemColor name="systemBackgroundColor">
             <color white="1" alpha="1" colorSpace="custom" customColorSpace="genericGamma22GrayColorSpace"/>
         </systemColor>
