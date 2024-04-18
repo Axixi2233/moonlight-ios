@@ -562,6 +562,7 @@ BOOL isCustomResolution(CGSize res) {
     BOOL rumblePhone =[self.rumbleiPhoneSelector selectedSegmentIndex] == 1;
     BOOL enableHdr = [self.hdrSelector selectedSegmentIndex] == 1;
     BOOL multiTouchScreen =[self.multiTouchScreenSelector selectedSegmentIndex] == 1;
+    BOOL externalMonitor =[self.externalMonitorSelector selectedSegmentIndex] ==1;
     [dataMan saveSettingsWithBitrate:_bitrate
                            framerate:framerate
                               height:height
@@ -579,7 +580,8 @@ BOOL isCustomResolution(CGSize res) {
                    absoluteTouchMode:absoluteTouchMode
                         statsOverlay:statsOverlay
                          rumblePhone:rumblePhone
-                    multiTouchScreen:multiTouchScreen];
+                    multiTouchScreen:multiTouchScreen
+                     externalMonitor:externalMonitor];
 }
 
 - (void)didReceiveMemoryWarning {

@@ -69,7 +69,8 @@
                absoluteTouchMode:(BOOL)absoluteTouchMode
                     statsOverlay:(BOOL)statsOverlay
                      rumblePhone:(BOOL)rumblePhone
-                multiTouchScreen:(BOOL)multiTouchScreen{
+                multiTouchScreen:(BOOL)multiTouchScreen
+                 externalMonitor:(BOOL)externalMonitor{
     
     [_managedObjectContext performBlockAndWait:^{
         Settings* settingsToSave = [self retrieveSettings];
@@ -91,6 +92,7 @@
         settingsToSave.statsOverlay = statsOverlay;
         settingsToSave.rumblePhone = rumblePhone;
         settingsToSave.multiTouchScreen = multiTouchScreen;
+        settingsToSave.externalMonitor = externalMonitor;
         [self saveData];
     }];
 }

@@ -8,7 +8,7 @@
 
 #import "VideoDecoderRenderer.h"
 #import "StreamView.h"
-
+#import "DataManager.h"
 #include <libavcodec/avcodec.h>
 #include <libavcodec/cbs.h>
 #include <libavcodec/cbs_av1.h>
@@ -90,6 +90,18 @@ extern int ff_isom_write_av1c(AVIOContext *pb, const uint8_t *buf, int size,
     
     [self reinitializeDisplayLayer];
     
+    TemporarySettings* settings = [[[DataManager alloc] init] getSettings];
+    if (settings.externalMonitor) {
+        //通知外接显示器
+        [[NSNotificationCenter defaultCenter] addObserver:self
+            selector:@selector(reinitializeDisplayLayer)
+              name:@"ScreenConnected"
+              object:nil];
+          [[NSNotificationCenter defaultCenter] addObserver:self
+          selector:@selector(reinitializeDisplayLayer)
+              name:@"ScreenDisconnected"
+            object:nil];
+    }
     return self;
 }
 

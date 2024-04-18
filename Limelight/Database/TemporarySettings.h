@@ -36,6 +36,7 @@
 @property (nonatomic) BOOL statsOverlay;
 @property (nonatomic) BOOL rumblePhone;
 @property (nonatomic) BOOL multiTouchScreen;
+@property (nonatomic) BOOL externalMonitor;
 
 - (id) initFromSettings:(Settings*)settings;
 

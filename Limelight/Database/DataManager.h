@@ -30,7 +30,8 @@
                absoluteTouchMode:(BOOL)absoluteTouchMode
                     statsOverlay:(BOOL)statsOverlay
                      rumblePhone:(BOOL)rumblePhone
-                multiTouchScreen:(BOOL)multiTouchScreen;
+                multiTouchScreen:(BOOL)multiTouchScreen
+                 externalMonitor:(Boolean)externalMonitor;
 
 - (NSArray*) getHosts;
 - (void) updateHost:(TemporaryHost*)host;

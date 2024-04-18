@@ -51,11 +51,37 @@
 #if !TARGET_OS_TV
     UIScreenEdgePanGestureRecognizer *_exitSwipeRecognizer;
 #endif
+    //外接显示器-----------start
+    UIWindow *_extWindow;
+    UIView *_renderView;
+    UIWindow *_deviceWindow;
+    //外接显示器-----------end
 }
 
 - (void)viewDidAppear:(BOOL)animated
 {
     [super viewDidAppear:animated];
+    //外接显示器
+    if(_settings.externalMonitor){
+        _deviceWindow = self.view.window;
+        if (UIScreen.screens.count > 1) {
+              [self prepExtScreen:UIScreen.screens.lastObject];
+          }
+        else {
+            dispatch_async(dispatch_get_main_queue(), ^{
+            [self.view insertSubview:self->_renderView atIndex:0];
+            });
+        }
+        // check to see if external screen is connected/disconnected
+        [[NSNotificationCenter defaultCenter] addObserver: self
+                                                 selector: @selector(extScreenDidConnect:)
+                                                     name: UIScreenDidConnectNotification
+                                                   object: nil];
+        [[NSNotificationCenter defaultCenter] addObserver: self
+                                                 selector: @selector(extScreenDidDisconnect:)
+                                                     name: UIScreenDidDisconnectNotification
+                                                   object: nil];
+    }
     
 #if !TARGET_OS_TV
     [[self revealViewController] setPrimaryViewController:self];
@@ -108,6 +134,13 @@
     _inactivityTimer = nil;
     
     _streamView = [[StreamView alloc] initWithFrame:self.view.frame];
+    
+    //外接显示器
+    if(_settings.externalMonitor){
+        _renderView = (StreamView*)[[UIView alloc] initWithFrame:self.view.frame];
+        _renderView.bounds = _streamView.bounds;
+    }
+    
     [_streamView setupStreamView:_controllerSupport interactionDelegate:self config:self.streamConfig];
     
 #if TARGET_OS_TV
@@ -151,9 +184,17 @@
     _tipLabel.textAlignment = NSTextAlignmentCenter;
     _tipLabel.center = CGPointMake(self.view.frame.size.width / 2, self.view.frame.size.height * 0.9);
     
-    _streamMan = [[StreamManager alloc] initWithConfig:self.streamConfig
-                                            renderView:_streamView
-                                   connectionCallbacks:self];
+    //外接显示器
+    if(_settings.externalMonitor){
+        _streamMan = [[StreamManager alloc] initWithConfig:self.streamConfig
+                                                renderView:_renderView
+                                       connectionCallbacks:self];
+    }else{
+        _streamMan = [[StreamManager alloc] initWithConfig:self.streamConfig
+                                                renderView:_streamView
+                                       connectionCallbacks:self];
+    }
+
     NSOperationQueue* opQueue = [[NSOperationQueue alloc] init];
     [opQueue addOperation:_streamMan];
     
@@ -253,6 +294,54 @@
 }
 #endif
 
+
+//外接显示器----start
+// External Screen connected
+- (void)extScreenDidConnect:(NSNotification *)notification {
+    Log(LOG_I, @"External Screen Connected");
+    dispatch_async(dispatch_get_main_queue(), ^{
+    [self prepExtScreen:notification.object];
+    });
+}
+
+// External Screen disconnected
+- (void)extScreenDidDisconnect:(NSNotification *)notification {
+    Log(LOG_I, @"External Screen Disconnected");
+    if(UIScreen.screens.count < 2)
+    {
+        dispatch_async(dispatch_get_main_queue(), ^{
+        [self removeExtScreen];
+        });
+    }
+}
+
+// Prepare Screen
+- (void)prepExtScreen:(UIScreen*)extScreen {
+    Log(LOG_I, @"Preparing External Screen");
+    CGRect frame = extScreen.bounds;
+    extScreen.overscanCompensation = 3;
+    _extWindow = [[UIWindow alloc] initWithFrame:frame];
+    _extWindow.screen = extScreen;
+    _renderView.bounds = frame;
+    _renderView.frame = frame;
+    NSNotificationCenter* nc = [NSNotificationCenter defaultCenter];
+    [nc postNotificationName:@"ScreenConnected" object:self];
+    [_extWindow addSubview:_renderView];
+    _extWindow.hidden = NO;
+}
+
+- (void)removeExtScreen {
+    Log(LOG_I, @"Removing External Screen");
+    _extWindow.hidden = YES;
+    _renderView.bounds = _deviceWindow.bounds;
+    _renderView.frame = _deviceWindow.frame;
+    NSNotificationCenter* nc = [NSNotificationCenter defaultCenter];
+    [nc postNotificationName:@"ScreenDisconnected" object:self];
+    [self.view insertSubview:_renderView atIndex:0];
+}
+//外接显示器----end
+
+
 - (void)updateStatsOverlay {
     NSString* overlayText = [self->_streamMan getStatsOverlayText];
     
@@ -313,6 +402,8 @@
     _statsUpdateTimer = nil;
     
     [self.navigationController popToRootViewControllerAnimated:YES];
+    _extWindow = nil;
+
 }
 
 // This will fire if the user opens control center or gets a low battery message

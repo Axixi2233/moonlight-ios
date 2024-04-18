@@ -87,6 +87,7 @@
     self.statsOverlay = settings.statsOverlay;
     self.rumblePhone=settings.rumblePhone;
     self.multiTouchScreen=settings.multiTouchScreen;
+    self.externalMonitor=settings.externalMonitor;
 #endif
     self.uniqueId = settings.uniqueId;
     
