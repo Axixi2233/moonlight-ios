@@ -35,6 +35,7 @@
 @property (nonatomic) BOOL absoluteTouchMode;
 @property (nonatomic) BOOL statsOverlay;
 @property (nonatomic) BOOL rumblePhone;
+@property (nonatomic) BOOL multiTouchScreen;
 
 - (id) initFromSettings:(Settings*)settings;
 

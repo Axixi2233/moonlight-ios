@@ -561,6 +561,7 @@ BOOL isCustomResolution(CGSize res) {
     BOOL statsOverlay = [self.statsOverlaySelector selectedSegmentIndex] == 1;
     BOOL rumblePhone =[self.rumbleiPhoneSelector selectedSegmentIndex] == 1;
     BOOL enableHdr = [self.hdrSelector selectedSegmentIndex] == 1;
+    BOOL multiTouchScreen =[self.multiTouchScreenSelector selectedSegmentIndex] == 1;
     [dataMan saveSettingsWithBitrate:_bitrate
                            framerate:framerate
                               height:height
@@ -577,7 +578,8 @@ BOOL isCustomResolution(CGSize res) {
                       btMouseSupport:btMouseSupport
                    absoluteTouchMode:absoluteTouchMode
                         statsOverlay:statsOverlay
-                         rumblePhone:rumblePhone];
+                         rumblePhone:rumblePhone
+                    multiTouchScreen:multiTouchScreen];
 }
 
 - (void)didReceiveMemoryWarning {

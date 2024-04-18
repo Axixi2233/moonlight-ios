@@ -86,6 +86,7 @@
     self.absoluteTouchMode = settings.absoluteTouchMode;
     self.statsOverlay = settings.statsOverlay;
     self.rumblePhone=settings.rumblePhone;
+    self.multiTouchScreen=settings.multiTouchScreen;
 #endif
     self.uniqueId = settings.uniqueId;
     

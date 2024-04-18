@@ -29,7 +29,8 @@
                   btMouseSupport:(BOOL)btMouseSupport
                absoluteTouchMode:(BOOL)absoluteTouchMode
                     statsOverlay:(BOOL)statsOverlay
-                     rumblePhone:(BOOL)rumblePhone;
+                     rumblePhone:(BOOL)rumblePhone
+                multiTouchScreen:(BOOL)multiTouchScreen;
 
 - (NSArray*) getHosts;
 - (void) updateHost:(TemporaryHost*)host;

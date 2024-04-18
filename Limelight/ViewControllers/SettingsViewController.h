@@ -28,6 +28,7 @@
 @property (strong, nonatomic) IBOutlet UISegmentedControl *btMouseSelector;
 @property (strong, nonatomic) IBOutlet UISegmentedControl *statsOverlaySelector;
 @property (strong, nonatomic) IBOutlet UISegmentedControl *rumbleiPhoneSelector;
+@property (strong, nonatomic) IBOutlet UISegmentedControl *multiTouchScreenSelector;
 @property (strong, nonatomic) IBOutlet UIScrollView *scrollView;
 @property (strong, nonatomic) LayoutOnScreenControlsViewController *layoutOnScreenControlsVC;
 

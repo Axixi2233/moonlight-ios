@@ -30,6 +30,7 @@
         <attribute name="framerate" attributeType="Integer 32" defaultValueString="60" usesScalarValueType="NO" syncable="YES"/>
         <attribute name="height" attributeType="Integer 32" defaultValueString="720" usesScalarValueType="NO" syncable="YES"/>
         <attribute name="multiController" attributeType="Boolean" defaultValueString="YES" usesScalarValueType="YES" syncable="YES"/>
+        <attribute name="multiTouchScreen" attributeType="Boolean" defaultValueString="NO" usesScalarValueType="YES" syncable="YES"/>
         <attribute name="onscreenControls" attributeType="Integer 32" defaultValueString="1" usesScalarValueType="NO" syncable="YES"/>
         <attribute name="optimizeGames" attributeType="Boolean" defaultValueString="YES" usesScalarValueType="YES" syncable="YES"/>
         <attribute name="playAudioOnPC" attributeType="Boolean" defaultValueString="NO" usesScalarValueType="YES" syncable="YES"/>

@@ -68,7 +68,8 @@
                   btMouseSupport:(BOOL)btMouseSupport
                absoluteTouchMode:(BOOL)absoluteTouchMode
                     statsOverlay:(BOOL)statsOverlay
-                     rumblePhone:(BOOL)rumblePhone{
+                     rumblePhone:(BOOL)rumblePhone
+                multiTouchScreen:(BOOL)multiTouchScreen{
     
     [_managedObjectContext performBlockAndWait:^{
         Settings* settingsToSave = [self retrieveSettings];
@@ -89,6 +90,7 @@
         settingsToSave.absoluteTouchMode = absoluteTouchMode;
         settingsToSave.statsOverlay = statsOverlay;
         settingsToSave.rumblePhone = rumblePhone;
+        settingsToSave.multiTouchScreen = multiTouchScreen;
         [self saveData];
     }];
 }

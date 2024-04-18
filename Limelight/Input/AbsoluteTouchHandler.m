@@ -7,6 +7,7 @@
 //
 
 #import "AbsoluteTouchHandler.h"
+#import "DataManager.h"
 
 #include <Limelight.h>
 
@@ -30,21 +31,27 @@
     CGPoint lastTouchDownLocation;
     UITouch* lastTouchUp;
     CGPoint lastTouchUpLocation;
+    TemporarySettings* settings;
 }
 
 - (id)initWithView:(StreamView*)view {
     self = [self init];
     self->view = view;
+    self->settings= [[[DataManager alloc] init] getSettings];
     return self;
 }
 
 - (void)onLongPressStart:(NSTimer*)timer {
+   
     // Raise the left click and start a right click
     LiSendMouseButtonEvent(BUTTON_ACTION_RELEASE, BUTTON_LEFT);
     LiSendMouseButtonEvent(BUTTON_ACTION_PRESS, BUTTON_RIGHT);
 }
 
 - (void)touchesBegan:(NSSet *)touches withEvent:(UIEvent *)event {
+    if (settings.multiTouchScreen) {
+        return;
+    }
     // Ignore touch down events with more than one finger
     if ([[event allTouches] count] > 1) {
         return;
@@ -75,6 +82,9 @@
 }
 
 - (void)touchesMoved:(NSSet *)touches withEvent:(UIEvent *)event {
+    if (settings.multiTouchScreen) {
+        return;
+    }
     // Ignore touch move events with more than one finger
     if ([[event allTouches] count] > 1) {
         return;
@@ -94,6 +104,9 @@
 }
 
 - (void)touchesEnded:(NSSet *)touches withEvent:(UIEvent *)event {
+    if (settings.multiTouchScreen) {
+        return;
+    }
     // Only fire this logic if all touches have ended
     if ([[event allTouches] count] == [touches count]) {
         // Cancel the long press timer
@@ -113,6 +126,9 @@
 }
 
 - (void)touchesCancelled:(NSSet *)touches withEvent:(UIEvent *)event {
+    if (settings.multiTouchScreen) {
+        return;
+    }
     // Treat this as a normal touchesEnded event
     [self touchesEnded:touches withEvent:event];
 }

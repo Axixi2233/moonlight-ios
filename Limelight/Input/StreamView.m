@@ -14,6 +14,7 @@
 #import "RelativeTouchHandler.h"
 #import "AbsoluteTouchHandler.h"
 #import "KeyboardInputField.h"
+#import "zlib.h" //to implement crc32 checksum
 
 static const double X1_MOUSE_SPEED_DIVISOR = 2.5;
 
@@ -42,7 +43,7 @@ static const double X1_MOUSE_SPEED_DIVISOR = 2.5;
     id<UserInteractionDelegate> interactionDelegate;
     NSTimer* interactionTimer;
     BOOL hasUserInteracted;
-    
+    TemporarySettings* settings;
     NSDictionary<NSString *, NSNumber *> *dictCodes;
 }
 
@@ -51,8 +52,7 @@ static const double X1_MOUSE_SPEED_DIVISOR = 2.5;
                   config:(StreamConfiguration*)streamConfig {
     self->interactionDelegate = interactionDelegate;
     self->streamAspectRatio = (float)streamConfig.width / (float)streamConfig.height;
-    
-    TemporarySettings* settings = [[[DataManager alloc] init] getSettings];
+    self->settings = [[[DataManager alloc] init] getSettings];
     
     keysDown = [[NSMutableSet alloc] init];
     keyInputField = [[KeyboardInputField alloc] initWithFrame:CGRectZero];
@@ -240,6 +240,46 @@ static const double X1_MOUSE_SPEED_DIVISOR = 2.5;
     return 90 - MIN(90, altitudeDegs);
 }
 
+// convert 64bit pointer to CRC32 checksum
+- (uint32_t)crc32OfUint64:(uint64_t)value {
+    // uint64_t可以被视为字符数组来计算CRC32
+    char data[sizeof(value)];
+    memcpy(data, &value, sizeof(value));
+    uint32_t crc = crc32(0, Z_NULL, 0);
+    crc = crc32(crc, (const Bytef *)data, sizeof(value));
+    return crc;
+}
+
+- (BOOL)trySendTouchEvent:(UITouch*)event{
+    uint8_t type;
+    switch (event.phase) {
+        case UITouchPhaseBegan://开始触摸
+            type = LI_TOUCH_EVENT_DOWN;
+            break;
+        case UITouchPhaseMoved://移动
+            type = LI_TOUCH_EVENT_MOVE;
+            break;
+        case UITouchPhaseEnded://触摸结束
+            type = LI_TOUCH_EVENT_UP;
+            break;
+        case UITouchPhaseCancelled://触摸取消
+            type = LI_TOUCH_EVENT_CANCEL_ALL;
+//            NSLog(@"trySendTouchEvent UITouchPhaseCancelled %d,%d",(uint32_t)UITouchPhaseCancelled,(uint32_t)event);
+            break;
+        default:
+//            NSLog(@"trySendTouchEvent %ld,%d",(long)event.phase,(uint32_t)event);
+            return NO;
+    }
+    CGPoint location = [self adjustCoordinatesForVideoArea:[event locationInView:self]];
+    CGSize videoSize = [self getVideoAreaSize];
+    // convert pointer event(64bit) to CRC32 checksum as touch pointer ID.
+    // There's no pointerId like Android in definition of iOS touch event "UITouch", we use pointer to UITouch to generate touch pointer ID.
+    // Since touch pointer ID is defined to be uint32_t, I implement CRC32 checksum to the 64bit address, which avoids touch pointer ID repetition.
+    uint32_t pointerId = [self crc32OfUint64:((uint64_t)event)];
+    return LiSendTouchEvent(type,pointerId,location.x / videoSize.width, location.y / videoSize.height,(event.force / event.maximumPossibleForce) / sin(event.altitudeAngle),0.0f, 0.0f,[self getRotationFromAzimuthAngle:[event azimuthAngleInView:self]]);
+}
+
+
 - (BOOL)sendStylusEvent:(UITouch*)event {
     uint8_t type;
     
@@ -332,12 +372,17 @@ static const double X1_MOUSE_SPEED_DIVISOR = 2.5;
     [self startInteractionTimer];
     
 #if !TARGET_OS_TV
-    if (@available(iOS 13.4, *)) {
-        for (UITouch* touch in touches) {
-            if (touch.type == UITouchTypePencil) {
+    for (UITouch* touch in touches) {
+        if (@available(iOS 13.4, *)) {
+            if(touch.type == UITouchTypePencil){
                 if ([self sendStylusEvent:touch]) {
                     return;
                 }
+            }
+        }
+        if (settings.multiTouchScreen) {
+            if([self trySendTouchEvent:touch]){
+                return;
             }
         }
     }
@@ -351,7 +396,7 @@ static const double X1_MOUSE_SPEED_DIVISOR = 2.5;
         // is triggered.
         [touchHandler touchesBegan:touches withEvent:event];
         
-        if ([[event allTouches] count] == 3) {
+        if ([[event allTouches] count] == 5) {
             if (isInputingText) {
                 Log(LOG_D, @"Closing the keyboard");
                 [keyInputField resignFirstResponder];
@@ -510,15 +555,22 @@ static const double X1_MOUSE_SPEED_DIVISOR = 2.5;
 
 - (void)touchesMoved:(NSSet *)touches withEvent:(UIEvent *)event {
 #if !TARGET_OS_TV
-    if (@available(iOS 13.4, *)) {
-        for (UITouch* touch in touches) {
-            if (touch.type == UITouchTypePencil) {
+    
+    for (UITouch* touch in touches) {
+        if (@available(iOS 13.4, *)) {
+            if(touch.type == UITouchTypePencil){
                 if ([self sendStylusEvent:touch]) {
                     return;
                 }
             }
         }
-        
+        if (settings.multiTouchScreen) {
+            if([self trySendTouchEvent:touch]){
+                return;
+            }
+        }
+    }
+    if (@available(iOS 13.4, *)) {
         UITouch *touch = [touches anyObject];
         if (touch.type == UITouchTypeIndirectPointer) {
             if (@available(iOS 14.0, *)) {
@@ -598,12 +650,17 @@ static const double X1_MOUSE_SPEED_DIVISOR = 2.5;
     hasUserInteracted = YES;
     
 #if !TARGET_OS_TV
-    if (@available(iOS 13.4, *)) {
-        for (UITouch* touch in touches) {
-            if (touch.type == UITouchTypePencil) {
+    for (UITouch* touch in touches) {
+        if (@available(iOS 13.4, *)) {
+            if(touch.type == UITouchTypePencil){
                 if ([self sendStylusEvent:touch]) {
                     return;
                 }
+            }
+        }
+        if (settings.multiTouchScreen) {
+            if([self trySendTouchEvent:touch]){
+                return;
             }
         }
     }
@@ -620,10 +677,17 @@ static const double X1_MOUSE_SPEED_DIVISOR = 2.5;
                       forTouches:touches
                        withEvent:event];
 #if !TARGET_OS_TV
-    if (@available(iOS 13.4, *)) {
-        for (UITouch* touch in touches) {
-            if (touch.type == UITouchTypePencil) {
-                [self sendStylusEvent:touch];
+    for (UITouch* touch in touches) {
+        if (@available(iOS 13.4, *)) {
+            if(touch.type == UITouchTypePencil){
+                if ([self sendStylusEvent:touch]) {
+                    return;
+                }
+            }
+        }
+        if (settings.multiTouchScreen) {
+            if([self trySendTouchEvent:touch]){
+                return;
             }
         }
     }
