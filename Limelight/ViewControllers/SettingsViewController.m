@@ -9,6 +9,7 @@
 #import "SettingsViewController.h"
 #import "TemporarySettings.h"
 #import "DataManager.h"
+#import "Utils.h"
 
 #import <VideoToolbox/VideoToolbox.h>
 #import <AVFoundation/AVFoundation.h>
@@ -645,6 +646,11 @@ BOOL isCustomResolution(CGSize res) {
     }
     
     [self OSCSegmentedControlsTapped:self.onscreenControlSelector]; // must call selector because the UIControlEventValueChanged can't work together with UITapGestureRecognizer
+}
+
+
+- (IBAction) openUrlAX:(id)sender {
+    [Utils launchUrl:@"https://space.bilibili.com/16893379"];
 }
 
 @end

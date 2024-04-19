@@ -31,7 +31,7 @@
                     statsOverlay:(BOOL)statsOverlay
                      rumblePhone:(BOOL)rumblePhone
                 multiTouchScreen:(BOOL)multiTouchScreen
-                 externalMonitor:(Boolean)externalMonitor;
+                 externalMonitor:(BOOL)externalMonitor;
 
 - (NSArray*) getHosts;
 - (void) updateHost:(TemporaryHost*)host;
