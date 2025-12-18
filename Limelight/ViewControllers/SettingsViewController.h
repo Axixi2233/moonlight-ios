@@ -30,6 +30,17 @@
 @property (strong, nonatomic) IBOutlet UISegmentedControl *rumbleiPhoneSelector;
 @property (strong, nonatomic) IBOutlet UISegmentedControl *multiTouchScreenSelector;
 @property (strong, nonatomic) IBOutlet UISegmentedControl *externalMonitorSelector;
+//陀螺仪
+@property (strong, nonatomic) IBOutlet UISegmentedControl *motionModeSelector;
+//虚拟显示器
+@property (strong, nonatomic) IBOutlet UISegmentedControl *virtualDisplayModeSelector;
+
+@property (strong, nonatomic) IBOutlet UISegmentedControl *enableTouchSensitivitySelector;
+@property (strong, nonatomic) IBOutlet UISegmentedControl *touchSensitivityGlobalSelector;
+@property (strong, nonatomic) IBOutlet UISlider *touchSensitivity;
+@property (strong, nonatomic) IBOutlet UILabel *touchSensitivityLable;
+
+
 @property (strong, nonatomic) IBOutlet UIScrollView *scrollView;
 @property (strong, nonatomic) LayoutOnScreenControlsViewController *layoutOnScreenControlsVC;
 

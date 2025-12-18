@@ -65,11 +65,11 @@
     if(_settings.externalMonitor){
         _deviceWindow = self.view.window;
         if (UIScreen.screens.count > 1) {
-              [self prepExtScreen:UIScreen.screens.lastObject];
-          }
+            [self prepExtScreen:UIScreen.screens.lastObject];
+        }
         else {
             dispatch_async(dispatch_get_main_queue(), ^{
-            [self.view insertSubview:self->_renderView atIndex:0];
+                [self.view insertSubview:self->_renderView atIndex:0];
             });
         }
         // check to see if external screen is connected/disconnected
@@ -109,6 +109,8 @@
     
     [UIApplication sharedApplication].idleTimerDisabled = YES;
     
+    self.previousBytes = 0;  // 初始化上次字节数为 0
+    
     _settings = [[[DataManager alloc] init] getSettings];
     
     _stageLabel = [[UILabel alloc] init];
@@ -147,7 +149,7 @@
     if (!_menuTapGestureRecognizer || !_menuDoubleTapGestureRecognizer || !_playPauseTapGestureRecognizer) {
         _menuTapGestureRecognizer = [[UITapGestureRecognizer alloc] initWithTarget:self action:@selector(controllerPauseButtonPressed:)];
         _menuTapGestureRecognizer.allowedPressTypes = @[@(UIPressTypeMenu)];
-
+        
         _playPauseTapGestureRecognizer = [[UITapGestureRecognizer alloc] initWithTarget:self action:@selector(controllerPlayPauseButtonPressed:)];
         _playPauseTapGestureRecognizer.allowedPressTypes = @[@(UIPressTypePlayPause)];
         
@@ -160,7 +162,7 @@
     [self.view addGestureRecognizer:_menuTapGestureRecognizer];
     [self.view addGestureRecognizer:_menuDoubleTapGestureRecognizer];
     [self.view addGestureRecognizer:_playPauseTapGestureRecognizer];
-
+    
 #else
     _exitSwipeRecognizer = [[UIScreenEdgePanGestureRecognizer alloc] initWithTarget:self action:@selector(edgeSwiped)];
     _exitSwipeRecognizer.edges = UIRectEdgeLeft;
@@ -194,7 +196,7 @@
                                                 renderView:_streamView
                                        connectionCallbacks:self];
     }
-
+    
     NSOperationQueue* opQueue = [[NSOperationQueue alloc] init];
     [opQueue addOperation:_streamMan];
     
@@ -212,7 +214,7 @@
                                              selector: @selector(applicationDidEnterBackground:)
                                                  name: UIApplicationDidEnterBackgroundNotification
                                                object: nil];
-
+    
 #if 0
     // FIXME: This doesn't work reliably on iPad for some reason. Showing and hiding the keyboard
     // several times in a row will not correctly restore the state of the UIScrollView.
@@ -273,7 +275,7 @@
 #if 0
 - (void)keyboardWillShow:(NSNotification *)notification {
     _keyboardSize = [[[notification userInfo] objectForKey:UIKeyboardFrameBeginUserInfoKey] CGRectValue].size;
-
+    
     [UIView animateWithDuration:0.3 animations:^{
         CGRect frame = self->_scrollView.frame;
         frame.size.height -= self->_keyboardSize.height;
@@ -300,7 +302,7 @@
 - (void)extScreenDidConnect:(NSNotification *)notification {
     Log(LOG_I, @"External Screen Connected");
     dispatch_async(dispatch_get_main_queue(), ^{
-    [self prepExtScreen:notification.object];
+        [self prepExtScreen:notification.object];
     });
 }
 
@@ -310,7 +312,7 @@
     if(UIScreen.screens.count < 2)
     {
         dispatch_async(dispatch_get_main_queue(), ^{
-        [self removeExtScreen];
+            [self removeExtScreen];
         });
     }
 }
@@ -343,7 +345,8 @@
 
 
 - (void)updateStatsOverlay {
-    NSString* overlayText = [self->_streamMan getStatsOverlayText];
+    //    NSString* overlayText = [self->_streamMan getStatsOverlayText];
+    NSString* overlayText = [NSString stringWithFormat:@"%@ %@",[self getInternetface],[self->_streamMan getStatsOverlayText]];
     
     dispatch_async(dispatch_get_main_queue(), ^{
         [self updateOverlayText:overlayText];
@@ -365,14 +368,21 @@
             [_overlayView setTextAlignment:NSTextAlignmentCenter];
         }
         
-        [_overlayView setTextColor:[UIColor lightGrayColor]];
-        [_overlayView setBackgroundColor:[UIColor blackColor]];
+        _overlayView.layer.cornerRadius = 2.0;  // 设置圆角半径
+        _overlayView.layer.masksToBounds = YES;  // 确保圆角生效
+        
+        [_overlayView setTextColor:[UIColor whiteColor]];
+        //        [_overlayView setBackgroundColor:[UIColor blackColor]];
+        UIColor *colorWithAlpha = [[UIColor blackColor] colorWithAlphaComponent:0.35];
+        [_overlayView setBackgroundColor:colorWithAlpha];
+        _overlayView.textContainerInset = UIEdgeInsetsMake(3, 2, 2, 3);  // 设置内边距
+        
 #if TARGET_OS_TV
         [_overlayView setFont:[UIFont systemFontOfSize:24]];
 #else
-        [_overlayView setFont:[UIFont systemFontOfSize:12]];
+        [_overlayView setFont:[UIFont systemFontOfSize:10]];
 #endif
-        [_overlayView setAlpha:0.5];
+        //        [_overlayView setAlpha:0.35];
         [self.view addSubview:_overlayView];
     }
     
@@ -388,6 +398,13 @@
         [_overlayView sizeToFit];
         [_overlayView setCenter:CGPointMake(self.view.frame.size.width / 2, _overlayView.frame.size.height / 2)];
         [_overlayView setHidden:NO];
+        
+        CGRect frame = _overlayView.frame;
+        frame.origin.y = 3.0;  // 设置顶部外边距为 4
+        _overlayView.frame = frame;  // 更新视图的位置
+        // 强制重新布局
+        [_overlayView setNeedsLayout];
+        [_overlayView layoutIfNeeded];
     }
     else {
         [_overlayView setHidden:YES];
@@ -403,7 +420,7 @@
     
     [self.navigationController popToRootViewControllerAnimated:YES];
     _extWindow = nil;
-
+    
 }
 
 // This will fire if the user opens control center or gets a low battery message
@@ -416,16 +433,16 @@
     // Terminate the stream if the app is inactive for 60 seconds
     Log(LOG_I, @"Starting inactivity termination timer");
     _inactivityTimer = [NSTimer scheduledTimerWithTimeInterval:60
-                                                      target:self
-                                                    selector:@selector(inactiveTimerExpired:)
-                                                    userInfo:nil
-                                                     repeats:NO];
+                                                        target:self
+                                                      selector:@selector(inactiveTimerExpired:)
+                                                      userInfo:nil
+                                                       repeats:NO];
 #endif
 }
 
 - (void)inactiveTimerExpired:(NSTimer*)timer {
     Log(LOG_I, @"Terminating stream after inactivity");
-
+    
     [self returnToMainFrame];
     
     _inactivityTimer = nil;
@@ -443,7 +460,7 @@
 // This fires when the home button is pressed
 - (void)applicationDidEnterBackground:(UIApplication *)application {
     Log(LOG_I, @"Terminating stream immediately for backgrounding");
-
+    
     if (_inactivityTimer != nil) {
         [_inactivityTimer invalidate];
         _inactivityTimer = nil;
@@ -454,8 +471,73 @@
 
 - (void)edgeSwiped {
     Log(LOG_I, @"User swiped to end stream");
-    
-    [self returnToMainFrame];
+    NSArray *options = @[@"断开连接", @"切换性能信息", @"弹出软键盘"];
+    [self showActionSheetWithTitle:@"游戏菜单" options:options];
+    //    [self returnToMainFrame];
+}
+
+
+- (void)showActionSheetWithTitle:(NSString *)title options:(NSArray<NSString *> *)options {
+    // 创建一个UIAlertController
+    UIAlertController *alertController = [UIAlertController alertControllerWithTitle:title
+                                                                             message:nil
+                                                                      preferredStyle:UIAlertControllerStyleActionSheet];
+    // 创建并添加选项
+    for (NSString *option in options) {
+        UIAlertAction *action = [UIAlertAction actionWithTitle:option
+                                                         style:UIAlertActionStyleDefault
+                                                       handler:^(UIAlertAction * _Nonnull action) {
+            //            NSLog(@"选项 %@", option);
+            if ([option isEqualToString:@"断开连接"]) {
+                // 执行选项1的操作
+                [self returnToMainFrame];
+            } else if ([option isEqualToString:@"切换性能信息"]) {
+                if(self->_statsUpdateTimer!=nil){
+                    if(self->_overlayView==nil){
+                        return;
+                    }
+                    if (self->_overlayView.hidden) {
+                        [self->_overlayView setHidden:NO];
+                        [self startHUD];
+                    } else {
+                        [self->_statsUpdateTimer invalidate];
+                        self->_statsUpdateTimer = nil;
+                        [self->_overlayView setHidden:YES];
+                    }
+                    return;
+                }
+                [self startHUD];
+                
+            } else if ([option isEqualToString:@"弹出软键盘"]) {
+                if(self->_streamView!=nil){
+                    [self->_streamView showKeyInputBoard];
+                }
+            }
+        }];
+        [alertController addAction:action];
+    }
+    // 添加取消按钮
+    UIAlertAction *cancelAction = [UIAlertAction actionWithTitle:@"取消"
+                                                           style:UIAlertActionStyleCancel
+                                                         handler:^(UIAlertAction * _Nonnull action) {
+        NSLog(@"取消按钮被点击");
+    }];
+    [alertController addAction:cancelAction];
+    // 在 iPad 上需要指定弹窗位置
+    if (UI_USER_INTERFACE_IDIOM() == UIUserInterfaceIdiomPad) {
+        alertController.popoverPresentationController.sourceView = self.view;
+        alertController.popoverPresentationController.sourceRect = CGRectMake(self.view.bounds.size.width / 2, self.view.bounds.size.height / 2, 1, 1);
+    }
+    // 显示弹窗
+    [self presentViewController:alertController animated:YES completion:nil];
+}
+
+- (void) startHUD {
+    self->_statsUpdateTimer = [NSTimer scheduledTimerWithTimeInterval:1.0f
+                                                               target:self
+                                                             selector:@selector(updateStatsOverlay)
+                                                             userInfo:nil
+                                                              repeats:YES];
 }
 
 - (void) connectionStarted {
@@ -801,5 +883,64 @@
     return [GCMouse mice].count > 0;
 }
 #endif
+
+- (NSString*)getInternetface {
+    long long currentBytes = [self getInterfaceBytes];  // 获取当前流量
+    long long deltaBytes = currentBytes - self.previousBytes;  // 计算差值
+
+    // 转换为 KB/s
+    float kbPerSecond = deltaBytes / 1024.0;  // 将字节转换为千字节（KB）
+    self.previousBytes = currentBytes;  // 更新上次字节数
+
+    // 判断是否超过 1000 KB/s，转换为 MB/s
+    if (kbPerSecond > 1000) {
+        float mbPerSecond = kbPerSecond / 1024.0;  // 转换为兆字节每秒（MB/s）
+//        NSLog(@"Network speed: %.2f MB/s", mbPerSecond);  // 输出 MB/s
+        return [NSString stringWithFormat:@"带宽: %.2f MB/s",mbPerSecond];
+    } else {
+//        NSLog(@"Network speed: %.2f KB/s", kbPerSecond);  // 输出 KB/s
+        return [NSString stringWithFormat:@"带宽: %.2f KB/s",kbPerSecond];
+    }
+    return @"";
+}
+
+/* 获取所有接口的网络流量信息 */
+- (long long)getInterfaceBytes {
+    struct ifaddrs *ifa_list = NULL, *ifa;
+    if (getifaddrs(&ifa_list) == -1) {
+        return 0;  // 获取失败，返回 0
+    }
+
+    uint32_t iBytes = 0;  // 输入字节
+    uint32_t oBytes = 0;  // 输出字节
+
+    // 遍历所有接口
+    for (ifa = ifa_list; ifa; ifa = ifa->ifa_next) {
+        // 过滤掉非链路层接口
+        if (AF_LINK != ifa->ifa_addr->sa_family) {
+            continue;
+        }
+
+        // 仅统计活动接口
+        if (!(ifa->ifa_flags & IFF_UP) && !(ifa->ifa_flags & IFF_RUNNING)) {
+            continue;
+        }
+
+        // 如果没有相关的流量数据，跳过该接口
+        if (ifa->ifa_data == 0) {
+            continue;
+        }
+
+        // 获取接口的流量数据
+        struct if_data *if_data = (struct if_data *)ifa->ifa_data;
+        iBytes += if_data->ifi_ibytes;  // 累加输入字节
+        oBytes += if_data->ifi_obytes;  // 累加输出字节
+    }
+
+    freeifaddrs(ifa_list);  // 释放内存
+
+    // 返回输入字节和输出字节的总和
+    return iBytes + oBytes;
+}
 
 @end

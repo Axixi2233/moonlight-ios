@@ -35,8 +35,13 @@
 @property (nonatomic) BOOL absoluteTouchMode;
 @property (nonatomic) BOOL statsOverlay;
 @property (nonatomic) BOOL rumblePhone;
+@property (nonatomic, retain) NSNumber * motionMode;
+@property (nonatomic, retain) NSNumber * virtualDisplayMode;
 @property (nonatomic) BOOL multiTouchScreen;
 @property (nonatomic) BOOL externalMonitor;
+@property (nonatomic) BOOL enableTouchSensitivity;
+@property (nonatomic) BOOL touchSensitivityGlobal;
+@property (nonatomic, retain) NSNumber * touchSensitivity;
 
 - (id) initFromSettings:(Settings*)settings;
 

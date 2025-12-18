@@ -30,7 +30,8 @@
 - (NSURLRequest*) newQuitAppRequest;
 - (NSURLRequest*) newAppAssetRequestWithAppId:(NSString*)appId;
 - (void) executeRequestSynchronously:(HttpRequest*)request;
-
+- (NSString*) getUrlParams:(StreamConfiguration*)config;
+//- (NSString*) getCurrentPCScale;
 @end
 
 

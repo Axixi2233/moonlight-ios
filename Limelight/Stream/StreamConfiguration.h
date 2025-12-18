@@ -26,6 +26,8 @@
 @property BOOL optimizeGameSettings;
 @property BOOL playAudioOnPC;
 @property BOOL swapABXYButtons;
+@property int motionMode;//陀螺仪
+@property int virtualDisplayMode;//虚拟显示器
 @property int audioConfiguration;
 @property int supportedVideoFormats;
 @property BOOL multiController;

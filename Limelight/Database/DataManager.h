@@ -31,7 +31,12 @@
                     statsOverlay:(BOOL)statsOverlay
                      rumblePhone:(BOOL)rumblePhone
                 multiTouchScreen:(BOOL)multiTouchScreen
-                 externalMonitor:(BOOL)externalMonitor;
+                 externalMonitor:(BOOL)externalMonitor
+            touchSensitivityGlobal:(BOOL)touchSensitivityGlobal
+            enableTouchSensitivity:(BOOL)enableTouchSensitivity
+            touchSensitivity:(NSInteger)touchSensitivity
+                      motionMode:(NSInteger)motionMode
+                virtualDisplayMode:(NSInteger)virtualDisplayMode;
 
 - (NSArray*) getHosts;
 - (void) updateHost:(TemporaryHost*)host;

@@ -639,7 +639,9 @@ static NSMutableSet* hostList;
     _streamConfig.playAudioOnPC = streamSettings.playAudioOnPC;
     _streamConfig.useFramePacing = streamSettings.useFramePacing;
     _streamConfig.swapABXYButtons = streamSettings.swapABXYButtons;
-    
+    _streamConfig.motionMode = [streamSettings.motionMode intValue];
+    _streamConfig.virtualDisplayMode = [streamSettings.virtualDisplayMode intValue];
+
     // multiController must be set before calling getConnectedGamepadMask
     _streamConfig.multiController = streamSettings.multiController;
     _streamConfig.gamepadMask = [ControllerSupport getConnectedGamepadMask:_streamConfig];

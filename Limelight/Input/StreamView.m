@@ -14,13 +14,12 @@
 #import "RelativeTouchHandler.h"
 #import "AbsoluteTouchHandler.h"
 #import "KeyboardInputField.h"
-#import "zlib.h" //to implement crc32 checksum
 
 static const double X1_MOUSE_SPEED_DIVISOR = 2.5;
 
 @implementation StreamView {
     OnScreenControls* onScreenControls;
-    
+
     KeyboardInputField* keyInputField;
     BOOL isInputingText;
     NSMutableSet* keysDown;
@@ -45,6 +44,12 @@ static const double X1_MOUSE_SPEED_DIVISOR = 2.5;
     BOOL hasUserInteracted;
     TemporarySettings* settings;
     NSDictionary<NSString *, NSNumber *> *dictCodes;
+    TouchScreenManager* touchManager;
+    
+    NSMutableDictionary<NSNumber *, SensitivityBean *> *sensitivityMap;
+    BOOL touchSensitivityGlobal;
+    BOOL enableTouchSensitivity;
+    CGFloat touchSensitivity;
 }
 
 - (void) setupStreamView:(ControllerSupport*)controllerSupport
@@ -53,6 +58,13 @@ static const double X1_MOUSE_SPEED_DIVISOR = 2.5;
     self->interactionDelegate = interactionDelegate;
     self->streamAspectRatio = (float)streamConfig.width / (float)streamConfig.height;
     self->settings = [[[DataManager alloc] init] getSettings];
+    
+    self->touchManager = [[TouchScreenManager alloc] init];
+    
+    self->sensitivityMap = [NSMutableDictionary dictionary];
+    self->touchSensitivityGlobal = settings.touchSensitivityGlobal; // 根据你的实际需求初始化
+    self->touchSensitivity = settings.touchSensitivity.floatValue; // 根据你的实际需求初始化
+    self->enableTouchSensitivity=settings.enableTouchSensitivity;
     
     keysDown = [[NSMutableSet alloc] init];
     keyInputField = [[KeyboardInputField alloc] initWithFrame:CGRectZero];
@@ -240,30 +252,27 @@ static const double X1_MOUSE_SPEED_DIVISOR = 2.5;
     return 90 - MIN(90, altitudeDegs);
 }
 
-// convert 64bit pointer to CRC32 checksum
-- (uint32_t)crc32OfUint64:(uint64_t)value {
-    // uint64_t可以被视为字符数组来计算CRC32
-    char data[sizeof(value)];
-    memcpy(data, &value, sizeof(value));
-    uint32_t crc = crc32(0, Z_NULL, 0);
-    crc = crc32(crc, (const Bytef *)data, sizeof(value));
-    return crc;
-}
-
 - (BOOL)trySendTouchEvent:(UITouch*)event{
     uint8_t type;
+    uint32_t touchID;
     switch (event.phase) {
         case UITouchPhaseBegan://开始触摸
             type = LI_TOUCH_EVENT_DOWN;
+            touchID= [touchManager identifierForTouch:event];
             break;
         case UITouchPhaseMoved://移动
             type = LI_TOUCH_EVENT_MOVE;
+            touchID= [touchManager identifierForTouch:event];
             break;
         case UITouchPhaseEnded://触摸结束
             type = LI_TOUCH_EVENT_UP;
+            touchID= [touchManager identifierForTouch:event];
+            [touchManager removeTouch:event];
             break;
         case UITouchPhaseCancelled://触摸取消
             type = LI_TOUCH_EVENT_CANCEL_ALL;
+            touchID= [touchManager identifierForTouch:event];
+            [touchManager removeTouch:event];
 //            NSLog(@"trySendTouchEvent UITouchPhaseCancelled %d,%d",(uint32_t)UITouchPhaseCancelled,(uint32_t)event);
             break;
         default:
@@ -271,12 +280,14 @@ static const double X1_MOUSE_SPEED_DIVISOR = 2.5;
             return NO;
     }
     CGPoint location = [self adjustCoordinatesForVideoArea:[event locationInView:self]];
+    //触控灵敏度
+    if(enableTouchSensitivity&&touchSensitivity!=100.0){
+        location=[self getStreamViewRelativeSensitivityXY:event touchID:touchID];
+    }
     CGSize videoSize = [self getVideoAreaSize];
-    // convert pointer event(64bit) to CRC32 checksum as touch pointer ID.
-    // There's no pointerId like Android in definition of iOS touch event "UITouch", we use pointer to UITouch to generate touch pointer ID.
-    // Since touch pointer ID is defined to be uint32_t, I implement CRC32 checksum to the 64bit address, which avoids touch pointer ID repetition.
-    uint32_t pointerId = [self crc32OfUint64:((uint64_t)event)];
-    return LiSendTouchEvent(type,pointerId,location.x / videoSize.width, location.y / videoSize.height,(event.force / event.maximumPossibleForce) / sin(event.altitudeAngle),0.0f, 0.0f,[self getRotationFromAzimuthAngle:[event azimuthAngleInView:self]]);
+//    NSLog(@"trySendTouchEvent touchID %d,%d",type,touchID);
+//    uint32_t pointerId = [self crc32OfUint64:((uint64_t)event)];
+    return LiSendTouchEvent(type,touchID,location.x / videoSize.width, location.y / videoSize.height,(event.force / event.maximumPossibleForce) / sin(event.altitudeAngle),0.0f, 0.0f,[self getRotationFromAzimuthAngle:[event azimuthAngleInView:self]]);
 }
 
 
@@ -397,85 +408,89 @@ static const double X1_MOUSE_SPEED_DIVISOR = 2.5;
         [touchHandler touchesBegan:touches withEvent:event];
         
         if ([[event allTouches] count] == 5) {
-            if (isInputingText) {
-                Log(LOG_D, @"Closing the keyboard");
-                [keyInputField resignFirstResponder];
-                isInputingText = false;
-            } else {
-                Log(LOG_D, @"Opening the keyboard");
-                // Prepare the textbox used to capture keyboard events.
-                keyInputField.delegate = self;
-                keyInputField.text = @"0";
-#if !TARGET_OS_TV
-                // Prepare the toolbar above the keyboard for more options
-                const CGFloat BUTTON_WIDTH = 88;
-                const CGFloat BUTTON_HEIGHT = 44;
-                // Function key count except for the `Done` button. `Done` button is not in the scrollView, but is always on top.
-                const CGFloat FUNCTION_KEY_COUNT = 23;
-                const CGFloat TOOLBAR_WIDTH = BUTTON_WIDTH * FUNCTION_KEY_COUNT;
-                
-                // Function toolbar
-                UIBarButtonItem *doneBarButton = [self createButtonWithImageNamed:@"DoneIcon.png" backgroundColor:[UIColor clearColor] buttonWidth: BUTTON_WIDTH target:self action:@selector(toolbarButtonClicked:) keyCode:0x00 isToggleable:NO];
-                UIBarButtonItem *windowsBarButton = [self createButtonWithImageNamed:@"WindowsIcon.png" backgroundColor:[UIColor blackColor] buttonWidth: BUTTON_WIDTH target:self action:@selector(toolbarButtonClicked:) keyCode:0x5B isToggleable:YES];
-                UIBarButtonItem *escapeBarButton = [self createButtonWithImageNamed:@"EscapeIcon.png" backgroundColor:[UIColor blackColor] buttonWidth: BUTTON_WIDTH target:self action:@selector(toolbarButtonClicked:) keyCode:0x1B isToggleable:NO];
-                UIBarButtonItem *tabBarButton = [self createButtonWithImageNamed:@"TabIcon.png" backgroundColor:[UIColor blackColor] buttonWidth: BUTTON_WIDTH target:self action:@selector(toolbarButtonClicked:) keyCode:0x09 isToggleable:NO];
-                UIBarButtonItem *shiftBarButton = [self createButtonWithImageNamed:@"ShiftIcon.png" backgroundColor:[UIColor blackColor] buttonWidth: BUTTON_WIDTH target:self action:@selector(toolbarButtonClicked:) keyCode:0xA0 isToggleable:YES];
-                UIBarButtonItem *controlBarButton = [self createButtonWithImageNamed:@"ControlIcon.png" backgroundColor:[UIColor blackColor] buttonWidth: BUTTON_WIDTH target:self action:@selector(toolbarButtonClicked:) keyCode:0xA2 isToggleable:YES];
-                UIBarButtonItem *altBarButton = [self createButtonWithImageNamed:@"AltIcon.png" backgroundColor:[UIColor blackColor] buttonWidth: BUTTON_WIDTH target:self action:@selector(toolbarButtonClicked:) keyCode:0xA4 isToggleable:YES];
-                UIBarButtonItem *deleteBarButton = [self createButtonWithImageNamed:@"DeleteIcon.png" backgroundColor:[UIColor blackColor] buttonWidth: BUTTON_WIDTH target:self action:@selector(toolbarButtonClicked:) keyCode:0x2E isToggleable:NO];
-                UIBarButtonItem *leftBarButton = [self createButtonWithImageNamed:@"LeftArrowIcon.png" backgroundColor:[UIColor blackColor] buttonWidth: BUTTON_WIDTH target:self action:@selector(toolbarButtonClicked:) keyCode:0x25 isToggleable:NO];
-                UIBarButtonItem *downBarButton = [self createButtonWithImageNamed:@"DownArrowIcon.png" backgroundColor:[UIColor blackColor] buttonWidth: BUTTON_WIDTH target:self action:@selector(toolbarButtonClicked:) keyCode:0x28 isToggleable:NO];
-                UIBarButtonItem *upBarButton = [self createButtonWithImageNamed:@"UpArrowIcon.png" backgroundColor:[UIColor blackColor] buttonWidth: BUTTON_WIDTH target:self action:@selector(toolbarButtonClicked:) keyCode:0x26 isToggleable:NO];
-                UIBarButtonItem *rightBarButton = [self createButtonWithImageNamed:@"RightArrowIcon.png" backgroundColor:[UIColor blackColor] buttonWidth: BUTTON_WIDTH target:self action:@selector(toolbarButtonClicked:) keyCode:0x27 isToggleable:NO];
-                UIBarButtonItem *f1BarButton = [self createButtonWithImageNamed:@"F1Icon.png" backgroundColor:[UIColor blackColor] buttonWidth: BUTTON_WIDTH target:self action:@selector(toolbarButtonClicked:) keyCode:0x70 isToggleable:NO];
-                UIBarButtonItem *f2BarButton = [self createButtonWithImageNamed:@"F2Icon.png" backgroundColor:[UIColor blackColor] buttonWidth: BUTTON_WIDTH target:self action:@selector(toolbarButtonClicked:) keyCode:0x71 isToggleable:NO];
-                UIBarButtonItem *f3BarButton = [self createButtonWithImageNamed:@"F3Icon.png" backgroundColor:[UIColor blackColor] buttonWidth: BUTTON_WIDTH target:self action:@selector(toolbarButtonClicked:) keyCode:0x72 isToggleable:NO];
-                UIBarButtonItem *f4BarButton = [self createButtonWithImageNamed:@"F4Icon.png" backgroundColor:[UIColor blackColor] buttonWidth: BUTTON_WIDTH target:self action:@selector(toolbarButtonClicked:) keyCode:0x73 isToggleable:NO];
-                UIBarButtonItem *f5BarButton = [self createButtonWithImageNamed:@"F5Icon.png" backgroundColor:[UIColor blackColor] buttonWidth: BUTTON_WIDTH target:self action:@selector(toolbarButtonClicked:) keyCode:0x74 isToggleable:NO];
-                UIBarButtonItem *f6BarButton = [self createButtonWithImageNamed:@"F6Icon.png" backgroundColor:[UIColor blackColor] buttonWidth: BUTTON_WIDTH  target:self action:@selector(toolbarButtonClicked:) keyCode:0x75 isToggleable:NO];
-                UIBarButtonItem *f7BarButton = [self createButtonWithImageNamed:@"F7Icon.png" backgroundColor:[UIColor blackColor] buttonWidth: BUTTON_WIDTH target:self action:@selector(toolbarButtonClicked:) keyCode:0x76 isToggleable:NO];
-                UIBarButtonItem *f8BarButton = [self createButtonWithImageNamed:@"F8Icon.png" backgroundColor:[UIColor blackColor] buttonWidth: BUTTON_WIDTH target:self action:@selector(toolbarButtonClicked:) keyCode:0x77 isToggleable:NO];
-                UIBarButtonItem *f9BarButton = [self createButtonWithImageNamed:@"F9Icon.png" backgroundColor:[UIColor blackColor] buttonWidth: BUTTON_WIDTH target:self action:@selector(toolbarButtonClicked:) keyCode:0x78 isToggleable:NO];
-                UIBarButtonItem *f10BarButton = [self createButtonWithImageNamed:@"F10Icon.png" backgroundColor:[UIColor blackColor] buttonWidth: BUTTON_WIDTH target:self action:@selector(toolbarButtonClicked:) keyCode:0x79 isToggleable:NO];
-                UIBarButtonItem *f11BarButton = [self createButtonWithImageNamed:@"F11Icon.png" backgroundColor:[UIColor blackColor] buttonWidth: BUTTON_WIDTH target:self action:@selector(toolbarButtonClicked:) keyCode:0x7A isToggleable:NO];
-                UIBarButtonItem *f12BarButton = [self createButtonWithImageNamed:@"F12Icon.png" backgroundColor:[UIColor blackColor] buttonWidth: BUTTON_WIDTH  target:self action:@selector(toolbarButtonClicked:) keyCode:0x7B isToggleable:NO];
-                UIBarButtonItem *flexibleSpace = [[UIBarButtonItem alloc] initWithBarButtonSystemItem:UIBarButtonSystemItemFlexibleSpace target:nil action:nil];
-                // Removes unwanted space between buttons
-                UIBarButtonItem *negativeSeperator = [[UIBarButtonItem alloc] initWithBarButtonSystemItem:UIBarButtonSystemItemFixedSpace target:nil action:nil];
-                negativeSeperator.width = -1;
-                
-                UIToolbar * functionToolbarView = [[UIToolbar alloc] initWithFrame:CGRectMake(0, 0, self.bounds.size.width, BUTTON_HEIGHT)];
-                functionToolbarView.autoresizingMask = UIViewAutoresizingNone;
-                [functionToolbarView setItems:[NSArray arrayWithObjects:negativeSeperator, windowsBarButton, escapeBarButton, tabBarButton, shiftBarButton, controlBarButton, altBarButton, deleteBarButton, leftBarButton, downBarButton, upBarButton, rightBarButton, f1BarButton, f2BarButton, f3BarButton, f4BarButton, f5BarButton, f6BarButton, f7BarButton, f8BarButton, f9BarButton, f10BarButton, f11BarButton, f12BarButton, flexibleSpace, nil]];
-                // Calculates remaining space for function keys, except for the `Done` button.
-                [functionToolbarView setFrame:CGRectMake(0, 0, self.bounds.size.width - BUTTON_WIDTH > TOOLBAR_WIDTH ? self.bounds.size.width - BUTTON_WIDTH : TOOLBAR_WIDTH, BUTTON_HEIGHT)];
-                
-                UIScrollView *scrollView = [[UIScrollView alloc] initWithFrame:CGRectMake(0, 0, self.bounds.size.width, BUTTON_HEIGHT)];
-                scrollView.autoresizingMask = UIViewAutoresizingNone;
-                scrollView.contentSize = functionToolbarView.frame.size;
-                scrollView.scrollEnabled = self.bounds.size.width - BUTTON_WIDTH > TOOLBAR_WIDTH ? false : true;
-                scrollView.bounces = false;
-                scrollView.bouncesZoom = false;
-                scrollView.showsVerticalScrollIndicator = false;
-                scrollView.showsHorizontalScrollIndicator = false;
-                [scrollView setBackgroundColor: [UIColor darkGrayColor]];
-                
-                [scrollView addSubview:functionToolbarView];
-                UIBarButtonItem *customItem = [[UIBarButtonItem alloc] initWithCustomView:scrollView];
-                UIToolbar *toolbarView = [[UIToolbar alloc] initWithFrame:CGRectMake(0, 0, self.bounds.size.width, BUTTON_HEIGHT)];
-                [toolbarView setItems:[NSArray arrayWithObjects:negativeSeperator, doneBarButton, customItem, negativeSeperator, nil]];
-                [toolbarView setBackgroundColor: [UIColor darkGrayColor]];
-                keyInputField.inputAccessoryView = toolbarView;
-#endif
-                [keyInputField becomeFirstResponder];
-                [keyInputField addTarget:self action:@selector(onKeyboardPressed:) forControlEvents:UIControlEventEditingChanged];
-                
-                // Undo causes issues for our state management, so turn it off
-                [keyInputField.undoManager disableUndoRegistration];
-                
-                isInputingText = true;
-            }
+            [self showKeyInputBoard];
         }
+    }
+}
+
+-(void)showKeyInputBoard{
+    if (isInputingText) {
+        Log(LOG_D, @"Closing the keyboard");
+        [keyInputField resignFirstResponder];
+        isInputingText = false;
+    } else {
+        Log(LOG_D, @"Opening the keyboard");
+        // Prepare the textbox used to capture keyboard events.
+        keyInputField.delegate = self;
+        keyInputField.text = @"0";
+#if !TARGET_OS_TV
+        // Prepare the toolbar above the keyboard for more options
+        const CGFloat BUTTON_WIDTH = 88;
+        const CGFloat BUTTON_HEIGHT = 44;
+        // Function key count except for the `Done` button. `Done` button is not in the scrollView, but is always on top.
+        const CGFloat FUNCTION_KEY_COUNT = 23;
+        const CGFloat TOOLBAR_WIDTH = BUTTON_WIDTH * FUNCTION_KEY_COUNT;
+        
+        // Function toolbar
+        UIBarButtonItem *doneBarButton = [self createButtonWithImageNamed:@"DoneIcon.png" backgroundColor:[UIColor clearColor] buttonWidth: BUTTON_WIDTH target:self action:@selector(toolbarButtonClicked:) keyCode:0x00 isToggleable:NO];
+        UIBarButtonItem *windowsBarButton = [self createButtonWithImageNamed:@"WindowsIcon.png" backgroundColor:[UIColor blackColor] buttonWidth: BUTTON_WIDTH target:self action:@selector(toolbarButtonClicked:) keyCode:0x5B isToggleable:YES];
+        UIBarButtonItem *escapeBarButton = [self createButtonWithImageNamed:@"EscapeIcon.png" backgroundColor:[UIColor blackColor] buttonWidth: BUTTON_WIDTH target:self action:@selector(toolbarButtonClicked:) keyCode:0x1B isToggleable:NO];
+        UIBarButtonItem *tabBarButton = [self createButtonWithImageNamed:@"TabIcon.png" backgroundColor:[UIColor blackColor] buttonWidth: BUTTON_WIDTH target:self action:@selector(toolbarButtonClicked:) keyCode:0x09 isToggleable:NO];
+        UIBarButtonItem *shiftBarButton = [self createButtonWithImageNamed:@"ShiftIcon.png" backgroundColor:[UIColor blackColor] buttonWidth: BUTTON_WIDTH target:self action:@selector(toolbarButtonClicked:) keyCode:0xA0 isToggleable:YES];
+        UIBarButtonItem *controlBarButton = [self createButtonWithImageNamed:@"ControlIcon.png" backgroundColor:[UIColor blackColor] buttonWidth: BUTTON_WIDTH target:self action:@selector(toolbarButtonClicked:) keyCode:0xA2 isToggleable:YES];
+        UIBarButtonItem *altBarButton = [self createButtonWithImageNamed:@"AltIcon.png" backgroundColor:[UIColor blackColor] buttonWidth: BUTTON_WIDTH target:self action:@selector(toolbarButtonClicked:) keyCode:0xA4 isToggleable:YES];
+        UIBarButtonItem *deleteBarButton = [self createButtonWithImageNamed:@"DeleteIcon.png" backgroundColor:[UIColor blackColor] buttonWidth: BUTTON_WIDTH target:self action:@selector(toolbarButtonClicked:) keyCode:0x2E isToggleable:NO];
+        UIBarButtonItem *leftBarButton = [self createButtonWithImageNamed:@"LeftArrowIcon.png" backgroundColor:[UIColor blackColor] buttonWidth: BUTTON_WIDTH target:self action:@selector(toolbarButtonClicked:) keyCode:0x25 isToggleable:NO];
+        UIBarButtonItem *downBarButton = [self createButtonWithImageNamed:@"DownArrowIcon.png" backgroundColor:[UIColor blackColor] buttonWidth: BUTTON_WIDTH target:self action:@selector(toolbarButtonClicked:) keyCode:0x28 isToggleable:NO];
+        UIBarButtonItem *upBarButton = [self createButtonWithImageNamed:@"UpArrowIcon.png" backgroundColor:[UIColor blackColor] buttonWidth: BUTTON_WIDTH target:self action:@selector(toolbarButtonClicked:) keyCode:0x26 isToggleable:NO];
+        UIBarButtonItem *rightBarButton = [self createButtonWithImageNamed:@"RightArrowIcon.png" backgroundColor:[UIColor blackColor] buttonWidth: BUTTON_WIDTH target:self action:@selector(toolbarButtonClicked:) keyCode:0x27 isToggleable:NO];
+        UIBarButtonItem *f1BarButton = [self createButtonWithImageNamed:@"F1Icon.png" backgroundColor:[UIColor blackColor] buttonWidth: BUTTON_WIDTH target:self action:@selector(toolbarButtonClicked:) keyCode:0x70 isToggleable:NO];
+        UIBarButtonItem *f2BarButton = [self createButtonWithImageNamed:@"F2Icon.png" backgroundColor:[UIColor blackColor] buttonWidth: BUTTON_WIDTH target:self action:@selector(toolbarButtonClicked:) keyCode:0x71 isToggleable:NO];
+        UIBarButtonItem *f3BarButton = [self createButtonWithImageNamed:@"F3Icon.png" backgroundColor:[UIColor blackColor] buttonWidth: BUTTON_WIDTH target:self action:@selector(toolbarButtonClicked:) keyCode:0x72 isToggleable:NO];
+        UIBarButtonItem *f4BarButton = [self createButtonWithImageNamed:@"F4Icon.png" backgroundColor:[UIColor blackColor] buttonWidth: BUTTON_WIDTH target:self action:@selector(toolbarButtonClicked:) keyCode:0x73 isToggleable:NO];
+        UIBarButtonItem *f5BarButton = [self createButtonWithImageNamed:@"F5Icon.png" backgroundColor:[UIColor blackColor] buttonWidth: BUTTON_WIDTH target:self action:@selector(toolbarButtonClicked:) keyCode:0x74 isToggleable:NO];
+        UIBarButtonItem *f6BarButton = [self createButtonWithImageNamed:@"F6Icon.png" backgroundColor:[UIColor blackColor] buttonWidth: BUTTON_WIDTH  target:self action:@selector(toolbarButtonClicked:) keyCode:0x75 isToggleable:NO];
+        UIBarButtonItem *f7BarButton = [self createButtonWithImageNamed:@"F7Icon.png" backgroundColor:[UIColor blackColor] buttonWidth: BUTTON_WIDTH target:self action:@selector(toolbarButtonClicked:) keyCode:0x76 isToggleable:NO];
+        UIBarButtonItem *f8BarButton = [self createButtonWithImageNamed:@"F8Icon.png" backgroundColor:[UIColor blackColor] buttonWidth: BUTTON_WIDTH target:self action:@selector(toolbarButtonClicked:) keyCode:0x77 isToggleable:NO];
+        UIBarButtonItem *f9BarButton = [self createButtonWithImageNamed:@"F9Icon.png" backgroundColor:[UIColor blackColor] buttonWidth: BUTTON_WIDTH target:self action:@selector(toolbarButtonClicked:) keyCode:0x78 isToggleable:NO];
+        UIBarButtonItem *f10BarButton = [self createButtonWithImageNamed:@"F10Icon.png" backgroundColor:[UIColor blackColor] buttonWidth: BUTTON_WIDTH target:self action:@selector(toolbarButtonClicked:) keyCode:0x79 isToggleable:NO];
+        UIBarButtonItem *f11BarButton = [self createButtonWithImageNamed:@"F11Icon.png" backgroundColor:[UIColor blackColor] buttonWidth: BUTTON_WIDTH target:self action:@selector(toolbarButtonClicked:) keyCode:0x7A isToggleable:NO];
+        UIBarButtonItem *f12BarButton = [self createButtonWithImageNamed:@"F12Icon.png" backgroundColor:[UIColor blackColor] buttonWidth: BUTTON_WIDTH  target:self action:@selector(toolbarButtonClicked:) keyCode:0x7B isToggleable:NO];
+        UIBarButtonItem *flexibleSpace = [[UIBarButtonItem alloc] initWithBarButtonSystemItem:UIBarButtonSystemItemFlexibleSpace target:nil action:nil];
+        // Removes unwanted space between buttons
+        UIBarButtonItem *negativeSeperator = [[UIBarButtonItem alloc] initWithBarButtonSystemItem:UIBarButtonSystemItemFixedSpace target:nil action:nil];
+        negativeSeperator.width = -1;
+        
+        UIToolbar * functionToolbarView = [[UIToolbar alloc] initWithFrame:CGRectMake(0, 0, self.bounds.size.width, BUTTON_HEIGHT)];
+        functionToolbarView.autoresizingMask = UIViewAutoresizingNone;
+        [functionToolbarView setItems:[NSArray arrayWithObjects:negativeSeperator, windowsBarButton, escapeBarButton, tabBarButton, shiftBarButton, controlBarButton, altBarButton, deleteBarButton, leftBarButton, downBarButton, upBarButton, rightBarButton, f1BarButton, f2BarButton, f3BarButton, f4BarButton, f5BarButton, f6BarButton, f7BarButton, f8BarButton, f9BarButton, f10BarButton, f11BarButton, f12BarButton, flexibleSpace, nil]];
+        // Calculates remaining space for function keys, except for the `Done` button.
+        [functionToolbarView setFrame:CGRectMake(0, 0, self.bounds.size.width - BUTTON_WIDTH > TOOLBAR_WIDTH ? self.bounds.size.width - BUTTON_WIDTH : TOOLBAR_WIDTH, BUTTON_HEIGHT)];
+        
+        UIScrollView *scrollView = [[UIScrollView alloc] initWithFrame:CGRectMake(0, 0, self.bounds.size.width, BUTTON_HEIGHT)];
+        scrollView.autoresizingMask = UIViewAutoresizingNone;
+        scrollView.contentSize = functionToolbarView.frame.size;
+        scrollView.scrollEnabled = self.bounds.size.width - BUTTON_WIDTH > TOOLBAR_WIDTH ? false : true;
+        scrollView.bounces = false;
+        scrollView.bouncesZoom = false;
+        scrollView.showsVerticalScrollIndicator = false;
+        scrollView.showsHorizontalScrollIndicator = false;
+        [scrollView setBackgroundColor: [UIColor darkGrayColor]];
+        
+        [scrollView addSubview:functionToolbarView];
+        UIBarButtonItem *customItem = [[UIBarButtonItem alloc] initWithCustomView:scrollView];
+        UIToolbar *toolbarView = [[UIToolbar alloc] initWithFrame:CGRectMake(0, 0, self.bounds.size.width, BUTTON_HEIGHT)];
+        [toolbarView setItems:[NSArray arrayWithObjects:negativeSeperator, doneBarButton, customItem, negativeSeperator, nil]];
+        [toolbarView setBackgroundColor: [UIColor darkGrayColor]];
+        keyInputField.inputAccessoryView = toolbarView;
+#endif
+        [keyInputField becomeFirstResponder];
+        [keyInputField addTarget:self action:@selector(onKeyboardPressed:) forControlEvents:UIControlEventEditingChanged];
+        
+        // Undo causes issues for our state management, so turn it off
+        [keyInputField.undoManager disableUndoRegistration];
+        
+        isInputingText = true;
     }
 }
 
@@ -1058,6 +1073,51 @@ static const double X1_MOUSE_SPEED_DIVISOR = 2.5;
     LiSendScrollEvent(deltaZ);
 }
 
+- (CGFloat)getScreenWidth {
+    return [UIScreen mainScreen].bounds.size.width;
+}
+
+- (CGPoint)getStreamViewRelativeSensitivityXY:(UITouch *)touch touchID:(uint32_t)touchID {
+    CGPoint location = [self adjustCoordinatesForVideoArea:[touch locationInView:self]];
+    CGFloat normalizedX = location.x;
+    CGFloat normalizedY = location.y;
+    if (!touchSensitivityGlobal && normalizedX < [self getScreenWidth] / 2) {
+        return location;
+    }
+    NSNumber *key = [NSNumber numberWithUnsignedInt:touchID];
+
+    if (touch.phase == UITouchPhaseMoved) {
+        SensitivityBean *bean = [sensitivityMap objectForKey:key];
+        if (!bean) {
+            bean = [[SensitivityBean alloc] init];
+        }
+
+        if (bean.lastAbsoluteX != -1) {
+            CGFloat dx = normalizedX - bean.lastAbsoluteX;
+            CGFloat dy = normalizedY - bean.lastAbsoluteY;
+            dx *= 0.01f * touchSensitivity; // 灵敏度
+            dy *= 0.01f * touchSensitivity;
+            normalizedX = bean.lastRelativelyX + dx;
+            normalizedY = bean.lastRelativelyY + dy;
+        }
+
+        bean.lastAbsoluteX = location.x;
+        bean.lastAbsoluteY = location.y;
+        bean.lastRelativelyX = normalizedX;
+        bean.lastRelativelyY = normalizedY;
+        [sensitivityMap setObject:bean forKey:key];
+    }
+
+    if (touch.phase == UITouchPhaseEnded || touch.phase == UITouchPhaseCancelled) {
+        [sensitivityMap removeObjectForKey:key];
+    }
+
+    location.x = normalizedX;
+    location.y = normalizedY;
+    return location;
+}
+
+
 #if !TARGET_OS_TV
 - (BOOL)isMultipleTouchEnabled {
     return YES;
@@ -1065,3 +1125,4 @@ static const double X1_MOUSE_SPEED_DIVISOR = 2.5;
 #endif
 
 @end
+

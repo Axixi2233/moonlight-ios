@@ -109,6 +109,35 @@ void DrStop(void)
     }
 }
 
+-(NSString*) getActiveCodecNameLite
+{
+    switch (activeVideoFormat)
+    {
+        case VIDEO_FORMAT_H264:
+            return @"H.264";
+        case VIDEO_FORMAT_H265:
+            return @"HEVC";
+        case VIDEO_FORMAT_H265_MAIN10:
+            if (LiGetCurrentHostDisplayHdrMode()) {
+                return @"HEVC HDR";
+            }
+            else {
+                return @"HEVC";
+            }
+        case VIDEO_FORMAT_AV1_MAIN8:
+            return @"AV1";
+        case VIDEO_FORMAT_AV1_MAIN10:
+            if (LiGetCurrentHostDisplayHdrMode()) {
+                return @"AV1 HDR";
+            }
+            else {
+                return @"AV1";
+            }
+        default:
+            return @"";
+    }
+}
+
 int DrSubmitDecodeUnit(PDECODE_UNIT decodeUnit)
 {
     int offset = 0;

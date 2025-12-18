@@ -70,7 +70,12 @@
                     statsOverlay:(BOOL)statsOverlay
                      rumblePhone:(BOOL)rumblePhone
                 multiTouchScreen:(BOOL)multiTouchScreen
-                 externalMonitor:(BOOL)externalMonitor{
+                 externalMonitor:(BOOL)externalMonitor
+          touchSensitivityGlobal:(BOOL)touchSensitivityGlobal
+          enableTouchSensitivity:(BOOL)enableTouchSensitivity
+              touchSensitivity:(NSInteger)touchSensitivity
+                      motionMode:(NSInteger)motionMode
+              virtualDisplayMode:(NSInteger)virtualDisplayMode{
     
     [_managedObjectContext performBlockAndWait:^{
         Settings* settingsToSave = [self retrieveSettings];
@@ -93,6 +98,11 @@
         settingsToSave.rumblePhone = rumblePhone;
         settingsToSave.multiTouchScreen = multiTouchScreen;
         settingsToSave.externalMonitor = externalMonitor;
+        settingsToSave.enableTouchSensitivity=enableTouchSensitivity;
+        settingsToSave.touchSensitivity=[NSNumber numberWithInteger:touchSensitivity];
+        settingsToSave.touchSensitivityGlobal=touchSensitivityGlobal;
+        settingsToSave.motionMode = [NSNumber numberWithInteger:motionMode];
+        settingsToSave.virtualDisplayMode = [NSNumber numberWithInteger:virtualDisplayMode];
         [self saveData];
     }];
 }

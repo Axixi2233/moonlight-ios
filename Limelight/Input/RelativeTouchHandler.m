@@ -7,6 +7,7 @@
 //
 
 #import "RelativeTouchHandler.h"
+#import "DataManager.h"
 
 #include <Limelight.h>
 
@@ -19,7 +20,7 @@ static const int REFERENCE_HEIGHT = 720;
     BOOL isDragging;
     NSTimer* dragTimer;
     NSUInteger peakTouchCount;
-    
+    TemporarySettings* settings;
 #if TARGET_OS_TV
     UIGestureRecognizer* remotePressRecognizer;
     UIGestureRecognizer* remoteLongPressRecognizer;
@@ -31,7 +32,7 @@ static const int REFERENCE_HEIGHT = 720;
 - (id)initWithView:(StreamView*)view {
     self = [self init];
     self->view = view;
-    
+    self->settings= [[[DataManager alloc] init] getSettings];
 #if TARGET_OS_TV
     remotePressRecognizer = [[UITapGestureRecognizer alloc] initWithTarget:self action:@selector(remoteButtonPressed:)];
     remotePressRecognizer.allowedPressTypes = @[@(UIPressTypeSelect)];
@@ -59,6 +60,9 @@ static const int REFERENCE_HEIGHT = 720;
 }
 
 - (void)touchesBegan:(NSSet *)touches withEvent:(UIEvent *)event {
+    if (settings.multiTouchScreen) {
+        return;
+    }
     touchMoved = false;
     peakTouchCount = [[event allTouches] count];
     if ([[event allTouches] count] == 1) {
@@ -81,6 +85,9 @@ static const int REFERENCE_HEIGHT = 720;
 }
 
 - (void)touchesMoved:(NSSet *)touches withEvent:(UIEvent *)event {
+    if (settings.multiTouchScreen) {
+        return;
+    }
     if ([[event allTouches] count] == 1) {
         UITouch *touch = [[event allTouches] anyObject];
         CGPoint currentLocation = [touch locationInView:view];
@@ -122,6 +129,9 @@ static const int REFERENCE_HEIGHT = 720;
 }
 
 - (void)touchesEnded:(NSSet *)touches withEvent:(UIEvent *)event {
+    if (settings.multiTouchScreen) {
+        return;
+    }
     [dragTimer invalidate];
     dragTimer = nil;
     if (isDragging) {
@@ -171,6 +181,9 @@ static const int REFERENCE_HEIGHT = 720;
 }
 
 - (void)touchesCancelled:(NSSet *)touches withEvent:(UIEvent *)event {
+    if (settings.multiTouchScreen) {
+        return;
+    }
     [dragTimer invalidate];
     dragTimer = nil;
     if (isDragging) {

@@ -24,7 +24,7 @@
 
 @dynamic overrideUserInterfaceStyle;
 
-static NSString* bitrateFormat = @"Bitrate: %.1f Mbps";
+static NSString* bitrateFormat = @"码率: %.1f Mbps";
 static const int bitrateTable[] = {
     500,
     1000,
@@ -52,7 +52,15 @@ static const int bitrateTable[] = {
     100000,
     120000,
     150000,
+    180000,
+    200000,
+    250000,
+    300000,
+    400000,
+    500000,
 };
+
+static NSString* touchSensitivityFormat = @"触觉灵敏度(百分比): %.1f";
 
 const int RESOLUTION_TABLE_SIZE = 7;
 const int RESOLUTION_TABLE_CUSTOM_INDEX = RESOLUTION_TABLE_SIZE - 1;
@@ -249,6 +257,14 @@ BOOL isCustomResolution(CGSize res) {
     [self.touchModeSelector addTarget:self action:@selector(touchModeChanged) forControlEvents:UIControlEventValueChanged];
     [self.statsOverlaySelector setSelectedSegmentIndex:currentSettings.statsOverlay ? 1 : 0];
     [self.rumbleiPhoneSelector setSelectedSegmentIndex:currentSettings.rumblePhone ? 1 : 0];
+    //陀螺仪
+    NSInteger motionMode = [currentSettings.motionMode integerValue];
+    [self.motionModeSelector setSelectedSegmentIndex:motionMode];
+    //虚拟显示器
+    NSInteger virtualDisplayMode = [currentSettings.virtualDisplayMode integerValue];
+    [self.virtualDisplayModeSelector setSelectedSegmentIndex:virtualDisplayMode];
+
+    
     [self.btMouseSelector setSelectedSegmentIndex:currentSettings.btMouseSupport ? 1 : 0];
     [self.optimizeSettingsSelector setSelectedSegmentIndex:currentSettings.optimizeGames ? 1 : 0];
     [self.framePacingSelector setSelectedSegmentIndex:currentSettings.useFramePacing ? 1 : 0];
@@ -270,6 +286,18 @@ BOOL isCustomResolution(CGSize res) {
     [self updateBitrateText];
 //    [self updateCustomResolutionText];
     
+    [self.enableTouchSensitivitySelector setSelectedSegmentIndex:currentSettings.enableTouchSensitivity ? 1 : 0];
+    [self.externalMonitorSelector setSelectedSegmentIndex:currentSettings.externalMonitor ? 1 : 0];
+    [self.touchSensitivityGlobalSelector setSelectedSegmentIndex:currentSettings.touchSensitivityGlobal ? 1 : 0];
+    [self.multiTouchScreenSelector setSelectedSegmentIndex:currentSettings.multiTouchScreen ? 1 : 0];
+
+    CGFloat floatValue = [currentSettings.touchSensitivity floatValue];
+    [self.touchSensitivity setValue:floatValue];
+    
+    [self.touchSensitivity addTarget:self action:@selector(touchSensitivitySliderMoved) forControlEvents:(UIControlEventValueChanged)];
+
+    [self.touchSensitivityLable setText:[NSString stringWithFormat:touchSensitivityFormat,self.touchSensitivity.value]];
+
     tapGesture = [[UITapGestureRecognizer alloc] initWithTarget:self action:@selector(OSCSegmentControlReselected:)];  // detects when OSC segmented control button is re-selected
     [self.onscreenControlSelector addGestureRecognizer:tapGesture];
 
@@ -485,6 +513,12 @@ BOOL isCustomResolution(CGSize res) {
     [self updateBitrateText];
 }
 
+- (void) touchSensitivitySliderMoved{
+//    Log(LOG_I, @"touchSensitivitySliderMoved: %d", self.touchSensitivity.value);
+    [self.touchSensitivityLable setText:[NSString stringWithFormat:touchSensitivityFormat,_touchSensitivity.value]];
+    
+}
+
 - (void) updateBitrateText {
     // Display bitrate in Mbps
     [self.bitrateLabel setText:[NSString stringWithFormat:bitrateFormat, _bitrate / 1000.]];
@@ -564,6 +598,14 @@ BOOL isCustomResolution(CGSize res) {
     BOOL enableHdr = [self.hdrSelector selectedSegmentIndex] == 1;
     BOOL multiTouchScreen =[self.multiTouchScreenSelector selectedSegmentIndex] == 1;
     BOOL externalMonitor =[self.externalMonitorSelector selectedSegmentIndex] ==1;
+    NSInteger motionMode = [self.motionModeSelector selectedSegmentIndex];
+    NSInteger virtualDisplayMode = [self.virtualDisplayModeSelector selectedSegmentIndex];
+    
+    BOOL touchSensitivityGlobal =[self.touchSensitivityGlobalSelector selectedSegmentIndex] == 1;
+    BOOL enableTouchSensitivity =[self.enableTouchSensitivitySelector selectedSegmentIndex] ==1;
+
+    NSInteger touchSensitivity=[self.touchSensitivity value];
+    
     [dataMan saveSettingsWithBitrate:_bitrate
                            framerate:framerate
                               height:height
@@ -582,7 +624,12 @@ BOOL isCustomResolution(CGSize res) {
                         statsOverlay:statsOverlay
                          rumblePhone:rumblePhone
                     multiTouchScreen:multiTouchScreen
-                     externalMonitor:externalMonitor];
+                     externalMonitor:externalMonitor
+              touchSensitivityGlobal:touchSensitivityGlobal
+              enableTouchSensitivity:enableTouchSensitivity
+                    touchSensitivity:touchSensitivity
+                          motionMode:motionMode
+                  virtualDisplayMode:virtualDisplayMode];
 }
 
 - (void)didReceiveMemoryWarning {

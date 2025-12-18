@@ -9,7 +9,6 @@
 @import AVFoundation;
 
 #import "ConnectionCallbacks.h"
-
 #include "Limelight.h"
 
 @interface VideoDecoderRenderer : NSObject

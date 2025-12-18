@@ -268,8 +268,8 @@
     // on GFE 3.20.3. We do not do this hack for Sunshine (which is
     // indicated by a negative version in the last field.
     int fps = (config.frameRate > 60 && ![config.appVersion containsString:@".-"]) ? 0 : config.frameRate;
-    
-    NSString* urlString = [NSString stringWithFormat:@"%@/%@?uniqueid=%@&appid=%@&mode=%dx%dx%d&additionalStates=1&sops=%d&rikey=%@&rikeyid=%d%@&localAudioPlayMode=%d&surroundAudioInfo=%d&remoteControllersBitmap=%d&gcmap=%d&gcpersist=%d%s",
+
+    NSString* urlString = [NSString stringWithFormat:@"%@/%@?uniqueid=%@&appid=%@&mode=%dx%dx%d&additionalStates=1&sops=%d&rikey=%@&rikeyid=%d%@&localAudioPlayMode=%d&surroundAudioInfo=%d&remoteControllersBitmap=%d&gcmap=%d&gcpersist=%d%s%@",
                            _baseHTTPSURL, verb, _uniqueId,
                            config.appID,
                            config.width, config.height, fps,
@@ -280,11 +280,77 @@
                            SURROUNDAUDIOINFO_FROM_AUDIO_CONFIGURATION(config.audioConfiguration),
                            config.gamepadMask, config.gamepadMask,
                            !config.multiController ? 1 : 0,
-                           LiGetLaunchUrlQueryParameters()];
+                           LiGetLaunchUrlQueryParameters(),[self getUrlParams:config]];
     Log(LOG_I, @"Requesting: %@", urlString);
     // This blocks while the app is launching
     return [self createRequestFromString:urlString timeout:LONG_TIMEOUT_SEC];
 }
+
+
+- (NSString *)getUrlParams:(StreamConfiguration *)config {
+    if (config.virtualDisplayMode==0) {
+        return @"";
+    }
+    
+    int fps = (config.frameRate > 60 && ![config.appVersion containsString:@".-"]) ? 0 : config.frameRate;
+    
+    NSMutableString *sb = [NSMutableString string];
+    
+    [sb appendString:@"&"];
+    [sb appendString:@"virtualDisplay=2"];
+    [sb appendString:@"&"];
+    [sb appendString:@"virtualDisplayMode="];
+    [sb appendFormat:@"%dx%dx%d", config.width, config.height,fps];
+    [sb appendString:@"&"];
+    [sb appendFormat:@"uuid=%@",[NSUUID UUID].UUIDString];
+    [sb appendString:@"&"];
+    [sb appendString:@"screen_resolution="];
+    [sb appendFormat:@"%dx%d", config.width, config.height];
+    [sb appendString:@"&"];
+    [sb appendString:@"timeToTerminateApp=0"];
+    [sb appendString:@"&"];
+    [sb appendFormat:@"UIScale=%@",[self getCurrentPCScale]];
+    NSLog(@"axixi %@", sb);
+    return sb;
+}
+
+- (CGFloat)getCurrentiOSDeviceScale {
+    
+    CGFloat scale = [UIScreen.mainScreen scale];
+//    NSLog(@"current device scale = %f", scale);
+    return scale;
+}
+
+-(NSString *)getCurrentPCScale {
+    
+    CGFloat scale = [self getCurrentiOSDeviceScale];
+    
+    CGFloat currentScreenWidth = UIScreen.mainScreen.bounds.size.width;
+    
+    if (currentScreenWidth < 720.0) {
+        NSArray *scaleArray = @[@1.0, @1.25, @1.5, @1.75, @2.0];
+        CGFloat devicePT = currentScreenWidth * scale;
+        CGFloat calculateScale = devicePT / 720.0;
+        
+        CGFloat closestScale = 1.0;
+        CGFloat smllestDistance = fabs(closestScale - calculateScale);
+        
+        for (int i = 0; i < scaleArray.count; i++) {
+            CGFloat scale = [scaleArray[i] floatValue];
+            CGFloat distance = fabs(scale - calculateScale);
+            
+            if (distance < smllestDistance) {
+                closestScale = scale;
+                smllestDistance = distance;
+            }
+        }
+        scale = closestScale;
+    }
+    
+    int pcScale = scale * 100;
+    return [NSString stringWithFormat:@"%d", pcScale];
+}
+
 
 - (NSURLRequest*) newQuitAppRequest {
     if (![self ensureHttpsUrlPopulated:NO]) {

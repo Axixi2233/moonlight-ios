@@ -10,12 +10,16 @@
 #import "Controller.h"
 
 #import "OnScreenControls.h"
-
 #import "DataManager.h"
 #include "Limelight.h"
 
 @import GameController;
 @import AudioToolbox;
+
+//设备陀螺仪
+#if !TARGET_OS_TV
+    @import CoreMotion;
+#endif
 
 static const double MOUSE_SPEED_DIVISOR = 1.25;
 
@@ -46,6 +50,10 @@ static const double MOUSE_SPEED_DIVISOR = 1.25;
     char _controllerNumbers;
     bool _multiController;
     bool _swapABXYButtons;
+    
+    int _motionMode;//陀螺仪模式
+    
+    bool _rumblePhone;//iphone震动
 }
 
 // UPDATE_BUTTON_FLAG(controller, flag, pressed)
@@ -59,6 +67,11 @@ static const double MOUSE_SPEED_DIVISOR = 1.25;
     Controller* controller = [_controllers objectForKey:[NSNumber numberWithInteger:controllerNumber]];
     if (controller == nil && controllerNumber == 0 && _oscEnabled) {
         // TODO: Rumble emulation for OSC
+        //iPhone震动
+        if(_rumblePhone){
+            controller = _oscController;
+            [self initializeControllerHaptics:controller];
+        }
     }
     if (controller == nil) {
         // No connected controller for this player
@@ -84,19 +97,137 @@ static const double MOUSE_SPEED_DIVISOR = 1.25;
     [controller.rightTriggerMotor setMotorAmplitude:rightTrigger];
 }
 
+
 - (void) setMotionEventState:(uint16_t)controllerNumber motionType:(uint8_t)motionType reportRateHz:(uint16_t)reportRateHz
 {
     if (@available(iOS 14.0, tvOS 14.0, *)) {
         Controller* controller = [_controllers objectForKey:[NSNumber numberWithInteger:controllerNumber]];
-        if (controller == nil) {
-            // No connected controller for this player
-            return;
+//        if (controller == nil) {
+//            // No connected controller for this player
+//            return;
+//        }
+//        
+//        if (controller.gamepad.motion == nil) {
+//            // No motion supported for this controller
+//            return;
+//        }
+        NSInteger motionMode = _motionMode; //motionMode 0 = auto | 1 = always device | 2 = always controller
+        NSLog(@"axixi-motionMode %ld", (long)motionMode);
+        if (motionMode==2) {
+            if (controller == nil) {
+                // No connected controller for this player
+                return;
+            }
+            if (controller.gamepad.motion == nil) {
+                // No motion supported for this controller
+                return;
+            }
+            NSLog(@"axixi-gamepad %@", controller.gamepad.description);
+            NSLog(@"axixi-gamepad %@", controller.gamepad.productCategory);
         }
+        //陀螺仪
+        #if !TARGET_OS_TV //tvOS has no device motion
+            if(controllerNumber < 2 && motionMode != 2){
+                //motionMode 0 = auto | 1 = always device | 2 = always controller
+                if(controller == nil || controller.gamepad.motion == nil || motionMode == 1){
+                    //Player has no controller *or* no motion for controller 1 *or* wants to override controller 1 motion with device motion
+                    //using device motion
+                    if (controller == nil) {
+                        // No connected controller for this player, use the _oscController instead
+                        controller = _oscController;
+                    }
+                    if(!controller.motionManager) {
+                        controller.motionManager = [[CMMotionManager alloc] init];
+                    }
+
+                    switch (motionType) {
+                        case LI_MOTION_TYPE_ACCEL:
+                            [controller.accelTimer invalidate];
+                            controller.accelTimer = nil;
+
+                            // Reset the last motion sample
+                            CMAcceleration emptyDeviceAccelSample = {};
+                            controller.lastDeviceAccelSample = emptyDeviceAccelSample;
+
+                            {dispatch_sync(dispatch_get_main_queue(), ^{
+                                controller.accelTimer = [NSTimer scheduledTimerWithTimeInterval:1.0 / reportRateHz repeats:YES block:^(NSTimer *timer) {
+                                    // Don't send duplicate samples
+                                    CMAcceleration lastDeviceAccelSample = controller.lastDeviceAccelSample;
+                                    CMAcceleration deviceAccelSample = controller.motionManager.deviceMotion.userAcceleration;
+                                    //userAcceleration does not contain gravity, add gravity to x, y and z values:
+                                    deviceAccelSample.x += controller.motionManager.deviceMotion.gravity.x;
+                                    deviceAccelSample.y += controller.motionManager.deviceMotion.gravity.y;
+                                    deviceAccelSample.z += controller.motionManager.deviceMotion.gravity.z;
+
+                                    if (memcmp(&deviceAccelSample, &lastDeviceAccelSample, sizeof(deviceAccelSample)) == 0) {
+                                        return;
+                                    }
+                                    controller.lastDeviceAccelSample = deviceAccelSample;
+
+                                    // Convert g to m/s^2
+                                    if(UIApplication.sharedApplication.windows.firstObject.windowScene.interfaceOrientation == 4){ //check for landscape left or landscape right
+                                        LiSendControllerMotionEvent((uint8_t)controllerNumber,
+                                                                    LI_MOTION_TYPE_ACCEL,
+                                                                    deviceAccelSample.y * -9.80665f,
+                                                                    deviceAccelSample.z * -9.80665f,
+                                                                    deviceAccelSample.x * -9.80665f);
+                                    }
+                                    else{
+                                        LiSendControllerMotionEvent((uint8_t)controllerNumber,
+                                                                    LI_MOTION_TYPE_ACCEL,
+                                                                    deviceAccelSample.y * +9.80665f,
+                                                                    deviceAccelSample.z * -9.80665f,
+                                                                    deviceAccelSample.x * +9.80665f);
+                                    }
+                                }];
+                            });}
+                            break;
+                        case LI_MOTION_TYPE_GYRO:
+                            [controller.gyroTimer invalidate];
+                            controller.gyroTimer = nil;
+
+                            // Reset the last motion sample
+                            CMRotationRate emptyDeviceGyroSample = {};
+                            controller.lastDeviceGyroSample = emptyDeviceGyroSample;
+
+                            [controller.motionManager startDeviceMotionUpdates];
+
+                            dispatch_sync(dispatch_get_main_queue(), ^{
+                                controller.gyroTimer = [NSTimer scheduledTimerWithTimeInterval:1.0 / reportRateHz repeats:YES block:^(NSTimer *timer) {
+
+                                    // Don't send duplicate samples
+                                    CMRotationRate lastDeviceGyroSample = controller.lastDeviceGyroSample;
+                                    CMRotationRate deviceGyroSample = controller.motionManager.deviceMotion.rotationRate;
+                                    if (memcmp(&deviceGyroSample, &lastDeviceGyroSample, sizeof(deviceGyroSample)) == 0) {
+                                        return;
+                                    }
+                                    controller.lastDeviceGyroSample = deviceGyroSample;
+
+                                    // Convert rad/s to deg/s
+                                    if(UIApplication.sharedApplication.windows.firstObject.windowScene.interfaceOrientation == 4){//check for landscape left or landscape right
+                                        LiSendControllerMotionEvent((uint8_t)controllerNumber,
+                                                                    LI_MOTION_TYPE_GYRO,
+                                                                    deviceGyroSample.y * 57.2957795f,
+                                                                    deviceGyroSample.z * 57.2957795f,
+                                                                    deviceGyroSample.x * 57.2957795f);
+                                    }
+                                    else{
+                                        LiSendControllerMotionEvent((uint8_t)controllerNumber,
+                                                                    LI_MOTION_TYPE_GYRO,
+                                                                    deviceGyroSample.y * -57.2957795f,
+                                                                    deviceGyroSample.z * 57.2957795f,
+                                                                    deviceGyroSample.x * -57.2957795f);
+                                    }
+
+                                }];
+                            });
+                            break;
+                    }
+                    return;
+                }
+            }
+        #endif
         
-        if (controller.gamepad.motion == nil) {
-            // No motion supported for this controller
-            return;
-        }
         
         switch (motionType) {
             case LI_MOTION_TYPE_ACCEL:
@@ -493,7 +624,6 @@ static const double MOUSE_SPEED_DIVISOR = 1.25;
         
         // Start is always present
         supportedButtonFlags |= PLAY_FLAG;
-        
         // Detect buttons present in the GCExtendedGamepad profile
         if (controller.extendedGamepad.dpad) {
             supportedButtonFlags |= UP_FLAG | DOWN_FLAG | LEFT_FLAG | RIGHT_FLAG;
@@ -1082,6 +1212,9 @@ static const double MOUSE_SPEED_DIVISOR = 1.25;
     _controllerNumbers = 0;
     _multiController = streamConfig.multiController;
     _swapABXYButtons = streamConfig.swapABXYButtons;
+    //陀螺仪
+    _motionMode = streamConfig.motionMode;
+    
     _delegate = delegate;
 
     _oscController = [[Controller alloc] init];
@@ -1089,6 +1222,8 @@ static const double MOUSE_SPEED_DIVISOR = 1.25;
 
     DataManager* dataMan = [[DataManager alloc] init];
     _oscEnabled = (OnScreenControlsLevel)[[dataMan getSettings].onscreenControls integerValue] != OnScreenControlsLevelOff;
+    //iPhone震动
+    _rumblePhone=[dataMan getSettings].rumblePhone;
     
     Log(LOG_I, @"Number of supported controllers connected: %d", [ControllerSupport getGamepadCount]);
     Log(LOG_I, @"Multi-controller: %d", _multiController);
@@ -1255,6 +1390,13 @@ static const double MOUSE_SPEED_DIVISOR = 1.25;
         [self cleanupControllerBattery:controller];
     }
     [_controllers removeAllObjects];
+    
+    //陀螺仪
+    #if !TARGET_OS_TV
+        [self cleanupControllerMotion:_oscController];
+        [self cleanupControllerHaptics:_oscController];
+        [_oscController.motionManager stopDeviceMotionUpdates];
+    #endif
     
     for (GCController* controller in [GCController controllers]) {
         if ([ControllerSupport isSupportedGamepad:controller]) {

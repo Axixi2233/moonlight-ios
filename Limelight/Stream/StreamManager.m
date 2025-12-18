@@ -151,42 +151,54 @@
     video_stats_t stats;
     
     if (!_connection) {
-        return nil;
+        return @"";
     }
     
     if (![_connection getVideoStats:&stats]) {
-        return nil;
+        return @"";
     }
     
     uint32_t rtt, variance;
     NSString* latencyString;
+    NSString* latencyStringLite;
     if (LiGetEstimatedRttInfo(&rtt, &variance)) {
         latencyString = [NSString stringWithFormat:@"%u ms (variance: %u ms)", rtt, variance];
+        latencyStringLite= [NSString stringWithFormat:@"延迟：%u ms (抖动%u ms)", rtt, variance];
     }
     else {
         latencyString = @"N/A";
+        latencyStringLite= @"";
     }
     
     NSString* hostProcessingString;
+    NSString* hostProcessingStringLite;
+
     if (stats.framesWithHostProcessingLatency != 0) {
         hostProcessingString = [NSString stringWithFormat:@"\nHost processing latency min/max/avg: %.1f/%.1f/%.1f ms",
                                 stats.minHostProcessingLatency / 10.f,
                                 stats.maxHostProcessingLatency / 10.f,
                                 (float)stats.totalHostProcessingLatency / stats.framesWithHostProcessingLatency / 10.f];
+        hostProcessingStringLite=[NSString stringWithFormat:@"编码：%.1f ms",(float)stats.totalHostProcessingLatency / stats.framesWithHostProcessingLatency / 10.f];
     }
     else {
         hostProcessingString = @"";
+        hostProcessingStringLite=@"";
     }
     
     float interval = stats.endTime - stats.startTime;
-    return [NSString stringWithFormat:@"Video stream: %dx%d %.2f FPS (Codec: %@)\nFrames dropped by your network connection: %.2f%%\nAverage network latency: %@%@",
-            _config.width,
-            _config.height,
-            stats.totalFrames / interval,
-            [_connection getActiveCodecName],
-            stats.networkDroppedFrames / interval,
-            latencyString,
-            hostProcessingString];
+    
+    return [NSString stringWithFormat:@"%dx%d %@ %@ %@ 丢帧：%.2f FPS：%.2f",_config.width,_config.height,
+            [_connection getActiveCodecNameLite],latencyStringLite,hostProcessingStringLite,stats.networkDroppedFrames / interval,stats.totalFrames / interval];
+    
+//    return [NSString stringWithFormat:@"Video stream: %dx%d %.2f FPS (Codec: %@)\nFrames dropped by your network connection: %.2f%%\nAverage network latency: %@%@",
+//            _config.width,
+//            _config.height,
+//            stats.totalFrames / interval,
+//            [_connection getActiveCodecName],
+//            stats.networkDroppedFrames / interval,
+//            latencyString,
+//            hostProcessingString];
+    
 }
 
 @end

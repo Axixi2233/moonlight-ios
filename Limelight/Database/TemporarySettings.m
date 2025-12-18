@@ -88,6 +88,11 @@
     self.rumblePhone=settings.rumblePhone;
     self.multiTouchScreen=settings.multiTouchScreen;
     self.externalMonitor=settings.externalMonitor;
+    self.touchSensitivity=settings.touchSensitivity;
+    self.enableTouchSensitivity=settings.enableTouchSensitivity;
+    self.touchSensitivityGlobal=settings.touchSensitivityGlobal;
+    self.motionMode = settings.motionMode;
+    self.virtualDisplayMode=settings.virtualDisplayMode;
 #endif
     self.uniqueId = settings.uniqueId;
     

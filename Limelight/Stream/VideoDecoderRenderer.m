@@ -417,7 +417,6 @@ int DrSubmitDecodeUnit(PDECODE_UNIT decodeUnit);
 - (int)submitDecodeBuffer:(unsigned char *)data length:(int)length bufferType:(int)bufferType decodeUnit:(PDECODE_UNIT)du
 {
     OSStatus status;
-    
     // Construct a new format description object each time we receive an IDR frame
     if (du->frameType == FRAME_TYPE_IDR) {
         if (bufferType != BUFFER_TYPE_PICDATA) {

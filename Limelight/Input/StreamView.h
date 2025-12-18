@@ -10,6 +10,8 @@
 #import "OnScreenControls.h"
 #import "Moonlight-Swift.h"
 #import "StreamConfiguration.h"
+#import "TouchScreenManager.h"
+#import "SensitivityBean.h"
 
 @protocol UserInteractionDelegate <NSObject>
 
@@ -29,6 +31,7 @@
                   config:(StreamConfiguration*)streamConfig;
 - (void) showOnScreenControls;
 - (OnScreenControlsLevel) getCurrentOscState;
+- (void) showKeyInputBoard;
 
 #if !TARGET_OS_TV
 - (void) updateCursorLocation:(CGPoint)location isMouse:(BOOL)isMouse;

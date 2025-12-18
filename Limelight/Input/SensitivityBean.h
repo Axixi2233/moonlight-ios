@@ -5,9 +5,12 @@
 //  Created by Klee on 2024/5/16.
 //  Copyright © 2024 Moonlight Game Streaming Project. All rights reserved.
 //
+@interface SensitivityBean : NSObject
 
-#ifndef SensitivityBean_h
-#define SensitivityBean_h
+@property (nonatomic, assign) CGFloat lastAbsoluteX;
+@property (nonatomic, assign) CGFloat lastAbsoluteY;
+@property (nonatomic, assign) CGFloat lastRelativelyX;
+@property (nonatomic, assign) CGFloat lastRelativelyY;
 
+@end
 
-#endif /* SensitivityBean_h */
