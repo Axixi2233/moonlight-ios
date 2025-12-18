@@ -8,6 +8,8 @@
 
 /* Begin PBXBuildFile section */
 		693B3A9B218638CD00982F7B /* Settings.bundle in Resources */ = {isa = PBXBuildFile; fileRef = 693B3A9A218638CD00982F7B /* Settings.bundle */; };
+		791F0E5F2BF5D82500837217 /* TouchScreenManager.m in Sources */ = {isa = PBXBuildFile; fileRef = 791F0E5E2BF5D82500837217 /* TouchScreenManager.m */; };
+		791F0E632BF5E33500837217 /* SensitivityBean.m in Sources */ = {isa = PBXBuildFile; fileRef = 791F0E622BF5E33500837217 /* SensitivityBean.m */; };
 		79A316772BCE720600435DCE /* iPhone.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 79A316762BCE720600435DCE /* iPhone.storyboard */; };
 		79A316792BCE721000435DCE /* iPad.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 79A316782BCE721000435DCE /* iPad.storyboard */; };
 		79A316832BCE72B800435DCE /* OnScreenButtonState.m in Sources */ = {isa = PBXBuildFile; fileRef = 79A3167B2BCE72B800435DCE /* OnScreenButtonState.m */; };
@@ -181,6 +183,11 @@
 /* Begin PBXFileReference section */
 		566E9D2B2770B23A00EF7BFE /* Moonlight v1.7.xcdatamodel */ = {isa = PBXFileReference; lastKnownFileType = wrapper.xcdatamodel; path = "Moonlight v1.7.xcdatamodel"; sourceTree = "<group>"; };
 		693B3A9A218638CD00982F7B /* Settings.bundle */ = {isa = PBXFileReference; lastKnownFileType = "wrapper.plug-in"; path = Settings.bundle; sourceTree = "<group>"; };
+		7915FC412DE5777300912831 /* IOKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = IOKit.framework; path = System/Library/Frameworks/IOKit.framework; sourceTree = SDKROOT; };
+		791F0E5E2BF5D82500837217 /* TouchScreenManager.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = TouchScreenManager.m; sourceTree = "<group>"; };
+		791F0E602BF5D85800837217 /* TouchScreenManager.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = TouchScreenManager.h; sourceTree = "<group>"; };
+		791F0E612BF5E31D00837217 /* SensitivityBean.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = SensitivityBean.h; sourceTree = "<group>"; };
+		791F0E622BF5E33500837217 /* SensitivityBean.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = SensitivityBean.m; sourceTree = "<group>"; };
 		79A316762BCE720600435DCE /* iPhone.storyboard */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; path = iPhone.storyboard; sourceTree = "<group>"; };
 		79A316782BCE721000435DCE /* iPad.storyboard */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; path = iPad.storyboard; sourceTree = "<group>"; };
 		79A3167B2BCE72B800435DCE /* OnScreenButtonState.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = OnScreenButtonState.m; sourceTree = "<group>"; };
@@ -483,6 +490,7 @@
 		FB290CF019B2C406004C83CF /* Frameworks */ = {
 			isa = PBXGroup;
 			children = (
+				7915FC412DE5777300912831 /* IOKit.framework */,
 				98882A032AF60F5300C5A11C /* libavcodec.a */,
 				98882A052AF60F5300C5A11C /* libavformat.a */,
 				98882A0A2AF60F9000C5A11C /* libavcodec.a */,
@@ -585,6 +593,10 @@
 				9819CC21254F180F008A7C8E /* AbsoluteTouchHandler.m */,
 				988FCD3F293B091B003050E2 /* KeyboardInputField.h */,
 				988FCD40293B091B003050E2 /* KeyboardInputField.m */,
+				791F0E5E2BF5D82500837217 /* TouchScreenManager.m */,
+				791F0E602BF5D85800837217 /* TouchScreenManager.h */,
+				791F0E612BF5E31D00837217 /* SensitivityBean.h */,
+				791F0E622BF5E33500837217 /* SensitivityBean.m */,
 			);
 			path = Input;
 			sourceTree = "<group>";
@@ -981,6 +993,7 @@
 				FB4678FA1A55FFAD00377732 /* DiscoveryManager.m in Sources */,
 				98D5856D1C0EA79600F6CC00 /* TemporaryHost.m in Sources */,
 				79A316832BCE72B800435DCE /* OnScreenButtonState.m in Sources */,
+				791F0E632BF5E33500837217 /* SensitivityBean.m in Sources */,
 				FB89463519F646E200339C8A /* MainFrameViewController.m in Sources */,
 				FBD1C8E21A8AD71400C6703C /* Logger.m in Sources */,
 				FB1D599A1BBCCD7E00F482CA /* AppCollectionView.m in Sources */,
@@ -1001,6 +1014,7 @@
 				FBD3494319FC9C04002D2A60 /* AppAssetManager.m in Sources */,
 				FB6549561A57907E001C8F39 /* DiscoveryWorker.m in Sources */,
 				79A316962BCE730D00435DCE /* ProfileTableViewCell.m in Sources */,
+				791F0E5F2BF5D82500837217 /* TouchScreenManager.m in Sources */,
 				FB89462A19F646E200339C8A /* ControllerSupport.m in Sources */,
 				FB9AFD3D1A7E111600872C98 /* AppAssetResponse.m in Sources */,
 				FBD349621A0089F6002D2A60 /* DataManager.m in Sources */,
@@ -1273,10 +1287,10 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CLANG_ENABLE_MODULES = YES;
-				CODE_SIGN_IDENTITY = "iPhone Developer";
-				"CODE_SIGN_IDENTITY[sdk=iphoneos*]" = "iPhone Developer";
+				CODE_SIGN_IDENTITY = "Apple Development";
+				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = U39XM5BN3U;
+				DEVELOPMENT_TEAM = HK3R4Y8D92;
 				GCC_PRECOMPILE_PREFIX_HEADER = YES;
 				GCC_PREFIX_HEADER = "Limelight/Limelight-Prefix.pch";
 				HEADER_SEARCH_PATHS = (
@@ -1305,9 +1319,10 @@
 					"$(PROJECT_DIR)/libs/FFmpeg/lib/iOS-Sim",
 				);
 				MARKETING_VERSION = 9.0.2;
-				PRODUCT_BUNDLE_IDENTIFIER = "com.moonlight-stream.iPadOS";
+				PRODUCT_BUNDLE_IDENTIFIER = cn.axi.moonlight.ap1;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				PROVISIONING_PROFILE = "";
+				PROVISIONING_PROFILE_SPECIFIER = "";
 				SKIP_INSTALL = NO;
 				SWIFT_OBJC_BRIDGING_HEADER = "Limelight/Input/Moonlight-Bridging-Header.h";
 				SWIFT_OBJC_INTERFACE_HEADER_NAME = "Moonlight-Swift.h";
@@ -1323,10 +1338,10 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CLANG_ENABLE_MODULES = YES;
-				CODE_SIGN_IDENTITY = "iPhone Developer";
-				"CODE_SIGN_IDENTITY[sdk=iphoneos*]" = "iPhone Developer";
+				CODE_SIGN_IDENTITY = "Apple Development";
+				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = U39XM5BN3U;
+				DEVELOPMENT_TEAM = HK3R4Y8D92;
 				GCC_PRECOMPILE_PREFIX_HEADER = YES;
 				GCC_PREFIX_HEADER = "Limelight/Limelight-Prefix.pch";
 				HEADER_SEARCH_PATHS = (
@@ -1355,9 +1370,10 @@
 					"$(PROJECT_DIR)/libs/FFmpeg/lib/iOS-Sim",
 				);
 				MARKETING_VERSION = 9.0.2;
-				PRODUCT_BUNDLE_IDENTIFIER = "com.moonlight-stream.iPadOS";
+				PRODUCT_BUNDLE_IDENTIFIER = cn.axi.moonlight.ap1;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				PROVISIONING_PROFILE = "";
+				PROVISIONING_PROFILE_SPECIFIER = "";
 				SKIP_INSTALL = NO;
 				SWIFT_COMPILATION_MODE = wholemodule;
 				SWIFT_OBJC_BRIDGING_HEADER = "Limelight/Input/Moonlight-Bridging-Header.h";
