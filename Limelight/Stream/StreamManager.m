@@ -178,7 +178,7 @@
                                 stats.minHostProcessingLatency / 10.f,
                                 stats.maxHostProcessingLatency / 10.f,
                                 (float)stats.totalHostProcessingLatency / stats.framesWithHostProcessingLatency / 10.f];
-        hostProcessingStringLite=[NSString stringWithFormat:@"编码：%.1f ms",(float)stats.totalHostProcessingLatency / stats.framesWithHostProcessingLatency / 10.f];
+        hostProcessingStringLite=[NSString stringWithFormat:@"主机：%.1f ms",(float)stats.totalHostProcessingLatency / stats.framesWithHostProcessingLatency / 10.f];
     }
     else {
         hostProcessingString = @"";
