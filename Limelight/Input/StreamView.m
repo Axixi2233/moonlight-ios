@@ -14,8 +14,21 @@
 #import "RelativeTouchHandler.h"
 #import "AbsoluteTouchHandler.h"
 #import "KeyboardInputField.h"
+#import "OSCProfilesManager.h"
 
 static const double X1_MOUSE_SPEED_DIVISOR = 2.5;
+NSString * const StreamViewBoundsDidChangeNotification = @"StreamViewBoundsDidChangeNotification";
+
+@interface KeyboardAccessoryScrollView : UIScrollView
+@end
+
+@implementation KeyboardAccessoryScrollView
+
+- (BOOL)touchesShouldCancelInContentView:(UIView *)view {
+    return YES;
+}
+
+@end
 
 @implementation StreamView {
     OnScreenControls* onScreenControls;
@@ -38,6 +51,7 @@ static const double X1_MOUSE_SPEED_DIVISOR = 2.5;
     double accumulatedMouseDeltaY;
     
     UIResponder* touchHandler;
+    ControllerSupport* controllerSupport;
     
     id<UserInteractionDelegate> interactionDelegate;
     NSTimer* interactionTimer;
@@ -50,6 +64,47 @@ static const double X1_MOUSE_SPEED_DIVISOR = 2.5;
     BOOL touchSensitivityGlobal;
     BOOL enableTouchSensitivity;
     CGFloat touchSensitivity;
+    CGSize lastPostedBoundsSize;
+    StreamViewVideoAlignmentMode videoAlignmentMode;
+    CGFloat videoAlignmentMargin;
+    BOOL viewOnlyModeEnabled;
+    OnScreenControlsLevel requestedOnScreenControlsLevel;
+}
+
+- (BOOL)shouldUseFullOnScreenControlsForCurrentOrientation {
+    return self.bounds.size.height > self.bounds.size.width;
+}
+
+- (OnScreenControlsLevel)effectiveOnScreenControlsLevelForRequestedLevel:(OnScreenControlsLevel)level {
+    if (level != OnScreenControlsCustom) {
+        return level;
+    }
+
+    OSCProfile *selectedProfile = [[OSCProfilesManager sharedManager] getSelectedProfile];
+    if (selectedProfile == nil || [self shouldUseFullOnScreenControlsForCurrentOrientation]) {
+        return OnScreenControlsLevelFull;
+    }
+
+    return OnScreenControlsCustom;
+}
+
+- (void)applyRequestedOnScreenControlsLevel {
+#if !TARGET_OS_TV
+    if (onScreenControls == nil) {
+        return;
+    }
+
+    if (requestedOnScreenControlsLevel == OnScreenControlsLevelAuto && controllerSupport != nil) {
+        [controllerSupport initAutoOnScreenControlMode:onScreenControls];
+        return;
+    }
+
+    OnScreenControlsLevel effectiveLevel = [self effectiveOnScreenControlsLevelForRequestedLevel:requestedOnScreenControlsLevel];
+    if ([onScreenControls getLevel] != effectiveLevel) {
+        [onScreenControls setLevel:effectiveLevel];
+    }
+    [onScreenControls show];
+#endif
 }
 
 - (void) setupStreamView:(ControllerSupport*)controllerSupport
@@ -58,6 +113,8 @@ static const double X1_MOUSE_SPEED_DIVISOR = 2.5;
     self->interactionDelegate = interactionDelegate;
     self->streamAspectRatio = (float)streamConfig.width / (float)streamConfig.height;
     self->settings = [[[DataManager alloc] init] getSettings];
+    self->controllerSupport = controllerSupport;
+    self.multipleTouchEnabled = YES;
     
     self->touchManager = [[TouchScreenManager alloc] init];
     
@@ -79,26 +136,13 @@ static const double X1_MOUSE_SPEED_DIVISOR = 2.5;
     self->touchHandler = [[RelativeTouchHandler alloc] initWithView:self];
 #else
     // iOS uses RelativeTouchHandler or AbsoluteTouchHandler depending on user preference
-    if (settings.absoluteTouchMode) {
-        self->touchHandler = [[AbsoluteTouchHandler alloc] initWithView:self];
-    }
-    else {
-        self->touchHandler = [[RelativeTouchHandler alloc] initWithView:self];
-    }
+    [self applyTemporaryTouchModeWithAbsoluteTouchMode:settings.absoluteTouchMode
+                                      multiTouchScreen:settings.multiTouchScreen];
     
     onScreenControls = [[OnScreenControls alloc] initWithView:self controllerSup:controllerSupport streamConfig:streamConfig];
-    OnScreenControlsLevel level = (OnScreenControlsLevel)[settings.onscreenControls integerValue];
-    if (settings.absoluteTouchMode) {
-        Log(LOG_I, @"On-screen controls disabled in absolute touch mode");
-        [onScreenControls setLevel:OnScreenControlsLevelOff];
-    }
-    else if (level == OnScreenControlsLevelAuto) {
-        [controllerSupport initAutoOnScreenControlMode:onScreenControls];
-    }
-    else {
-        Log(LOG_I, @"Setting manual on-screen controls level: %d", (int)level);
-        [onScreenControls setLevel:level];
-    }
+    requestedOnScreenControlsLevel = (OnScreenControlsLevel)[settings.onscreenControls integerValue];
+    Log(LOG_I, @"Setting requested on-screen controls level: %d", (int)requestedOnScreenControlsLevel);
+    [self applyRequestedOnScreenControlsLevel];
     
     // It would be nice to just use GCMouse on iOS 14+ and the older API on iOS 13
     // but unfortunately that isn't possible today. GCMouse doesn't recognize many
@@ -139,6 +183,63 @@ static const double X1_MOUSE_SPEED_DIVISOR = 2.5;
     // This is critical to ensure keyboard events are delivered to this
     // StreamView and not our parent UIView, especially on tvOS.
     [self becomeFirstResponder];
+}
+
+- (void)applyTemporaryTouchModeWithAbsoluteTouchMode:(BOOL)absoluteTouchMode
+                                    multiTouchScreen:(BOOL)multiTouchScreen {
+#if !TARGET_OS_TV
+    settings.absoluteTouchMode = absoluteTouchMode;
+    settings.multiTouchScreen = multiTouchScreen;
+    self.multipleTouchEnabled = YES;
+    touchManager = [[TouchScreenManager alloc] init];
+
+    if (absoluteTouchMode) {
+        touchHandler = [[AbsoluteTouchHandler alloc] initWithView:self settings:settings];
+    }
+    else {
+        touchHandler = [[RelativeTouchHandler alloc] initWithView:self settings:settings];
+    }
+
+    if (onScreenControls != nil) {
+        [self applyRequestedOnScreenControlsLevel];
+    }
+#endif
+}
+
+- (void)resetAfterTemporaryTouchModeChange {
+#if !TARGET_OS_TV
+    if (isInputingText) {
+        [keyInputField resignFirstResponder];
+        isInputingText = NO;
+    }
+
+    [interactionTimer invalidate];
+    interactionTimer = nil;
+    hasUserInteracted = NO;
+
+    lastMouseButtonMask = 0;
+    lastMouseX = 0;
+    lastMouseY = 0;
+    lastScrollTranslation = CGPointZero;
+    accumulatedMouseDeltaX = 0;
+    accumulatedMouseDeltaY = 0;
+
+    LiSendMouseButtonEvent(BUTTON_ACTION_RELEASE, BUTTON_LEFT);
+    LiSendMouseButtonEvent(BUTTON_ACTION_RELEASE, BUTTON_RIGHT);
+    LiSendMouseButtonEvent(BUTTON_ACTION_RELEASE, BUTTON_MIDDLE);
+
+    [self becomeFirstResponder];
+#endif
+}
+
+- (void)layoutSubviews {
+    [super layoutSubviews];
+
+    if (!CGSizeEqualToSize(lastPostedBoundsSize, self.bounds.size)) {
+        [self applyRequestedOnScreenControlsLevel];
+        lastPostedBoundsSize = self.bounds.size;
+        [[NSNotificationCenter defaultCenter] postNotificationName:StreamViewBoundsDidChangeNotification object:self];
+    }
 }
 
 - (void)startInteractionTimer {
@@ -188,12 +289,104 @@ static const double X1_MOUSE_SPEED_DIVISOR = 2.5;
     }
 }
 
+- (void)setTemporaryVirtualGamepadVisible:(BOOL)visible {
+#if !TARGET_OS_TV
+    if (onScreenControls == nil) {
+        return;
+    }
+
+    [controllerSupport setOscEnabledForCurrentSession:visible];
+    requestedOnScreenControlsLevel = OnScreenControlsLevelOff;
+    if (visible) {
+        OSCProfile *selectedProfile = [[OSCProfilesManager sharedManager] getSelectedProfile];
+        requestedOnScreenControlsLevel = (selectedProfile != nil) ? OnScreenControlsCustom : OnScreenControlsLevelFull;
+    }
+
+    [self applyRequestedOnScreenControlsLevel];
+#endif
+}
+
+- (void)setTemporaryOnScreenControlsLevel:(OnScreenControlsLevel)level {
+#if !TARGET_OS_TV
+    if (onScreenControls == nil) {
+        return;
+    }
+
+    [controllerSupport setOscEnabledForCurrentSession:(level != OnScreenControlsLevelOff)];
+    requestedOnScreenControlsLevel = level;
+    [self applyRequestedOnScreenControlsLevel];
+#endif
+}
+
+- (void)setVideoAlignmentMode:(StreamViewVideoAlignmentMode)alignmentMode {
+    if (videoAlignmentMode == alignmentMode) {
+        return;
+    }
+
+    videoAlignmentMode = alignmentMode;
+    [self setNeedsLayout];
+    [self layoutIfNeeded];
+    [[NSNotificationCenter defaultCenter] postNotificationName:StreamViewBoundsDidChangeNotification object:self];
+}
+
+- (StreamViewVideoAlignmentMode)videoAlignmentMode {
+    return videoAlignmentMode;
+}
+
+- (void)setVideoAlignmentMargin:(CGFloat)alignmentMargin {
+    CGFloat clampedMargin = MAX(0.0f, MIN(alignmentMargin, 150.0f));
+    if (videoAlignmentMargin == clampedMargin) {
+        return;
+    }
+
+    videoAlignmentMargin = clampedMargin;
+    [self setNeedsLayout];
+    [self layoutIfNeeded];
+    [[NSNotificationCenter defaultCenter] postNotificationName:StreamViewBoundsDidChangeNotification object:self];
+}
+
+- (CGFloat)videoAlignmentMargin {
+    return videoAlignmentMargin;
+}
+
+- (void)setViewOnlyModeEnabled:(BOOL)enabled {
+    viewOnlyModeEnabled = enabled;
+}
+
+- (BOOL)isViewOnlyModeEnabled {
+    return viewOnlyModeEnabled;
+}
+
 - (CGSize) getVideoAreaSize {
     if (self.bounds.size.width > self.bounds.size.height * streamAspectRatio) {
         return CGSizeMake(self.bounds.size.height * streamAspectRatio, self.bounds.size.height);
     } else {
         return CGSizeMake(self.bounds.size.width, self.bounds.size.width / streamAspectRatio);
     }
+}
+
+- (CGPoint)getVideoOriginForCurrentAlignment {
+    CGSize videoSize = [self getVideoAreaSize];
+    CGFloat originX = self.bounds.size.width / 2 - videoSize.width / 2;
+    CGFloat originY = self.bounds.size.height / 2 - videoSize.height / 2;
+    CGFloat availableVerticalPadding = MAX(self.bounds.size.height - videoSize.height, 0.0f);
+    CGFloat clampedMargin = MIN(videoAlignmentMargin, availableVerticalPadding);
+
+    if (videoSize.height < self.bounds.size.height) {
+        switch (videoAlignmentMode) {
+            case StreamViewVideoAlignmentModeTop:
+                originY = clampedMargin;
+                break;
+            case StreamViewVideoAlignmentModeBottom:
+                originY = self.bounds.size.height - videoSize.height - clampedMargin;
+                break;
+            case StreamViewVideoAlignmentModeCenter:
+            default:
+                break;
+        }
+    }
+
+    return CGPointMake(originX, originY);
 }
 
 - (CGPoint) adjustCoordinatesForVideoArea:(CGPoint)point {
@@ -222,8 +415,7 @@ static const double X1_MOUSE_SPEED_DIVISOR = 2.5;
     
     // This logic mimics what iOS does with AVLayerVideoGravityResizeAspect
     CGSize videoSize = [self getVideoAreaSize];
-    CGPoint videoOrigin = CGPointMake(self.bounds.size.width / 2 - videoSize.width / 2,
-                                      self.bounds.size.height / 2 - videoSize.height / 2);
+    CGPoint videoOrigin = [self getVideoOriginForCurrentAlignment];
     
     // Confine the cursor to the video region. We don't just discard events outside
     // the region because we won't always get one exactly when the mouse leaves the region.
@@ -370,6 +562,11 @@ static const double X1_MOUSE_SPEED_DIVISOR = 2.5;
 #endif
 
 - (void)touchesBegan:(NSSet *)touches withEvent:(UIEvent *)event {
+    if (viewOnlyModeEnabled) {
+        [super touchesBegan:touches withEvent:event];
+        return;
+    }
+
     if ([self handleMouseButtonEvent:BUTTON_ACTION_PRESS
                           forTouches:touches
                            withEvent:event]) {
@@ -425,64 +622,106 @@ static const double X1_MOUSE_SPEED_DIVISOR = 2.5;
         keyInputField.text = @"0";
 #if !TARGET_OS_TV
         // Prepare the toolbar above the keyboard for more options
-        const CGFloat BUTTON_WIDTH = 88;
-        const CGFloat BUTTON_HEIGHT = 44;
+        const BOOL isPad = [UIDevice currentDevice].userInterfaceIdiom == UIUserInterfaceIdiomPad;
+        const CGFloat BUTTON_HEIGHT = isPad ? 44.0 : 38.0;
+        const CGFloat FUNCTION_BUTTON_WIDTH = isPad ? 72.0 : 54.0;
+        const CGFloat DONE_BUTTON_WIDTH = isPad ? 72.0 : 52.0;
+        const CGFloat BUTTON_SPACING = isPad ? 6.0 : 4.0;
+        const CGFloat ACCESSORY_OUTER_HORIZONTAL_PADDING = isPad ? 10.0 : 8.0;
+        const CGFloat ACCESSORY_OUTER_VERTICAL_PADDING = isPad ? 8.0 : 6.0;
         // Function key count except for the `Done` button. `Done` button is not in the scrollView, but is always on top.
         const CGFloat FUNCTION_KEY_COUNT = 23;
-        const CGFloat TOOLBAR_WIDTH = BUTTON_WIDTH * FUNCTION_KEY_COUNT;
+        const CGFloat TOOLBAR_WIDTH = (FUNCTION_BUTTON_WIDTH * FUNCTION_KEY_COUNT) + (BUTTON_SPACING * (FUNCTION_KEY_COUNT - 1));
         
         // Function toolbar
-        UIBarButtonItem *doneBarButton = [self createButtonWithImageNamed:@"DoneIcon.png" backgroundColor:[UIColor clearColor] buttonWidth: BUTTON_WIDTH target:self action:@selector(toolbarButtonClicked:) keyCode:0x00 isToggleable:NO];
-        UIBarButtonItem *windowsBarButton = [self createButtonWithImageNamed:@"WindowsIcon.png" backgroundColor:[UIColor blackColor] buttonWidth: BUTTON_WIDTH target:self action:@selector(toolbarButtonClicked:) keyCode:0x5B isToggleable:YES];
-        UIBarButtonItem *escapeBarButton = [self createButtonWithImageNamed:@"EscapeIcon.png" backgroundColor:[UIColor blackColor] buttonWidth: BUTTON_WIDTH target:self action:@selector(toolbarButtonClicked:) keyCode:0x1B isToggleable:NO];
-        UIBarButtonItem *tabBarButton = [self createButtonWithImageNamed:@"TabIcon.png" backgroundColor:[UIColor blackColor] buttonWidth: BUTTON_WIDTH target:self action:@selector(toolbarButtonClicked:) keyCode:0x09 isToggleable:NO];
-        UIBarButtonItem *shiftBarButton = [self createButtonWithImageNamed:@"ShiftIcon.png" backgroundColor:[UIColor blackColor] buttonWidth: BUTTON_WIDTH target:self action:@selector(toolbarButtonClicked:) keyCode:0xA0 isToggleable:YES];
-        UIBarButtonItem *controlBarButton = [self createButtonWithImageNamed:@"ControlIcon.png" backgroundColor:[UIColor blackColor] buttonWidth: BUTTON_WIDTH target:self action:@selector(toolbarButtonClicked:) keyCode:0xA2 isToggleable:YES];
-        UIBarButtonItem *altBarButton = [self createButtonWithImageNamed:@"AltIcon.png" backgroundColor:[UIColor blackColor] buttonWidth: BUTTON_WIDTH target:self action:@selector(toolbarButtonClicked:) keyCode:0xA4 isToggleable:YES];
-        UIBarButtonItem *deleteBarButton = [self createButtonWithImageNamed:@"DeleteIcon.png" backgroundColor:[UIColor blackColor] buttonWidth: BUTTON_WIDTH target:self action:@selector(toolbarButtonClicked:) keyCode:0x2E isToggleable:NO];
-        UIBarButtonItem *leftBarButton = [self createButtonWithImageNamed:@"LeftArrowIcon.png" backgroundColor:[UIColor blackColor] buttonWidth: BUTTON_WIDTH target:self action:@selector(toolbarButtonClicked:) keyCode:0x25 isToggleable:NO];
-        UIBarButtonItem *downBarButton = [self createButtonWithImageNamed:@"DownArrowIcon.png" backgroundColor:[UIColor blackColor] buttonWidth: BUTTON_WIDTH target:self action:@selector(toolbarButtonClicked:) keyCode:0x28 isToggleable:NO];
-        UIBarButtonItem *upBarButton = [self createButtonWithImageNamed:@"UpArrowIcon.png" backgroundColor:[UIColor blackColor] buttonWidth: BUTTON_WIDTH target:self action:@selector(toolbarButtonClicked:) keyCode:0x26 isToggleable:NO];
-        UIBarButtonItem *rightBarButton = [self createButtonWithImageNamed:@"RightArrowIcon.png" backgroundColor:[UIColor blackColor] buttonWidth: BUTTON_WIDTH target:self action:@selector(toolbarButtonClicked:) keyCode:0x27 isToggleable:NO];
-        UIBarButtonItem *f1BarButton = [self createButtonWithImageNamed:@"F1Icon.png" backgroundColor:[UIColor blackColor] buttonWidth: BUTTON_WIDTH target:self action:@selector(toolbarButtonClicked:) keyCode:0x70 isToggleable:NO];
-        UIBarButtonItem *f2BarButton = [self createButtonWithImageNamed:@"F2Icon.png" backgroundColor:[UIColor blackColor] buttonWidth: BUTTON_WIDTH target:self action:@selector(toolbarButtonClicked:) keyCode:0x71 isToggleable:NO];
-        UIBarButtonItem *f3BarButton = [self createButtonWithImageNamed:@"F3Icon.png" backgroundColor:[UIColor blackColor] buttonWidth: BUTTON_WIDTH target:self action:@selector(toolbarButtonClicked:) keyCode:0x72 isToggleable:NO];
-        UIBarButtonItem *f4BarButton = [self createButtonWithImageNamed:@"F4Icon.png" backgroundColor:[UIColor blackColor] buttonWidth: BUTTON_WIDTH target:self action:@selector(toolbarButtonClicked:) keyCode:0x73 isToggleable:NO];
-        UIBarButtonItem *f5BarButton = [self createButtonWithImageNamed:@"F5Icon.png" backgroundColor:[UIColor blackColor] buttonWidth: BUTTON_WIDTH target:self action:@selector(toolbarButtonClicked:) keyCode:0x74 isToggleable:NO];
-        UIBarButtonItem *f6BarButton = [self createButtonWithImageNamed:@"F6Icon.png" backgroundColor:[UIColor blackColor] buttonWidth: BUTTON_WIDTH  target:self action:@selector(toolbarButtonClicked:) keyCode:0x75 isToggleable:NO];
-        UIBarButtonItem *f7BarButton = [self createButtonWithImageNamed:@"F7Icon.png" backgroundColor:[UIColor blackColor] buttonWidth: BUTTON_WIDTH target:self action:@selector(toolbarButtonClicked:) keyCode:0x76 isToggleable:NO];
-        UIBarButtonItem *f8BarButton = [self createButtonWithImageNamed:@"F8Icon.png" backgroundColor:[UIColor blackColor] buttonWidth: BUTTON_WIDTH target:self action:@selector(toolbarButtonClicked:) keyCode:0x77 isToggleable:NO];
-        UIBarButtonItem *f9BarButton = [self createButtonWithImageNamed:@"F9Icon.png" backgroundColor:[UIColor blackColor] buttonWidth: BUTTON_WIDTH target:self action:@selector(toolbarButtonClicked:) keyCode:0x78 isToggleable:NO];
-        UIBarButtonItem *f10BarButton = [self createButtonWithImageNamed:@"F10Icon.png" backgroundColor:[UIColor blackColor] buttonWidth: BUTTON_WIDTH target:self action:@selector(toolbarButtonClicked:) keyCode:0x79 isToggleable:NO];
-        UIBarButtonItem *f11BarButton = [self createButtonWithImageNamed:@"F11Icon.png" backgroundColor:[UIColor blackColor] buttonWidth: BUTTON_WIDTH target:self action:@selector(toolbarButtonClicked:) keyCode:0x7A isToggleable:NO];
-        UIBarButtonItem *f12BarButton = [self createButtonWithImageNamed:@"F12Icon.png" backgroundColor:[UIColor blackColor] buttonWidth: BUTTON_WIDTH  target:self action:@selector(toolbarButtonClicked:) keyCode:0x7B isToggleable:NO];
-        UIBarButtonItem *flexibleSpace = [[UIBarButtonItem alloc] initWithBarButtonSystemItem:UIBarButtonSystemItemFlexibleSpace target:nil action:nil];
-        // Removes unwanted space between buttons
-        UIBarButtonItem *negativeSeperator = [[UIBarButtonItem alloc] initWithBarButtonSystemItem:UIBarButtonSystemItemFixedSpace target:nil action:nil];
-        negativeSeperator.width = -1;
+        UIButton *doneButton = [self createToolbarIconButtonWithSystemName:@"xmark"
+                                                                buttonWidth:DONE_BUTTON_WIDTH
+                                                               buttonHeight:BUTTON_HEIGHT
+                                                                     target:self
+                                                                     action:@selector(toolbarButtonClicked:)
+                                                                    keyCode:0x00
+                                                               isToggleable:NO];
+        NSArray<UIButton *> *functionButtons = @[
+            [self createToolbarTextButtonWithTitle:@"Win" buttonWidth:FUNCTION_BUTTON_WIDTH buttonHeight:BUTTON_HEIGHT target:self action:@selector(toolbarButtonClicked:) keyCode:0x5B isToggleable:YES],
+            [self createToolbarTextButtonWithTitle:@"Esc" buttonWidth:FUNCTION_BUTTON_WIDTH buttonHeight:BUTTON_HEIGHT target:self action:@selector(toolbarButtonClicked:) keyCode:0x1B isToggleable:NO],
+            [self createToolbarTextButtonWithTitle:@"Tab" buttonWidth:FUNCTION_BUTTON_WIDTH buttonHeight:BUTTON_HEIGHT target:self action:@selector(toolbarButtonClicked:) keyCode:0x09 isToggleable:NO],
+            [self createToolbarTextButtonWithTitle:@"Shift" buttonWidth:FUNCTION_BUTTON_WIDTH buttonHeight:BUTTON_HEIGHT target:self action:@selector(toolbarButtonClicked:) keyCode:0xA0 isToggleable:YES],
+            [self createToolbarTextButtonWithTitle:@"Ctrl" buttonWidth:FUNCTION_BUTTON_WIDTH buttonHeight:BUTTON_HEIGHT target:self action:@selector(toolbarButtonClicked:) keyCode:0xA2 isToggleable:YES],
+            [self createToolbarTextButtonWithTitle:@"Alt" buttonWidth:FUNCTION_BUTTON_WIDTH buttonHeight:BUTTON_HEIGHT target:self action:@selector(toolbarButtonClicked:) keyCode:0xA4 isToggleable:YES],
+            [self createToolbarTextButtonWithTitle:@"Del" buttonWidth:FUNCTION_BUTTON_WIDTH buttonHeight:BUTTON_HEIGHT target:self action:@selector(toolbarButtonClicked:) keyCode:0x2E isToggleable:NO],
+            [self createToolbarTextButtonWithTitle:@"←" buttonWidth:FUNCTION_BUTTON_WIDTH buttonHeight:BUTTON_HEIGHT target:self action:@selector(toolbarButtonClicked:) keyCode:0x25 isToggleable:NO],
+            [self createToolbarTextButtonWithTitle:@"↓" buttonWidth:FUNCTION_BUTTON_WIDTH buttonHeight:BUTTON_HEIGHT target:self action:@selector(toolbarButtonClicked:) keyCode:0x28 isToggleable:NO],
+            [self createToolbarTextButtonWithTitle:@"↑" buttonWidth:FUNCTION_BUTTON_WIDTH buttonHeight:BUTTON_HEIGHT target:self action:@selector(toolbarButtonClicked:) keyCode:0x26 isToggleable:NO],
+            [self createToolbarTextButtonWithTitle:@"→" buttonWidth:FUNCTION_BUTTON_WIDTH buttonHeight:BUTTON_HEIGHT target:self action:@selector(toolbarButtonClicked:) keyCode:0x27 isToggleable:NO],
+            [self createToolbarTextButtonWithTitle:@"F1" buttonWidth:FUNCTION_BUTTON_WIDTH buttonHeight:BUTTON_HEIGHT target:self action:@selector(toolbarButtonClicked:) keyCode:0x70 isToggleable:NO],
+            [self createToolbarTextButtonWithTitle:@"F2" buttonWidth:FUNCTION_BUTTON_WIDTH buttonHeight:BUTTON_HEIGHT target:self action:@selector(toolbarButtonClicked:) keyCode:0x71 isToggleable:NO],
+            [self createToolbarTextButtonWithTitle:@"F3" buttonWidth:FUNCTION_BUTTON_WIDTH buttonHeight:BUTTON_HEIGHT target:self action:@selector(toolbarButtonClicked:) keyCode:0x72 isToggleable:NO],
+            [self createToolbarTextButtonWithTitle:@"F4" buttonWidth:FUNCTION_BUTTON_WIDTH buttonHeight:BUTTON_HEIGHT target:self action:@selector(toolbarButtonClicked:) keyCode:0x73 isToggleable:NO],
+            [self createToolbarTextButtonWithTitle:@"F5" buttonWidth:FUNCTION_BUTTON_WIDTH buttonHeight:BUTTON_HEIGHT target:self action:@selector(toolbarButtonClicked:) keyCode:0x74 isToggleable:NO],
+            [self createToolbarTextButtonWithTitle:@"F6" buttonWidth:FUNCTION_BUTTON_WIDTH buttonHeight:BUTTON_HEIGHT target:self action:@selector(toolbarButtonClicked:) keyCode:0x75 isToggleable:NO],
+            [self createToolbarTextButtonWithTitle:@"F7" buttonWidth:FUNCTION_BUTTON_WIDTH buttonHeight:BUTTON_HEIGHT target:self action:@selector(toolbarButtonClicked:) keyCode:0x76 isToggleable:NO],
+            [self createToolbarTextButtonWithTitle:@"F8" buttonWidth:FUNCTION_BUTTON_WIDTH buttonHeight:BUTTON_HEIGHT target:self action:@selector(toolbarButtonClicked:) keyCode:0x77 isToggleable:NO],
+            [self createToolbarTextButtonWithTitle:@"F9" buttonWidth:FUNCTION_BUTTON_WIDTH buttonHeight:BUTTON_HEIGHT target:self action:@selector(toolbarButtonClicked:) keyCode:0x78 isToggleable:NO],
+            [self createToolbarTextButtonWithTitle:@"F10" buttonWidth:FUNCTION_BUTTON_WIDTH buttonHeight:BUTTON_HEIGHT target:self action:@selector(toolbarButtonClicked:) keyCode:0x79 isToggleable:NO],
+            [self createToolbarTextButtonWithTitle:@"F11" buttonWidth:FUNCTION_BUTTON_WIDTH buttonHeight:BUTTON_HEIGHT target:self action:@selector(toolbarButtonClicked:) keyCode:0x7A isToggleable:NO],
+            [self createToolbarTextButtonWithTitle:@"F12" buttonWidth:FUNCTION_BUTTON_WIDTH buttonHeight:BUTTON_HEIGHT target:self action:@selector(toolbarButtonClicked:) keyCode:0x7B isToggleable:NO]
+        ];
         
-        UIToolbar * functionToolbarView = [[UIToolbar alloc] initWithFrame:CGRectMake(0, 0, self.bounds.size.width, BUTTON_HEIGHT)];
-        functionToolbarView.autoresizingMask = UIViewAutoresizingNone;
-        [functionToolbarView setItems:[NSArray arrayWithObjects:negativeSeperator, windowsBarButton, escapeBarButton, tabBarButton, shiftBarButton, controlBarButton, altBarButton, deleteBarButton, leftBarButton, downBarButton, upBarButton, rightBarButton, f1BarButton, f2BarButton, f3BarButton, f4BarButton, f5BarButton, f6BarButton, f7BarButton, f8BarButton, f9BarButton, f10BarButton, f11BarButton, f12BarButton, flexibleSpace, nil]];
-        // Calculates remaining space for function keys, except for the `Done` button.
-        [functionToolbarView setFrame:CGRectMake(0, 0, self.bounds.size.width - BUTTON_WIDTH > TOOLBAR_WIDTH ? self.bounds.size.width - BUTTON_WIDTH : TOOLBAR_WIDTH, BUTTON_HEIGHT)];
+        UIStackView *functionButtonStackView = [[UIStackView alloc] init];
+        functionButtonStackView.axis = UILayoutConstraintAxisHorizontal;
+        functionButtonStackView.alignment = UIStackViewAlignmentFill;
+        functionButtonStackView.distribution = UIStackViewDistributionFill;
+        functionButtonStackView.spacing = BUTTON_SPACING;
+        functionButtonStackView.translatesAutoresizingMaskIntoConstraints = NO;
+        for (UIButton *functionButton in functionButtons) {
+            [functionButtonStackView addArrangedSubview:functionButton];
+        }
         
-        UIScrollView *scrollView = [[UIScrollView alloc] initWithFrame:CGRectMake(0, 0, self.bounds.size.width, BUTTON_HEIGHT)];
+        KeyboardAccessoryScrollView *scrollView = [[KeyboardAccessoryScrollView alloc] initWithFrame:CGRectZero];
         scrollView.autoresizingMask = UIViewAutoresizingNone;
-        scrollView.contentSize = functionToolbarView.frame.size;
-        scrollView.scrollEnabled = self.bounds.size.width - BUTTON_WIDTH > TOOLBAR_WIDTH ? false : true;
+        scrollView.scrollEnabled = YES;
+        scrollView.alwaysBounceHorizontal = YES;
+        scrollView.delaysContentTouches = YES;
+        scrollView.canCancelContentTouches = YES;
         scrollView.bounces = false;
         scrollView.bouncesZoom = false;
         scrollView.showsVerticalScrollIndicator = false;
-        scrollView.showsHorizontalScrollIndicator = false;
-        [scrollView setBackgroundColor: [UIColor darkGrayColor]];
+        scrollView.showsHorizontalScrollIndicator = NO;
+        scrollView.indicatorStyle = UIScrollViewIndicatorStyleWhite;
+        [scrollView setBackgroundColor:[UIColor clearColor]];
         
-        [scrollView addSubview:functionToolbarView];
-        UIBarButtonItem *customItem = [[UIBarButtonItem alloc] initWithCustomView:scrollView];
-        UIToolbar *toolbarView = [[UIToolbar alloc] initWithFrame:CGRectMake(0, 0, self.bounds.size.width, BUTTON_HEIGHT)];
-        [toolbarView setItems:[NSArray arrayWithObjects:negativeSeperator, doneBarButton, customItem, negativeSeperator, nil]];
-        [toolbarView setBackgroundColor: [UIColor darkGrayColor]];
-        keyInputField.inputAccessoryView = toolbarView;
+        [scrollView addSubview:functionButtonStackView];
+        
+        UIView *accessoryView = [[UIView alloc] initWithFrame:CGRectMake(0, 0, self.bounds.size.width, BUTTON_HEIGHT + ACCESSORY_OUTER_VERTICAL_PADDING * 2.0)];
+        accessoryView.backgroundColor = [UIColor colorWithWhite:0.12 alpha:0.96];
+        
+        doneButton.translatesAutoresizingMaskIntoConstraints = NO;
+        scrollView.translatesAutoresizingMaskIntoConstraints = NO;
+        
+        [accessoryView addSubview:doneButton];
+        [accessoryView addSubview:scrollView];
+        
+        [NSLayoutConstraint activateConstraints:@[
+            [doneButton.leadingAnchor constraintEqualToAnchor:accessoryView.leadingAnchor constant:ACCESSORY_OUTER_HORIZONTAL_PADDING],
+            [doneButton.topAnchor constraintEqualToAnchor:accessoryView.topAnchor constant:ACCESSORY_OUTER_VERTICAL_PADDING],
+            [doneButton.bottomAnchor constraintEqualToAnchor:accessoryView.bottomAnchor constant:-ACCESSORY_OUTER_VERTICAL_PADDING],
+            
+            [scrollView.leadingAnchor constraintEqualToAnchor:doneButton.trailingAnchor constant:BUTTON_SPACING],
+            [scrollView.trailingAnchor constraintEqualToAnchor:accessoryView.trailingAnchor constant:-ACCESSORY_OUTER_HORIZONTAL_PADDING],
+            [scrollView.topAnchor constraintEqualToAnchor:accessoryView.topAnchor constant:ACCESSORY_OUTER_VERTICAL_PADDING],
+            [scrollView.bottomAnchor constraintEqualToAnchor:accessoryView.bottomAnchor constant:-ACCESSORY_OUTER_VERTICAL_PADDING],
+            
+            [functionButtonStackView.leadingAnchor constraintEqualToAnchor:scrollView.contentLayoutGuide.leadingAnchor],
+            [functionButtonStackView.trailingAnchor constraintEqualToAnchor:scrollView.contentLayoutGuide.trailingAnchor],
+            [functionButtonStackView.topAnchor constraintEqualToAnchor:scrollView.contentLayoutGuide.topAnchor],
+            [functionButtonStackView.bottomAnchor constraintEqualToAnchor:scrollView.contentLayoutGuide.bottomAnchor],
+            [functionButtonStackView.heightAnchor constraintEqualToAnchor:scrollView.frameLayoutGuide.heightAnchor],
+            [functionButtonStackView.widthAnchor constraintEqualToConstant:TOOLBAR_WIDTH]
+        ]];
+        
+        scrollView.contentSize = CGSizeMake(TOOLBAR_WIDTH, BUTTON_HEIGHT);
+        
+        keyInputField.inputAccessoryView = accessoryView;
 #endif
         [keyInputField becomeFirstResponder];
         [keyInputField addTarget:self action:@selector(onKeyboardPressed:) forControlEvents:UIControlEventEditingChanged];
@@ -494,20 +733,103 @@ static const double X1_MOUSE_SPEED_DIVISOR = 2.5;
     }
 }
 
-- (UIBarButtonItem *)createButtonWithImageNamed:(NSString *)imageName backgroundColor:(UIColor *)backgroundColor buttonWidth:(CGFloat)buttonWidth target:(id)target action:(SEL)action keyCode:(NSInteger)keyCode isToggleable:(BOOL)isToggleable {
-    UIImage *image = [UIImage imageNamed:imageName];
+- (UIButton *)createToolbarButtonWithTitle:(NSString *)title
+                               systemImage:(NSString *)systemImageName
+                               buttonWidth:(CGFloat)buttonWidth
+                              buttonHeight:(CGFloat)buttonHeight
+                                    target:(id)target
+                                    action:(SEL)action
+                                   keyCode:(NSInteger)keyCode
+                              isToggleable:(BOOL)isToggleable {
     UIButton *button = [UIButton buttonWithType:UIButtonTypeCustom];
-    [button setImage:image forState:UIControlStateNormal];
-    button.frame = CGRectMake(0, 0, 30, 30);
-    button.imageView.contentMode = UIViewContentModeScaleAspectFit;
-    button.imageView.backgroundColor = backgroundColor;
-    button.imageView.layer.cornerRadius = 10.0;
-    button.imageEdgeInsets = UIEdgeInsetsMake(6, 6, 6, 6);
-    [button addConstraint:[NSLayoutConstraint constraintWithItem:button attribute:NSLayoutAttributeWidth relatedBy:NSLayoutRelationEqual toItem:nil attribute:NSLayoutAttributeNotAnAttribute multiplier:1.0 constant:buttonWidth]];
+    button.translatesAutoresizingMaskIntoConstraints = NO;
+    button.backgroundColor = [UIColor colorWithWhite:0.18 alpha:1.0];
+    button.contentHorizontalAlignment = UIControlContentHorizontalAlignmentCenter;
+    button.contentVerticalAlignment = UIControlContentVerticalAlignmentCenter;
+    button.layer.cornerRadius = 10.0;
+    button.layer.borderWidth = 1.0;
+    button.layer.borderColor = [UIColor colorWithWhite:1.0 alpha:0.10].CGColor;
+    button.clipsToBounds = YES;
+    button.contentEdgeInsets = UIEdgeInsetsMake(0, 10, 0, 10);
+    if (title.length > 0) {
+        [button setTitle:title forState:UIControlStateNormal];
+        [button setTitleColor:[UIColor whiteColor] forState:UIControlStateNormal];
+        button.titleLabel.font = [UIFont systemFontOfSize:13.0 weight:UIFontWeightSemibold];
+    }
+    if (systemImageName.length > 0) {
+        UIImageSymbolConfiguration *configuration = [UIImageSymbolConfiguration configurationWithPointSize:15 weight:UIImageSymbolWeightSemibold];
+        UIImage *image = [UIImage systemImageNamed:systemImageName withConfiguration:configuration];
+        [button setImage:image forState:UIControlStateNormal];
+        [button setTintColor:[UIColor whiteColor]];
+    }
     [button addTarget:target action:action forControlEvents:UIControlEventTouchUpInside];
+    [button addTarget:self action:@selector(toolbarButtonPressDown:) forControlEvents:UIControlEventTouchDown];
+    [button addTarget:self action:@selector(toolbarButtonPressRelease:) forControlEvents:UIControlEventTouchUpInside];
+    [button addTarget:self action:@selector(toolbarButtonPressRelease:) forControlEvents:UIControlEventTouchUpOutside];
+    [button addTarget:self action:@selector(toolbarButtonPressRelease:) forControlEvents:UIControlEventTouchCancel];
+    [button addTarget:self action:@selector(toolbarButtonPressDown:) forControlEvents:UIControlEventTouchDragEnter];
+    [button addTarget:self action:@selector(toolbarButtonPressRelease:) forControlEvents:UIControlEventTouchDragExit];
+    [NSLayoutConstraint activateConstraints:@[
+        [button.widthAnchor constraintEqualToConstant:buttonWidth],
+        [button.heightAnchor constraintEqualToConstant:buttonHeight]
+    ]];
+    UIColor *baseBackgroundColor = [UIColor colorWithWhite:0.18 alpha:1.0];
+    if (keyCode == 0x00) {
+        baseBackgroundColor = [UIColor colorWithRed:0.89 green:0.49 blue:0.52 alpha:0.98];
+        button.layer.borderColor = [UIColor colorWithRed:1.0 green:0.90 blue:0.90 alpha:0.34].CGColor;
+    }
+    button.backgroundColor = baseBackgroundColor;
     objc_setAssociatedObject(button, "keyCode", @(keyCode), OBJC_ASSOCIATION_RETAIN_NONATOMIC);
     objc_setAssociatedObject(button, "isToggleable", @(isToggleable), OBJC_ASSOCIATION_RETAIN_NONATOMIC);
     objc_setAssociatedObject(button, "isOn", @(NO), OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    objc_setAssociatedObject(button, "baseBackgroundColor", baseBackgroundColor, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    return button;
+}
+
+- (UIButton *)createToolbarTextButtonWithTitle:(NSString *)title
+                                   buttonWidth:(CGFloat)buttonWidth
+                                  buttonHeight:(CGFloat)buttonHeight
+                                        target:(id)target
+                                        action:(SEL)action
+                                       keyCode:(NSInteger)keyCode
+                                  isToggleable:(BOOL)isToggleable {
+    return [self createToolbarButtonWithTitle:title
+                                  systemImage:nil
+                                  buttonWidth:buttonWidth
+                                 buttonHeight:buttonHeight
+                                       target:target
+                                       action:action
+                                      keyCode:keyCode
+                                 isToggleable:isToggleable];
+}
+
+- (UIButton *)createToolbarIconButtonWithSystemName:(NSString *)systemImageName
+                                        buttonWidth:(CGFloat)buttonWidth
+                                       buttonHeight:(CGFloat)buttonHeight
+                                             target:(id)target
+                                             action:(SEL)action
+                                            keyCode:(NSInteger)keyCode
+                                       isToggleable:(BOOL)isToggleable {
+    return [self createToolbarButtonWithTitle:nil
+                                  systemImage:systemImageName
+                                  buttonWidth:buttonWidth
+                                 buttonHeight:buttonHeight
+                                       target:target
+                                       action:action
+                                      keyCode:keyCode
+                                 isToggleable:isToggleable];
+}
+
+- (UIBarButtonItem *)createButtonWithImageNamed:(NSString *)imageName backgroundColor:(UIColor *)backgroundColor buttonWidth:(CGFloat)buttonWidth target:(id)target action:(SEL)action keyCode:(NSInteger)keyCode isToggleable:(BOOL)isToggleable {
+    (void)imageName;
+    (void)backgroundColor;
+    UIButton *button = [self createToolbarTextButtonWithTitle:@""
+                                                  buttonWidth:buttonWidth
+                                                 buttonHeight:44.0
+                                                       target:target
+                                                       action:action
+                                                      keyCode:keyCode
+                                                 isToggleable:isToggleable];
     UIBarButtonItem *barButton = [[UIBarButtonItem alloc] initWithCustomView:button];
     return barButton;
 }
@@ -519,9 +841,10 @@ static const double X1_MOUSE_SPEED_DIVISOR = 2.5;
         isOn = !isOn;
         // Update the button's appearance based on its new state
         if (isOn) {
-            sender.imageView.backgroundColor = [UIColor lightGrayColor];
+            sender.backgroundColor = [UIColor colorWithRed:0.48 green:0.45 blue:0.90 alpha:1.0];
         } else {
-            sender.imageView.backgroundColor = [UIColor blackColor];
+            UIColor *baseBackgroundColor = objc_getAssociatedObject(sender, "baseBackgroundColor");
+            sender.backgroundColor = baseBackgroundColor ?: [UIColor colorWithWhite:0.18 alpha:1.0];
         }
     }
     // Update the new on/off state of the button
@@ -550,6 +873,50 @@ static const double X1_MOUSE_SPEED_DIVISOR = 2.5;
             LiSendKeyboardEvent(keyCode, KEY_ACTION_UP, 0);
         }
     }
+}
+
+- (void)toolbarButtonPressDown:(UIButton *)sender {
+    [UIView animateWithDuration:0.08 animations:^{
+        sender.alpha = 0.72f;
+        sender.transform = CGAffineTransformMakeScale(0.94f, 0.94f);
+    }];
+}
+
+- (void)toolbarButtonPressRelease:(UIButton *)sender {
+    [UIView animateWithDuration:0.12 animations:^{
+        sender.alpha = 1.0f;
+        sender.transform = CGAffineTransformIdentity;
+    }];
+}
+
+- (void)sendShortcutPrimaryKeyCodes:(NSArray<NSNumber *> *)primaryKeyCodes
+                   secondaryKeyCodes:(NSArray<NSNumber *> *)secondaryKeyCodes {
+    NSArray<NSNumber *> *primaryCodes = [primaryKeyCodes copy] ?: @[];
+    NSArray<NSNumber *> *secondaryCodes = [secondaryKeyCodes copy] ?: @[];
+
+    dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
+        for (NSNumber *keyCode in primaryCodes) {
+            LiSendKeyboardEvent((short)[keyCode integerValue], KEY_ACTION_DOWN, 0);
+        }
+
+        if (primaryCodes.count > 0) {
+            usleep(50 * 1000);
+            for (NSNumber *keyCode in [primaryCodes reverseObjectEnumerator]) {
+                LiSendKeyboardEvent((short)[keyCode integerValue], KEY_ACTION_UP, 0);
+            }
+        }
+
+        if (secondaryCodes.count > 0) {
+            usleep(80 * 1000);
+            for (NSNumber *keyCode in secondaryCodes) {
+                short code = (short)[keyCode integerValue];
+                LiSendKeyboardEvent(code, KEY_ACTION_DOWN, 0);
+                usleep(50 * 1000);
+                LiSendKeyboardEvent(code, KEY_ACTION_UP, 0);
+                usleep(50 * 1000);
+            }
+        }
+    });
 }
 
 - (BOOL)handleMouseButtonEvent:(int)buttonAction forTouches:(NSSet *)touches withEvent:(UIEvent *)event {
@@ -614,6 +981,11 @@ static const double X1_MOUSE_SPEED_DIVISOR = 2.5;
 }
 
 - (void)touchesMoved:(NSSet *)touches withEvent:(UIEvent *)event {
+    if (viewOnlyModeEnabled) {
+        [super touchesMoved:touches withEvent:event];
+        return;
+    }
+
 #if !TARGET_OS_TV
     
     for (UITouch* touch in touches) {
@@ -698,6 +1070,11 @@ static const double X1_MOUSE_SPEED_DIVISOR = 2.5;
 }
 
 - (void)touchesEnded:(NSSet *)touches withEvent:(UIEvent *)event {
+    if (viewOnlyModeEnabled) {
+        [super touchesEnded:touches withEvent:event];
+        return;
+    }
+
     if ([self handleMouseButtonEvent:BUTTON_ACTION_RELEASE
                           forTouches:touches
                            withEvent:event]) {
@@ -732,6 +1109,11 @@ static const double X1_MOUSE_SPEED_DIVISOR = 2.5;
 }
 
 - (void)touchesCancelled:(NSSet *)touches withEvent:(UIEvent *)event {
+    if (viewOnlyModeEnabled) {
+        [super touchesCancelled:touches withEvent:event];
+        return;
+    }
+
     [touchHandler touchesCancelled:touches withEvent:event];
     [self handleMouseButtonEvent:BUTTON_ACTION_RELEASE
                       forTouches:touches
@@ -796,8 +1178,7 @@ static const double X1_MOUSE_SPEED_DIVISOR = 2.5;
     } else {
         videoSize = CGSizeMake(self.bounds.size.width, self.bounds.size.width / streamAspectRatio);
     }
-    videoOrigin = CGPointMake(self.bounds.size.width / 2 - videoSize.width / 2,
-                              self.bounds.size.height / 2 - videoSize.height / 2);
+    videoOrigin = [self getVideoOriginForCurrentAlignment];
     
     // Move the cursor on the host if no buttons are pressed.
     // Motion with buttons pressed in handled in touchesMoved:
@@ -1125,4 +1506,3 @@ static const double X1_MOUSE_SPEED_DIVISOR = 2.5;
 #endif
 
 @end
-

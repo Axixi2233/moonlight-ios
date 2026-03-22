@@ -75,7 +75,12 @@
           enableTouchSensitivity:(BOOL)enableTouchSensitivity
               touchSensitivity:(NSInteger)touchSensitivity
                       motionMode:(NSInteger)motionMode
-              virtualDisplayMode:(NSInteger)virtualDisplayMode{
+                virtualDisplayMode:(NSInteger)virtualDisplayMode
+           videoAlignmentSelection:(NSInteger)videoAlignmentSelection
+              videoAlignmentMargin:(CGFloat)videoAlignmentMargin
+performanceOverlayPositionSelection:(NSInteger)performanceOverlayPositionSelection
+         performanceOverlayMargin:(CGFloat)performanceOverlayMargin
+               floatingMenuEnabled:(BOOL)floatingMenuEnabled{
     
     [_managedObjectContext performBlockAndWait:^{
         Settings* settingsToSave = [self retrieveSettings];
@@ -103,6 +108,13 @@
         settingsToSave.touchSensitivityGlobal=touchSensitivityGlobal;
         settingsToSave.motionMode = [NSNumber numberWithInteger:motionMode];
         settingsToSave.virtualDisplayMode = [NSNumber numberWithInteger:virtualDisplayMode];
+        NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
+        [defaults setInteger:MAX(0, MIN(videoAlignmentSelection, 2)) forKey:StreamPreferenceVideoAlignmentSelectionKey];
+        [defaults setDouble:MAX(0.0, MIN(videoAlignmentMargin, 150.0)) forKey:StreamPreferenceVideoAlignmentMarginKey];
+        [defaults setInteger:MAX(0, MIN(performanceOverlayPositionSelection, 5)) forKey:StreamPreferencePerformanceOverlayPositionSelectionKey];
+        [defaults setDouble:MAX(0.0, MIN(performanceOverlayMargin, 150.0)) forKey:StreamPreferencePerformanceOverlayMarginKey];
+        [defaults setBool:floatingMenuEnabled forKey:StreamPreferenceFloatingMenuEnabledKey];
+        [defaults synchronize];
         [self saveData];
     }];
 }
@@ -257,4 +269,3 @@
 }
 
 @end
-

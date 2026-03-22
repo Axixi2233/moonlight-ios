@@ -12,10 +12,42 @@
     BOOL presented;
 };
 
+- (instancetype)init {
+    self = [super init];
+    if (self) {
+        self.modalTransitionStyle = UIModalTransitionStyleCrossDissolve;
+        self.modalPresentationStyle = UIModalPresentationOverCurrentContext;
+    }
+    return self;
+}
+
+- (void)loadView {
+    UIView *rootView = [[UIView alloc] initWithFrame:[UIScreen mainScreen].bounds];
+    rootView.backgroundColor = [[UIColor blackColor] colorWithAlphaComponent:0.5];
+
+    UIActivityIndicatorViewStyle spinnerStyle = UIActivityIndicatorViewStyleLarge;
+    if (@available(iOS 13.0, *)) {
+        spinnerStyle = UIActivityIndicatorViewStyleLarge;
+    }
+
+    UIActivityIndicatorView *spinner = [[UIActivityIndicatorView alloc] initWithActivityIndicatorStyle:spinnerStyle];
+    spinner.translatesAutoresizingMaskIntoConstraints = NO;
+    spinner.color = [UIColor whiteColor];
+    [spinner startAnimating];
+
+    [rootView addSubview:spinner];
+    [NSLayoutConstraint activateConstraints:@[
+        [spinner.centerXAnchor constraintEqualToAnchor:rootView.centerXAnchor],
+        [spinner.centerYAnchor constraintEqualToAnchor:rootView.centerYAnchor]
+    ]];
+
+    self.loadingSpinner = spinner;
+    self.view = rootView;
+}
+
 - (void)viewDidLoad {
     [super viewDidLoad];
-    // center the loading spinner
-    self.loadingSpinner.center = CGPointMake(self.view.frame.size.width / 2, self.view.frame.size.height / 2);
+    [self.loadingSpinner startAnimating];
 }
 
 - (UIViewController*) activeViewController {

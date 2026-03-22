@@ -184,6 +184,22 @@ int DrSubmitDecodeUnit(PDECODE_UNIT decodeUnit)
         currentVideoStats.framesWithHostProcessingLatency++;
         currentVideoStats.totalHostProcessingLatency += decodeUnit->frameHostProcessingLatency;
     }
+
+    uint64_t nowMs = LiGetMillis();
+    if (decodeUnit->enqueueTimeMs != 0 && nowMs >= decodeUnit->enqueueTimeMs) {
+        uint64_t clientQueueLatency = nowMs - decodeUnit->enqueueTimeMs;
+
+        if (currentVideoStats.minClientQueueLatency == 0 || clientQueueLatency < currentVideoStats.minClientQueueLatency) {
+            currentVideoStats.minClientQueueLatency = clientQueueLatency;
+        }
+
+        if (clientQueueLatency > currentVideoStats.maxClientQueueLatency) {
+            currentVideoStats.maxClientQueueLatency = clientQueueLatency;
+        }
+
+        currentVideoStats.framesWithClientQueueLatency++;
+        currentVideoStats.totalClientQueueLatency += clientQueueLatency;
+    }
     
     currentVideoStats.receivedFrames++;
     currentVideoStats.totalFrames++;

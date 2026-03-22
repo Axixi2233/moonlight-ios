@@ -36,7 +36,12 @@
             enableTouchSensitivity:(BOOL)enableTouchSensitivity
             touchSensitivity:(NSInteger)touchSensitivity
                       motionMode:(NSInteger)motionMode
-                virtualDisplayMode:(NSInteger)virtualDisplayMode;
+                virtualDisplayMode:(NSInteger)virtualDisplayMode
+             videoAlignmentSelection:(NSInteger)videoAlignmentSelection
+                videoAlignmentMargin:(CGFloat)videoAlignmentMargin
+performanceOverlayPositionSelection:(NSInteger)performanceOverlayPositionSelection
+         performanceOverlayMargin:(CGFloat)performanceOverlayMargin
+               floatingMenuEnabled:(BOOL)floatingMenuEnabled;
 
 - (NSArray*) getHosts;
 - (void) updateHost:(TemporaryHost*)host;

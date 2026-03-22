@@ -13,6 +13,14 @@
 #import "TouchScreenManager.h"
 #import "SensitivityBean.h"
 
+extern NSString * const StreamViewBoundsDidChangeNotification;
+
+typedef NS_ENUM(NSInteger, StreamViewVideoAlignmentMode) {
+    StreamViewVideoAlignmentModeCenter = 0,
+    StreamViewVideoAlignmentModeTop = 1,
+    StreamViewVideoAlignmentModeBottom = 2
+};
+
 @protocol UserInteractionDelegate <NSObject>
 
 - (void) userInteractionBegan;
@@ -31,7 +39,20 @@
                   config:(StreamConfiguration*)streamConfig;
 - (void) showOnScreenControls;
 - (OnScreenControlsLevel) getCurrentOscState;
+- (void) setTemporaryVirtualGamepadVisible:(BOOL)visible;
+- (void) setTemporaryOnScreenControlsLevel:(OnScreenControlsLevel)level;
+- (void) setVideoAlignmentMode:(StreamViewVideoAlignmentMode)alignmentMode;
+- (StreamViewVideoAlignmentMode) videoAlignmentMode;
+- (void) setVideoAlignmentMargin:(CGFloat)alignmentMargin;
+- (CGFloat) videoAlignmentMargin;
+- (void) setViewOnlyModeEnabled:(BOOL)enabled;
+- (BOOL) isViewOnlyModeEnabled;
 - (void) showKeyInputBoard;
+- (void) sendShortcutPrimaryKeyCodes:(NSArray<NSNumber *> *)primaryKeyCodes
+                   secondaryKeyCodes:(NSArray<NSNumber *> *)secondaryKeyCodes;
+- (void) applyTemporaryTouchModeWithAbsoluteTouchMode:(BOOL)absoluteTouchMode
+                                     multiTouchScreen:(BOOL)multiTouchScreen;
+- (void) resetAfterTemporaryTouchModeChange;
 
 #if !TARGET_OS_TV
 - (void) updateCursorLocation:(CGPoint)location isMouse:(BOOL)isMouse;

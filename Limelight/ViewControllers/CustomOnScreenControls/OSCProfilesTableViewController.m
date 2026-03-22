@@ -25,18 +25,90 @@ const double NAV_BAR_HEIGHT = 50;
 
 @synthesize tableView;
 
+- (void)loadView {
+    UIView *rootView = [[UIView alloc] initWithFrame:[UIScreen mainScreen].bounds];
+    rootView.backgroundColor = [UIColor colorWithRed:0.1215686275 green:0.1294117647 blue:0.1411764706 alpha:1.0];
+
+    UIView *headerView = [[UIView alloc] init];
+    headerView.translatesAutoresizingMaskIntoConstraints = NO;
+    headerView.backgroundColor = [UIColor colorWithRed:0.1215686275 green:0.1294117647 blue:0.1411764706 alpha:0.96];
+
+    UILabel *titleLabel = [[UILabel alloc] init];
+    titleLabel.translatesAutoresizingMaskIntoConstraints = NO;
+    titleLabel.text = @"选择布局配置";
+    titleLabel.font = [UIFont boldSystemFontOfSize:18.0];
+    titleLabel.textColor = [UIColor colorWithRed:0.9529411765 green:0.9764705882 blue:1.0 alpha:1.0];
+    titleLabel.textAlignment = NSTextAlignmentCenter;
+
+    UIButton *cancelButton = [UIButton buttonWithType:UIButtonTypeSystem];
+    cancelButton.translatesAutoresizingMaskIntoConstraints = NO;
+    [cancelButton setTitle:@"取消" forState:UIControlStateNormal];
+    cancelButton.titleLabel.font = [UIFont systemFontOfSize:16.0 weight:UIFontWeightSemibold];
+    [cancelButton setTitleColor:[UIColor colorWithRed:0.9529411765 green:0.9764705882 blue:1.0 alpha:1.0] forState:UIControlStateNormal];
+    [cancelButton addTarget:self action:@selector(cancelTapped:) forControlEvents:UIControlEventTouchUpInside];
+
+    UIButton *loadButton = [UIButton buttonWithType:UIButtonTypeSystem];
+    loadButton.translatesAutoresizingMaskIntoConstraints = NO;
+    [loadButton setTitle:@"加载" forState:UIControlStateNormal];
+    loadButton.titleLabel.font = [UIFont systemFontOfSize:16.0 weight:UIFontWeightSemibold];
+    [loadButton setTitleColor:[UIColor colorWithRed:0.9529411765 green:0.9764705882 blue:1.0 alpha:1.0] forState:UIControlStateNormal];
+    [loadButton addTarget:self action:@selector(loadTapped:) forControlEvents:UIControlEventTouchUpInside];
+
+    UITableView *profilesTableView = [[UITableView alloc] initWithFrame:CGRectZero style:UITableViewStylePlain];
+    profilesTableView.translatesAutoresizingMaskIntoConstraints = NO;
+    profilesTableView.backgroundColor = [UIColor clearColor];
+    profilesTableView.separatorColor = [UIColor colorWithWhite:1.0 alpha:0.08];
+    profilesTableView.tableFooterView = [[UIView alloc] initWithFrame:CGRectZero];
+    profilesTableView.contentInsetAdjustmentBehavior = UIScrollViewContentInsetAdjustmentNever;
+    if (@available(iOS 15.0, *)) {
+        profilesTableView.sectionHeaderTopPadding = 0.0;
+    }
+
+    [headerView addSubview:titleLabel];
+    [headerView addSubview:cancelButton];
+    [headerView addSubview:loadButton];
+    [rootView addSubview:headerView];
+    [rootView addSubview:profilesTableView];
+
+    UILayoutGuide *safeArea = rootView.safeAreaLayoutGuide;
+    [NSLayoutConstraint activateConstraints:@[
+        [headerView.leadingAnchor constraintEqualToAnchor:rootView.leadingAnchor],
+        [headerView.trailingAnchor constraintEqualToAnchor:rootView.trailingAnchor],
+        [headerView.topAnchor constraintEqualToAnchor:rootView.topAnchor],
+
+        [cancelButton.leadingAnchor constraintEqualToAnchor:headerView.leadingAnchor constant:16.0],
+        [cancelButton.topAnchor constraintEqualToAnchor:safeArea.topAnchor constant:8.0],
+        [cancelButton.bottomAnchor constraintEqualToAnchor:headerView.bottomAnchor constant:-10.0],
+
+        [loadButton.trailingAnchor constraintEqualToAnchor:headerView.trailingAnchor constant:-16.0],
+        [loadButton.centerYAnchor constraintEqualToAnchor:cancelButton.centerYAnchor],
+
+        [titleLabel.centerXAnchor constraintEqualToAnchor:headerView.centerXAnchor],
+        [titleLabel.centerYAnchor constraintEqualToAnchor:cancelButton.centerYAnchor],
+
+        [headerView.bottomAnchor constraintEqualToAnchor:titleLabel.bottomAnchor constant:18.0],
+
+        [profilesTableView.topAnchor constraintEqualToAnchor:headerView.bottomAnchor],
+        [profilesTableView.leadingAnchor constraintEqualToAnchor:rootView.leadingAnchor],
+        [profilesTableView.trailingAnchor constraintEqualToAnchor:rootView.trailingAnchor],
+        [profilesTableView.bottomAnchor constraintEqualToAnchor:safeArea.bottomAnchor]
+    ]];
+
+    self.tableView = profilesTableView;
+    self.view = rootView;
+}
+
 - (void) viewDidLoad {
     [super viewDidLoad];
         
     profilesManager = [OSCProfilesManager sharedManager];
 
     self.tableView.tableHeaderView = [[UIView alloc] initWithFrame:CGRectMake(0, 0, 0, NAV_BAR_HEIGHT)];
+    self.tableView.rowHeight = 44.0;
 
     self.tableView.delegate = self;
     self.tableView.dataSource = self;
-    
-    [self.tableView registerNib:[UINib nibWithNibName:@"ProfileTableViewCell" bundle:nil]
-                                        forCellReuseIdentifier:@"Cell"]; // Register the custom cell nib file with the table view
+    [self.tableView registerClass:[ProfileTableViewCell class] forCellReuseIdentifier:@"Cell"];
 
 }
 
@@ -53,7 +125,7 @@ const double NAV_BAR_HEIGHT = 50;
 #pragma mark - UIButton Actions
 
 /* Loads the OSC profile that user selected, dismisses this VC, then tells the presenting view controller to lay out the on screen buttons according to the selected profile's instructions */
-- (IBAction) loadTapped:(id)sender {
+- (void)loadTapped:(id)sender {
     [self dismissViewControllerAnimated:YES completion:nil];
 
     if (self.didDismissOSCProfilesTVC) {    // tells the presenting view controller to lay out the on screen buttons according to the selected profile's instructions
@@ -61,7 +133,7 @@ const double NAV_BAR_HEIGHT = 50;
     }
 }
 
-- (IBAction) cancelTapped:(id)sender {
+- (void)cancelTapped:(id)sender {
     [self dismissViewControllerAnimated:YES completion:nil];
 }
 
@@ -75,7 +147,7 @@ const double NAV_BAR_HEIGHT = 50;
 - (UITableViewCell *) tableView:(UITableView *)tableView cellForRowAtIndexPath:(NSIndexPath *)indexPath {
     ProfileTableViewCell *cell = [tableView dequeueReusableCellWithIdentifier:@"Cell" forIndexPath:indexPath];
     OSCProfile *profile = [[profilesManager getAllProfiles] objectAtIndex: indexPath.row];
-    cell.name.text = profile.name;
+    [cell configureWithName:profile.name];
     
     if ([profile.name isEqualToString: [profilesManager getSelectedProfile].name]) { // if this cell contains the name of the currently selected OSC profile then add a checkmark to the right side of the cell
         cell.accessoryType = UITableViewCellAccessoryCheckmark;

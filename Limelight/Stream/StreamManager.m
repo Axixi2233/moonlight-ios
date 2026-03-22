@@ -148,6 +148,10 @@
 }
 
 - (NSString*) getStatsOverlayText {
+    return [self getStatsOverlayTextWithExtendedMetrics:NO];
+}
+
+- (NSString*) getStatsOverlayTextWithExtendedMetrics:(BOOL)showsExtendedMetrics {
     video_stats_t stats;
     
     if (!_connection) {
@@ -170,25 +174,35 @@
         latencyStringLite= @"";
     }
     
-    NSString* hostProcessingString;
     NSString* hostProcessingStringLite;
-
-    if (stats.framesWithHostProcessingLatency != 0) {
-        hostProcessingString = [NSString stringWithFormat:@"\nHost processing latency min/max/avg: %.1f/%.1f/%.1f ms",
-                                stats.minHostProcessingLatency / 10.f,
-                                stats.maxHostProcessingLatency / 10.f,
-                                (float)stats.totalHostProcessingLatency / stats.framesWithHostProcessingLatency / 10.f];
-        hostProcessingStringLite=[NSString stringWithFormat:@"主机：%.1f ms",(float)stats.totalHostProcessingLatency / stats.framesWithHostProcessingLatency / 10.f];
+    if (showsExtendedMetrics && stats.framesWithHostProcessingLatency != 0) {
+        hostProcessingStringLite = [NSString stringWithFormat:@" 主机：%.1f ms",
+                                    (float)stats.totalHostProcessingLatency / stats.framesWithHostProcessingLatency / 10.f];
     }
     else {
-        hostProcessingString = @"";
-        hostProcessingStringLite=@"";
+        hostProcessingStringLite = @"";
+    }
+
+    NSString* clientLatencyStringLite;
+    if (showsExtendedMetrics && stats.framesWithClientQueueLatency != 0) {
+        clientLatencyStringLite = [NSString stringWithFormat:@" 客户端：%.1f ms",
+                                   (double)stats.totalClientQueueLatency / (double)stats.framesWithClientQueueLatency];
+    }
+    else {
+        clientLatencyStringLite = @"";
     }
     
     float interval = stats.endTime - stats.startTime;
     
-    return [NSString stringWithFormat:@"%dx%d %@ %@ %@ 丢帧：%.2f FPS：%.2f",_config.width,_config.height,
-            [_connection getActiveCodecNameLite],latencyStringLite,hostProcessingStringLite,stats.networkDroppedFrames / interval,stats.totalFrames / interval];
+    return [NSString stringWithFormat:@"%dx%d %@ %@%@%@ 丢帧：%.2f%% FPS：%.2f",
+            _config.width,
+            _config.height,
+            [_connection getActiveCodecNameLite],
+            latencyStringLite,
+            hostProcessingStringLite,
+            clientLatencyStringLite,
+            stats.networkDroppedFrames / interval,
+            stats.totalFrames / interval];
     
 //    return [NSString stringWithFormat:@"Video stream: %dx%d %.2f FPS (Codec: %@)\nFrames dropped by your network connection: %.2f%%\nAverage network latency: %@%@",
 //            _config.width,

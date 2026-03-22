@@ -37,6 +37,40 @@ extern int ff_isom_write_av1c(AVIOContext *pb, const uint8_t *buf, int size,
     BOOL framePacing;
 }
 
+- (void)updateDisplayLayerLayout
+{
+    if (displayLayer == nil || _view == nil) {
+        return;
+    }
+
+    CGSize videoSize;
+    if (_view.bounds.size.width > _view.bounds.size.height * _streamAspectRatio) {
+        videoSize = CGSizeMake(_view.bounds.size.height * _streamAspectRatio, _view.bounds.size.height);
+    } else {
+        videoSize = CGSizeMake(_view.bounds.size.width, _view.bounds.size.width / _streamAspectRatio);
+    }
+
+    CGFloat centerY = CGRectGetMidY(_view.bounds);
+    if (videoSize.height < _view.bounds.size.height) {
+        CGFloat availableVerticalPadding = MAX(_view.bounds.size.height - videoSize.height, 0.0f);
+        CGFloat clampedMargin = MIN([_view videoAlignmentMargin], availableVerticalPadding);
+        switch ([_view videoAlignmentMode]) {
+            case StreamViewVideoAlignmentModeTop:
+                centerY = clampedMargin + videoSize.height / 2.0;
+                break;
+            case StreamViewVideoAlignmentModeBottom:
+                centerY = _view.bounds.size.height - clampedMargin - videoSize.height / 2.0;
+                break;
+            case StreamViewVideoAlignmentModeCenter:
+            default:
+                break;
+        }
+    }
+
+    displayLayer.position = CGPointMake(CGRectGetMidX(_view.bounds), centerY);
+    displayLayer.bounds = CGRectMake(0, 0, videoSize.width, videoSize.height);
+}
+
 - (void)reinitializeDisplayLayer
 {
     CALayer *oldLayer = displayLayer;
@@ -49,14 +83,7 @@ extern int ff_isom_write_av1c(AVIOContext *pb, const uint8_t *buf, int size,
     // respects the PAR encoded in the SPS which causes our computed video-relative
     // touch location to be wrong in StreamView if the aspect ratio of the host
     // desktop doesn't match the aspect ratio of the stream.
-    CGSize videoSize;
-    if (_view.bounds.size.width > _view.bounds.size.height * _streamAspectRatio) {
-        videoSize = CGSizeMake(_view.bounds.size.height * _streamAspectRatio, _view.bounds.size.height);
-    } else {
-        videoSize = CGSizeMake(_view.bounds.size.width, _view.bounds.size.width / _streamAspectRatio);
-    }
-    displayLayer.position = CGPointMake(CGRectGetMidX(_view.bounds), CGRectGetMidY(_view.bounds));
-    displayLayer.bounds = CGRectMake(0, 0, videoSize.width, videoSize.height);
+    [self updateDisplayLayerLayout];
     displayLayer.videoGravity = AVLayerVideoGravityResize;
 
     // Hide the layer until we get an IDR frame. This ensures we
@@ -89,6 +116,11 @@ extern int ff_isom_write_av1c(AVIOContext *pb, const uint8_t *buf, int size,
     parameterSetBuffers = [[NSMutableArray alloc] init];
     
     [self reinitializeDisplayLayer];
+
+    [[NSNotificationCenter defaultCenter] addObserver:self
+                                             selector:@selector(updateDisplayLayerLayout)
+                                                 name:StreamViewBoundsDidChangeNotification
+                                               object:_view];
     
     TemporarySettings* settings = [[[DataManager alloc] init] getSettings];
     if (settings.externalMonitor) {
@@ -103,6 +135,11 @@ extern int ff_isom_write_av1c(AVIOContext *pb, const uint8_t *buf, int size,
             object:nil];
     }
     return self;
+}
+
+- (void)dealloc
+{
+    [[NSNotificationCenter defaultCenter] removeObserver:self];
 }
 
 - (void)setupWithVideoFormat:(int)videoFormat width:(int)videoWidth height:(int)videoHeight frameRate:(int)frameRate

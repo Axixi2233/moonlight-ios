@@ -21,13 +21,13 @@ NS_ASSUME_NONNULL_BEGIN
 @property LayoutOnScreenControls *layoutOSC;    // object that contains a view which contains the on screen controller buttons that allows the user to drag and positions each button on the screen using touch
 @property int OSCSegmentSelected;
 
-@property (weak, nonatomic) IBOutlet UIButton *trashCanButton;
-@property (weak, nonatomic) IBOutlet UIButton *undoButton;
+@property (strong, nonatomic) UIButton *trashCanButton;
+@property (strong, nonatomic) UIButton *undoButton;
 
-@property (weak, nonatomic) IBOutlet ToolBarContainerView *toolbarRootView;
-@property (weak, nonatomic) IBOutlet UIView *chevronView;
-@property (weak, nonatomic) IBOutlet UIImageView *chevronImageView;
-@property (weak, nonatomic) IBOutlet UIStackView *toolbarStackView;
+@property (strong, nonatomic) ToolBarContainerView *toolbarRootView;
+@property (strong, nonatomic) UIView *chevronView;
+@property (strong, nonatomic) UIImageView *chevronImageView;
+@property (strong, nonatomic) UIStackView *toolbarStackView;
 
 
 

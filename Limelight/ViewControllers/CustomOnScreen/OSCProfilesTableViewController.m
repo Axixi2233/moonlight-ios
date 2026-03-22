@@ -31,12 +31,11 @@ const double NAV_BAR_HEIGHT = 50;
     profilesManager = [OSCProfilesManager sharedManager];
 
     self.tableView.tableHeaderView = [[UIView alloc] initWithFrame:CGRectMake(0, 0, 0, NAV_BAR_HEIGHT)];
+    self.tableView.rowHeight = 44.0;
 
     self.tableView.delegate = self;
     self.tableView.dataSource = self;
-    
-    [self.tableView registerNib:[UINib nibWithNibName:@"ProfileTableViewCell" bundle:nil]
-                                        forCellReuseIdentifier:@"Cell"]; // Register the custom cell nib file with the table view
+    [self.tableView registerClass:[ProfileTableViewCell class] forCellReuseIdentifier:@"Cell"];
 
 }
 
@@ -75,7 +74,7 @@ const double NAV_BAR_HEIGHT = 50;
 - (UITableViewCell *) tableView:(UITableView *)tableView cellForRowAtIndexPath:(NSIndexPath *)indexPath {
     ProfileTableViewCell *cell = [tableView dequeueReusableCellWithIdentifier:@"Cell" forIndexPath:indexPath];
     OSCProfile *profile = [[profilesManager getAllProfiles] objectAtIndex: indexPath.row];
-    cell.name.text = profile.name;
+    [cell configureWithName:profile.name];
     
     if ([profile.name isEqualToString: [profilesManager getSelectedProfile].name]) { // if this cell contains the name of the currently selected OSC profile then add a checkmark to the right side of the cell
         cell.accessoryType = UITableViewCellAccessoryCheckmark;

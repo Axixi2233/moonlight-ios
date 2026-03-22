@@ -1149,6 +1149,23 @@ static const double MOUSE_SPEED_DIVISOR = 1.25;
     return _oscController;
 }
 
+-(void) setOscEnabledForCurrentSession:(BOOL)enabled
+{
+    _oscEnabled = enabled;
+
+    if (!enabled) {
+        @synchronized(_oscController) {
+            _oscController.lastButtonFlags = 0;
+            _oscController.lastLeftTrigger = 0;
+            _oscController.lastRightTrigger = 0;
+            _oscController.lastLeftStickX = 0;
+            _oscController.lastLeftStickY = 0;
+            _oscController.lastRightStickX = 0;
+            _oscController.lastRightStickY = 0;
+        }
+    }
+}
+
 +(bool) isSupportedGamepad:(GCController*) controller {
     return controller.extendedGamepad != nil;
 }

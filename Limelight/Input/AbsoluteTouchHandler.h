@@ -7,12 +7,14 @@
 //
 
 #import "StreamView.h"
+#import "TemporarySettings.h"
 
 NS_ASSUME_NONNULL_BEGIN
 
 @interface AbsoluteTouchHandler : UIResponder
 
 -(id)initWithView:(StreamView*)view;
+-(id)initWithView:(StreamView*)view settings:(TemporarySettings*)settings;
 
 @end
 

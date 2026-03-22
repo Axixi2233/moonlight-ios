@@ -24,5 +24,6 @@
 
 - (id) initWithApp:(TemporaryApp*)app cache:(NSCache*)cache andCallback:(id<AppCallback>)callback;
 - (void) updateAppImage;
+- (void)applyDisplaySize:(CGSize)size;
 
 @end

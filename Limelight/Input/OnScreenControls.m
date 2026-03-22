@@ -119,6 +119,25 @@ static float L2_Y;
 static float L3_X;
 static float L3_Y;
 
+- (void)refreshControlAreaForCurrentBounds {
+    CGRect bounds = _view.bounds;
+    _controlArea = CGRectMake(0, 0, bounds.size.width, bounds.size.height);
+
+    if (_iPad) {
+        _controlArea.size.height = bounds.size.height / 2.0;
+        _controlArea.origin.y = bounds.size.height - _controlArea.size.height;
+
+        BOOL portrait = bounds.size.height > bounds.size.width;
+        CGFloat horizontalInset = portrait ? MAX(24.0f, bounds.size.width * 0.08f) : 0.0f;
+        _controlArea.origin.x = horizontalInset;
+        _controlArea.size.width = MAX(0.0f, bounds.size.width - horizontalInset * 2.0f);
+    }
+    else {
+        _controlArea.origin.x = _controlArea.size.width * EDGE_WIDTH;
+        _controlArea.size.width -= _controlArea.origin.x * 2;
+    }
+}
+
 - (id) initWithView:(UIView*)view controllerSup:(ControllerSupport*)controllerSupport streamConfig:(StreamConfiguration*)streamConfig {
     self = [self init];
     _view = view;
@@ -137,18 +156,7 @@ static float L3_Y;
     }
     
     _iPad = ([UIDevice currentDevice].userInterfaceIdiom == UIUserInterfaceIdiomPad);
-    _controlArea = CGRectMake(0, 0, _view.frame.size.width, _view.frame.size.height);
-    if (_iPad)
-    {
-        // Cut down the control area on an iPad so the controls are more reachable
-        _controlArea.size.height = _view.frame.size.height / 2.0;
-        _controlArea.origin.y = _view.frame.size.height - _controlArea.size.height;
-    }
-    else
-    {
-        _controlArea.origin.x = _controlArea.size.width * EDGE_WIDTH;
-        _controlArea.size.width -= _controlArea.origin.x * 2;
-    }
+    [self refreshControlAreaForCurrentBounds];
 
     _aButton = [CALayer layer];
     _bButton = [CALayer layer];
@@ -238,6 +246,8 @@ static float L3_Y;
 }
 
 - (void) updateControls {
+    [self refreshControlAreaForCurrentBounds];
+
     switch (self._level) {
         case OnScreenControlsLevelOff:
             [self hideButtons];

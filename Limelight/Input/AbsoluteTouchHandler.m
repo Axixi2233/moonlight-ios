@@ -35,9 +35,13 @@
 }
 
 - (id)initWithView:(StreamView*)view {
+    return [self initWithView:view settings:[[[DataManager alloc] init] getSettings]];
+}
+
+- (id)initWithView:(StreamView*)view settings:(TemporarySettings*)settings {
     self = [self init];
     self->view = view;
-    self->settings= [[[DataManager alloc] init] getSettings];
+    self->settings = settings ?: [[[DataManager alloc] init] getSettings];
     return self;
 }
 

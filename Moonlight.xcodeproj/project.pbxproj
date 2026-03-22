@@ -10,8 +10,6 @@
 		693B3A9B218638CD00982F7B /* Settings.bundle in Resources */ = {isa = PBXBuildFile; fileRef = 693B3A9A218638CD00982F7B /* Settings.bundle */; };
 		791F0E5F2BF5D82500837217 /* TouchScreenManager.m in Sources */ = {isa = PBXBuildFile; fileRef = 791F0E5E2BF5D82500837217 /* TouchScreenManager.m */; };
 		791F0E632BF5E33500837217 /* SensitivityBean.m in Sources */ = {isa = PBXBuildFile; fileRef = 791F0E622BF5E33500837217 /* SensitivityBean.m */; };
-		79A316772BCE720600435DCE /* iPhone.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 79A316762BCE720600435DCE /* iPhone.storyboard */; };
-		79A316792BCE721000435DCE /* iPad.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 79A316782BCE721000435DCE /* iPad.storyboard */; };
 		79A316832BCE72B800435DCE /* OnScreenButtonState.m in Sources */ = {isa = PBXBuildFile; fileRef = 79A3167B2BCE72B800435DCE /* OnScreenButtonState.m */; };
 		79A316842BCE72B800435DCE /* OSCProfilesManager.m in Sources */ = {isa = PBXBuildFile; fileRef = 79A3167D2BCE72B800435DCE /* OSCProfilesManager.m */; };
 		79A316852BCE72B800435DCE /* LayoutOnScreenControls.m in Sources */ = {isa = PBXBuildFile; fileRef = 79A3167E2BCE72B800435DCE /* LayoutOnScreenControls.m */; };
@@ -19,8 +17,15 @@
 		79A3168E2BCE72EE00435DCE /* LayoutOnScreenControlsViewController.m in Sources */ = {isa = PBXBuildFile; fileRef = 79A316892BCE72EE00435DCE /* LayoutOnScreenControlsViewController.m */; };
 		79A3168F2BCE72EE00435DCE /* ToolBarContainerView.m in Sources */ = {isa = PBXBuildFile; fileRef = 79A3168B2BCE72EE00435DCE /* ToolBarContainerView.m */; };
 		79A316902BCE72EE00435DCE /* OSCProfilesTableViewController.m in Sources */ = {isa = PBXBuildFile; fileRef = 79A3168C2BCE72EE00435DCE /* OSCProfilesTableViewController.m */; };
-		79A316952BCE730D00435DCE /* ProfileTableViewCell.xib in Resources */ = {isa = PBXBuildFile; fileRef = 79A316932BCE730D00435DCE /* ProfileTableViewCell.xib */; };
 		79A316962BCE730D00435DCE /* ProfileTableViewCell.m in Sources */ = {isa = PBXBuildFile; fileRef = 79A316942BCE730D00435DCE /* ProfileTableViewCell.m */; };
+		7F0A00012D00000100000001 /* ProfileTableViewCellHostingBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7F0A00012D00000100000002 /* ProfileTableViewCellHostingBridge.swift */; };
+		7F0A00022D00000100000001 /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 7F0A00022D00000100000002 /* LaunchScreen.storyboard */; };
+		7F0A00032D00000100000001 /* MainFrameAppCellHostingBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7F0A00032D00000100000002 /* MainFrameAppCellHostingBridge.swift */; };
+		7F0A00042D00000100000001 /* MainFrameHostListHostingBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7F0A00042D00000100000002 /* MainFrameHostListHostingBridge.swift */; };
+		7F0A00052D00000100000001 /* MainFrameHostActionSheetHostingBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7F0A00052D00000100000002 /* MainFrameHostActionSheetHostingBridge.swift */; };
+		7F0A00062D00000100000001 /* StreamActionSheetHostingBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7F0A00062D00000100000002 /* StreamActionSheetHostingBridge.swift */; };
+		7F0A00072D00000100000001 /* AboutSwiftUIView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7F0A00072D00000100000002 /* AboutSwiftUIView.swift */; };
+		7F0A00082D00000100000001 /* GamepadTestSwiftUIView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7F0A00082D00000100000002 /* GamepadTestSwiftUIView.swift */; };
 		98181BE92791277400E43572 /* libSDL2.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 98181BE82791275D00E43572 /* libSDL2.a */; };
 		98181BEB2791278F00E43572 /* libSDL2.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 98181BEA2791278300E43572 /* libSDL2.a */; };
 		98181BED2791281100E43572 /* CoreMotion.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 98181BEC2791281100E43572 /* CoreMotion.framework */; };
@@ -57,6 +62,7 @@
 		DC1F5A07206436B20037755F /* ConnectionHelper.m in Sources */ = {isa = PBXBuildFile; fileRef = DC1F5A06206436B20037755F /* ConnectionHelper.m */; };
 		F74BEF9C2C1A705600224667 /* OpenSSL in Frameworks */ = {isa = PBXBuildFile; productRef = F74BEF9B2C1A705600224667 /* OpenSSL */; };
 		F74BEFA42C1A80E400224667 /* OpenSSL in Frameworks */ = {isa = PBXBuildFile; productRef = F74BEFA32C1A80E400224667 /* OpenSSL */; };
+		F74C00012D00000200000001 /* SettingsSwiftUIView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F74C00012D00000200000002 /* SettingsSwiftUIView.swift */; };
 		FB1A674D2131E65900507771 /* KeyboardSupport.m in Sources */ = {isa = PBXBuildFile; fileRef = FB1A674C2131E65900507771 /* KeyboardSupport.m */; };
 		FB1A67602132419700507771 /* Main.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = FB1A675E2132419700507771 /* Main.storyboard */; };
 		FB1A67622132419A00507771 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = FB1A67612132419A00507771 /* Assets.xcassets */; };
@@ -132,7 +138,6 @@
 		FB89463419F646E200339C8A /* Utils.m in Sources */ = {isa = PBXBuildFile; fileRef = FB89462219F646E200339C8A /* Utils.m */; };
 		FB89463519F646E200339C8A /* MainFrameViewController.m in Sources */ = {isa = PBXBuildFile; fileRef = FB89462519F646E200339C8A /* MainFrameViewController.m */; };
 		FB89463619F646E200339C8A /* StreamFrameViewController.m in Sources */ = {isa = PBXBuildFile; fileRef = FB89462719F646E200339C8A /* StreamFrameViewController.m */; };
-		FB89463819F6473800339C8A /* Launch Screen.xib in Resources */ = {isa = PBXBuildFile; fileRef = FB89463719F6473800339C8A /* Launch Screen.xib */; };
 		FB8946ED19F6AFE800339C8A /* libopus.a in Frameworks */ = {isa = PBXBuildFile; fileRef = FB8946EA19F6AFB800339C8A /* libopus.a */; };
 		FB9AFD281A7C84ED00872C98 /* HttpResponse.m in Sources */ = {isa = PBXBuildFile; fileRef = FB9AFD271A7C84ED00872C98 /* HttpResponse.m */; };
 		FB9AFD321A7D867C00872C98 /* AppAssetRetriever.m in Sources */ = {isa = PBXBuildFile; fileRef = FB9AFD311A7D867C00872C98 /* AppAssetRetriever.m */; };
@@ -188,8 +193,6 @@
 		791F0E602BF5D85800837217 /* TouchScreenManager.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = TouchScreenManager.h; sourceTree = "<group>"; };
 		791F0E612BF5E31D00837217 /* SensitivityBean.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = SensitivityBean.h; sourceTree = "<group>"; };
 		791F0E622BF5E33500837217 /* SensitivityBean.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = SensitivityBean.m; sourceTree = "<group>"; };
-		79A316762BCE720600435DCE /* iPhone.storyboard */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; path = iPhone.storyboard; sourceTree = "<group>"; };
-		79A316782BCE721000435DCE /* iPad.storyboard */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; path = iPad.storyboard; sourceTree = "<group>"; };
 		79A3167B2BCE72B800435DCE /* OnScreenButtonState.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = OnScreenButtonState.m; sourceTree = "<group>"; };
 		79A3167C2BCE72B800435DCE /* OnScreenButtonState.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = OnScreenButtonState.h; sourceTree = "<group>"; };
 		79A3167D2BCE72B800435DCE /* OSCProfilesManager.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = OSCProfilesManager.m; sourceTree = "<group>"; };
@@ -205,8 +208,15 @@
 		79A3168C2BCE72EE00435DCE /* OSCProfilesTableViewController.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = OSCProfilesTableViewController.m; sourceTree = "<group>"; };
 		79A3168D2BCE72EE00435DCE /* OSCProfilesTableViewController.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = OSCProfilesTableViewController.h; sourceTree = "<group>"; };
 		79A316922BCE730C00435DCE /* ProfileTableViewCell.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = ProfileTableViewCell.h; sourceTree = "<group>"; };
-		79A316932BCE730D00435DCE /* ProfileTableViewCell.xib */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = file.xib; path = ProfileTableViewCell.xib; sourceTree = "<group>"; };
 		79A316942BCE730D00435DCE /* ProfileTableViewCell.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = ProfileTableViewCell.m; sourceTree = "<group>"; };
+		7F0A00012D00000100000002 /* ProfileTableViewCellHostingBridge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfileTableViewCellHostingBridge.swift; sourceTree = "<group>"; };
+		7F0A00022D00000100000002 /* LaunchScreen.storyboard */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; path = LaunchScreen.storyboard; sourceTree = SOURCE_ROOT; };
+		7F0A00032D00000100000002 /* MainFrameAppCellHostingBridge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MainFrameAppCellHostingBridge.swift; sourceTree = "<group>"; };
+		7F0A00042D00000100000002 /* MainFrameHostListHostingBridge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MainFrameHostListHostingBridge.swift; sourceTree = "<group>"; };
+		7F0A00052D00000100000002 /* MainFrameHostActionSheetHostingBridge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MainFrameHostActionSheetHostingBridge.swift; sourceTree = "<group>"; };
+		7F0A00062D00000100000002 /* StreamActionSheetHostingBridge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StreamActionSheetHostingBridge.swift; sourceTree = "<group>"; };
+		7F0A00072D00000100000002 /* AboutSwiftUIView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AboutSwiftUIView.swift; sourceTree = "<group>"; };
+		7F0A00082D00000100000002 /* GamepadTestSwiftUIView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GamepadTestSwiftUIView.swift; sourceTree = "<group>"; };
 		9803CCAB254F9EAF00EE185E /* ConnectionCallbacks.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = ConnectionCallbacks.h; sourceTree = "<group>"; };
 		98132E8C20BC9A62007A053F /* Moonlight v1.1.xcdatamodel */ = {isa = PBXFileReference; lastKnownFileType = wrapper.xcdatamodel; path = "Moonlight v1.1.xcdatamodel"; sourceTree = "<group>"; };
 		98181BE82791275D00E43572 /* libSDL2.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; name = libSDL2.a; path = libs/SDL2/lib/iOS/libSDL2.a; sourceTree = "<group>"; };
@@ -250,6 +260,7 @@
 		D4746EEA1CBC740C006FB401 /* Moonlight-Bridging-Header.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = "Moonlight-Bridging-Header.h"; path = "Input/Moonlight-Bridging-Header.h"; sourceTree = "<group>"; };
 		DC1F5A05206436B10037755F /* ConnectionHelper.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = ConnectionHelper.h; sourceTree = "<group>"; };
 		DC1F5A06206436B20037755F /* ConnectionHelper.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = ConnectionHelper.m; sourceTree = "<group>"; };
+		F74C00012D00000200000002 /* SettingsSwiftUIView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsSwiftUIView.swift; sourceTree = "<group>"; };
 		FB1A674B2131E65900507771 /* KeyboardSupport.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = KeyboardSupport.h; sourceTree = "<group>"; };
 		FB1A674C2131E65900507771 /* KeyboardSupport.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = KeyboardSupport.m; sourceTree = "<group>"; };
 		FB1A67532132419700507771 /* Moonlight TV.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Moonlight TV.app"; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -320,7 +331,6 @@
 		FB89462519F646E200339C8A /* MainFrameViewController.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = MainFrameViewController.m; sourceTree = "<group>"; };
 		FB89462619F646E200339C8A /* StreamFrameViewController.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = StreamFrameViewController.h; sourceTree = "<group>"; };
 		FB89462719F646E200339C8A /* StreamFrameViewController.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = StreamFrameViewController.m; sourceTree = "<group>"; };
-		FB89463719F6473800339C8A /* Launch Screen.xib */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = file.xib; path = "Launch Screen.xib"; sourceTree = SOURCE_ROOT; };
 		FB8946E519F6AFB800339C8A /* opus.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = opus.h; sourceTree = "<group>"; };
 		FB8946E619F6AFB800339C8A /* opus_defines.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = opus_defines.h; sourceTree = "<group>"; };
 		FB8946E719F6AFB800339C8A /* opus_multistream.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = opus_multistream.h; sourceTree = "<group>"; };
@@ -432,7 +442,7 @@
 			children = (
 				79A316922BCE730C00435DCE /* ProfileTableViewCell.h */,
 				79A316942BCE730D00435DCE /* ProfileTableViewCell.m */,
-				79A316932BCE730D00435DCE /* ProfileTableViewCell.xib */,
+				7F0A00012D00000100000002 /* ProfileTableViewCellHostingBridge.swift */,
 			);
 			path = Cells;
 			sourceTree = "<group>";
@@ -533,15 +543,13 @@
 				FBDE86DF19F7A837001C18A8 /* UIComputerView.m */,
 				FBDE86E419F82297001C18A8 /* UIAppView.h */,
 				FBDE86E519F82297001C18A8 /* UIAppView.m */,
-				FB89463719F6473800339C8A /* Launch Screen.xib */,
+				7F0A00022D00000100000002 /* LaunchScreen.storyboard */,
 				FB290D0819B2C406004C83CF /* Images.xcassets */,
 				FB290D0519B2C406004C83CF /* Limelight.xcdatamodeld */,
 				FB1D59951BBCCB6400F482CA /* ComputerScrollView.h */,
 				FB1D59961BBCCB6400F482CA /* ComputerScrollView.m */,
 				FB1D59981BBCCD7E00F482CA /* AppCollectionView.h */,
 				FB1D59991BBCCD7E00F482CA /* AppCollectionView.m */,
-				79A316762BCE720600435DCE /* iPhone.storyboard */,
-				79A316782BCE721000435DCE /* iPad.storyboard */,
 			);
 			name = Moonlight;
 			path = Limelight;
@@ -652,10 +660,17 @@
 				FBD3495219FF36FB002D2A60 /* SWRevealViewController.m */,
 				FB89462419F646E200339C8A /* MainFrameViewController.h */,
 				FB89462519F646E200339C8A /* MainFrameViewController.m */,
+				7F0A00072D00000100000002 /* AboutSwiftUIView.swift */,
+				7F0A00082D00000100000002 /* GamepadTestSwiftUIView.swift */,
+				7F0A00032D00000100000002 /* MainFrameAppCellHostingBridge.swift */,
+				7F0A00052D00000100000002 /* MainFrameHostActionSheetHostingBridge.swift */,
+				7F0A00042D00000100000002 /* MainFrameHostListHostingBridge.swift */,
+				7F0A00062D00000100000002 /* StreamActionSheetHostingBridge.swift */,
 				FB89462619F646E200339C8A /* StreamFrameViewController.h */,
 				FB89462719F646E200339C8A /* StreamFrameViewController.m */,
 				FBD3494E19FF2174002D2A60 /* SettingsViewController.h */,
 				FBD3494F19FF2174002D2A60 /* SettingsViewController.m */,
+				F74C00012D00000200000002 /* SettingsSwiftUIView.swift */,
 				FB4A23B61A9D3637004D2EF2 /* LoadingFrameViewController.h */,
 				FB4A23B71A9D3637004D2EF2 /* LoadingFrameViewController.m */,
 			);
@@ -897,10 +912,7 @@
 			files = (
 				FB290CFE19B2C406004C83CF /* InfoPlist.strings in Resources */,
 				FB290D0919B2C406004C83CF /* Images.xcassets in Resources */,
-				FB89463819F6473800339C8A /* Launch Screen.xib in Resources */,
-				79A316792BCE721000435DCE /* iPad.storyboard in Resources */,
-				79A316772BCE720600435DCE /* iPhone.storyboard in Resources */,
-				79A316952BCE730D00435DCE /* ProfileTableViewCell.xib in Resources */,
+				7F0A00022D00000100000001 /* LaunchScreen.storyboard in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -987,14 +999,21 @@
 				FBD3495319FF36FB002D2A60 /* SWRevealViewController.m in Sources */,
 				FB1D59971BBCCB6400F482CA /* ComputerScrollView.m in Sources */,
 				FBD3495019FF2174002D2A60 /* SettingsViewController.m in Sources */,
+				F74C00012D00000200000001 /* SettingsSwiftUIView.swift in Sources */,
 				FB89462C19F646E200339C8A /* HttpManager.m in Sources */,
 				FB89462D19F646E200339C8A /* MDNSManager.m in Sources */,
 				FB89462B19F646E200339C8A /* StreamView.m in Sources */,
 				FB4678FA1A55FFAD00377732 /* DiscoveryManager.m in Sources */,
 				98D5856D1C0EA79600F6CC00 /* TemporaryHost.m in Sources */,
+				7F0A00072D00000100000001 /* AboutSwiftUIView.swift in Sources */,
+				7F0A00082D00000100000001 /* GamepadTestSwiftUIView.swift in Sources */,
 				79A316832BCE72B800435DCE /* OnScreenButtonState.m in Sources */,
 				791F0E632BF5E33500837217 /* SensitivityBean.m in Sources */,
 				FB89463519F646E200339C8A /* MainFrameViewController.m in Sources */,
+				7F0A00032D00000100000001 /* MainFrameAppCellHostingBridge.swift in Sources */,
+				7F0A00052D00000100000001 /* MainFrameHostActionSheetHostingBridge.swift in Sources */,
+				7F0A00042D00000100000001 /* MainFrameHostListHostingBridge.swift in Sources */,
+				7F0A00062D00000100000001 /* StreamActionSheetHostingBridge.swift in Sources */,
 				FBD1C8E21A8AD71400C6703C /* Logger.m in Sources */,
 				FB1D599A1BBCCD7E00F482CA /* AppCollectionView.m in Sources */,
 				FB89463619F646E200339C8A /* StreamFrameViewController.m in Sources */,
@@ -1013,6 +1032,7 @@
 				9896219723D15C7000211983 /* X1Kit.swift in Sources */,
 				FBD3494319FC9C04002D2A60 /* AppAssetManager.m in Sources */,
 				FB6549561A57907E001C8F39 /* DiscoveryWorker.m in Sources */,
+				7F0A00012D00000100000001 /* ProfileTableViewCellHostingBridge.swift in Sources */,
 				79A316962BCE730D00435DCE /* ProfileTableViewCell.m in Sources */,
 				791F0E5F2BF5D82500837217 /* TouchScreenManager.m in Sources */,
 				FB89462A19F646E200339C8A /* ControllerSupport.m in Sources */,
@@ -1219,7 +1239,7 @@
 				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
-				IPHONEOS_DEPLOYMENT_TARGET = 12.0;
+				IPHONEOS_DEPLOYMENT_TARGET = 13.0;
 				ONLY_ACTIVE_ARCH = YES;
 				SDKROOT = iphoneos;
 				SWIFT_OBJC_INTERFACE_HEADER_NAME = "";
@@ -1272,7 +1292,7 @@
 				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
-				IPHONEOS_DEPLOYMENT_TARGET = 12.0;
+				IPHONEOS_DEPLOYMENT_TARGET = 13.0;
 				PROVISIONING_PROFILE = "";
 				SDKROOT = iphoneos;
 				SWIFT_OBJC_INTERFACE_HEADER_NAME = "";
@@ -1290,7 +1310,7 @@
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = HK3R4Y8D92;
+				DEVELOPMENT_TEAM = 8A8QNT4D99;
 				GCC_PRECOMPILE_PREFIX_HEADER = YES;
 				GCC_PREFIX_HEADER = "Limelight/Limelight-Prefix.pch";
 				HEADER_SEARCH_PATHS = (
@@ -1318,7 +1338,7 @@
 					"$(PROJECT_DIR)/libs/SDL2/lib/iOS-Sim",
 					"$(PROJECT_DIR)/libs/FFmpeg/lib/iOS-Sim",
 				);
-				MARKETING_VERSION = 1.0;
+				MARKETING_VERSION = 1.0.0;
 				PRODUCT_BUNDLE_IDENTIFIER = cn.axi.moonlight.ap1;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				PROVISIONING_PROFILE = "";
@@ -1341,7 +1361,7 @@
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = HK3R4Y8D92;
+				DEVELOPMENT_TEAM = 8A8QNT4D99;
 				GCC_PRECOMPILE_PREFIX_HEADER = YES;
 				GCC_PREFIX_HEADER = "Limelight/Limelight-Prefix.pch";
 				HEADER_SEARCH_PATHS = (
@@ -1369,7 +1389,7 @@
 					"$(PROJECT_DIR)/libs/SDL2/lib/iOS-Sim",
 					"$(PROJECT_DIR)/libs/FFmpeg/lib/iOS-Sim",
 				);
-				MARKETING_VERSION = 1.0;
+				MARKETING_VERSION = 1.0.0;
 				PRODUCT_BUNDLE_IDENTIFIER = cn.axi.moonlight.ap1;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				PROVISIONING_PROFILE = "";

@@ -12,10 +12,13 @@
 #import "StreamManager.h"
 #import "ControllerSupport.h"
 #import "DataManager.h"
+#import "Moonlight-Swift.h"
 
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
+#include <ifaddrs.h>
+#include <net/if.h>
 #include <Limelight.h>
 
 #if TARGET_OS_TV
@@ -29,6 +32,16 @@
 @property(readonly, nonatomic) float refreshRate;
 - (id)initWithRefreshRate:(float)arg1 videoDynamicRange:(int)arg2;
 @end
+
+@interface StreamFrameViewController () <StreamActionSheetHostingViewControllerDelegate, StreamShortcutPanelHostingViewControllerDelegate, StreamVirtualKeyboardPanelHostingViewControllerDelegate, UIGestureRecognizerDelegate>
+@end
+
+static const CGFloat kStreamFloatingMenuPhoneButtonSize = 44.0f;
+static const CGFloat kStreamFloatingMenuPadButtonSize = 48.0f;
+static const CGFloat kStreamFloatingMenuExpandedMargin = 6.0f;
+static const CGFloat kStreamFloatingMenuAutoCollapseDelay = 3.0f;
+static const CGFloat kStreamFloatingMenuCollapsedAlpha = 0.42f;
+static const CGFloat kStreamFloatingMenuExpandedAlpha = 0.96f;
 
 @implementation StreamFrameViewController {
     ControllerSupport *_controllerSupport;
@@ -47,6 +60,31 @@
     UIScrollView *_scrollView;
     BOOL _userIsInteracting;
     CGSize _keyboardSize;
+    StreamActionSheetHostingViewController *_streamActionSheetHostingViewController;
+    StreamShortcutPanelHostingViewController *_streamShortcutPanelHostingViewController;
+    StreamVirtualKeyboardPanelHostingViewController *_streamVirtualKeyboardPanelHostingViewController;
+    NSInteger _currentSessionTouchModeSelection;
+    NSInteger _currentSessionVideoAlignmentSelection;
+    CGFloat _currentSessionVideoAlignmentMargin;
+    BOOL _extendedPerformanceMetricsEnabled;
+    NSInteger _currentSessionPerformanceOverlayPositionSelection;
+    CGFloat _currentSessionPerformanceOverlayMargin;
+    BOOL _viewOnlyModeEnabled;
+    CGFloat _viewOnlyRestoreZoomScale;
+    CGPoint _viewOnlyRestoreContentOffset;
+    BOOL _viewOnlyHadScrollViewBeforeEntering;
+    OnScreenControlsLevel _viewOnlyRestoreOscLevel;
+    BOOL _suppressTerminationAlertForManualExit;
+    UIControl *_floatingMenuButton;
+    UIImageView *_floatingMenuIconView;
+    NSTimer *_floatingMenuDormancyTimer;
+    UILongPressGestureRecognizer *_floatingMenuLongPressRecognizer;
+    BOOL _floatingMenuCollapsed;
+    BOOL _floatingMenuAnchoredRight;
+    CGFloat _floatingMenuCenterY;
+    CGPoint _floatingMenuPanStartCenter;
+    CGPoint _floatingMenuTouchOffset;
+    BOOL _floatingMenuDragMoved;
     
 #if !TARGET_OS_TV
     UIScreenEdgePanGestureRecognizer *_exitSwipeRecognizer;
@@ -56,6 +94,498 @@
     UIView *_renderView;
     UIWindow *_deviceWindow;
     //外接显示器-----------end
+}
+
+- (NSAttributedString *)statsOverlayAttributedTextForText:(NSString *)text {
+    if (text.length == 0) {
+        return [[NSAttributedString alloc] initWithString:@""];
+    }
+
+    UIFont *font = _overlayView.font ?: [UIFont systemFontOfSize:10.0];
+    NSMutableAttributedString *attributedText = [[NSMutableAttributedString alloc] init];
+    NSString *symbolName = [self currentNetworkSymbolName];
+    UIImage *symbolImage = nil;
+
+    if (@available(iOS 13.0, *)) {
+        UIImageSymbolConfiguration *configuration = [UIImageSymbolConfiguration configurationWithPointSize:font.pointSize weight:UIImageSymbolWeightSemibold];
+        symbolImage = [UIImage systemImageNamed:symbolName withConfiguration:configuration];
+        if (symbolImage != nil) {
+            symbolImage = [symbolImage imageWithTintColor:[UIColor whiteColor] renderingMode:UIImageRenderingModeAlwaysOriginal];
+        }
+    }
+
+    if (symbolImage != nil) {
+        NSTextAttachment *attachment = [[NSTextAttachment alloc] init];
+        attachment.image = symbolImage;
+        CGFloat iconSide = ceil(font.lineHeight);
+        CGFloat yOffset = floor((font.capHeight - iconSide) / 2.0);
+        attachment.bounds = CGRectMake(0, yOffset, iconSide, iconSide);
+        [attributedText appendAttributedString:[NSAttributedString attributedStringWithAttachment:attachment]];
+        [attributedText appendAttributedString:[[NSAttributedString alloc] initWithString:@" "]];
+    }
+
+    NSDictionary *attributes = @{
+        NSForegroundColorAttributeName: [UIColor whiteColor],
+        NSFontAttributeName: font
+    };
+    [attributedText appendAttributedString:[[NSAttributedString alloc] initWithString:text attributes:attributes]];
+    return attributedText;
+}
+
+- (NSString *)currentNetworkSymbolName {
+    struct ifaddrs *ifaList = NULL;
+    struct ifaddrs *ifa = NULL;
+    BOOL hasWiFi = NO;
+    BOOL hasCellular = NO;
+
+    if (getifaddrs(&ifaList) == -1) {
+        return @"wifi";
+    }
+
+    for (ifa = ifaList; ifa != NULL; ifa = ifa->ifa_next) {
+        if (ifa->ifa_addr == NULL) {
+            continue;
+        }
+
+        if (!(ifa->ifa_flags & IFF_UP) || !(ifa->ifa_flags & IFF_RUNNING)) {
+            continue;
+        }
+
+        if (ifa->ifa_flags & IFF_LOOPBACK) {
+            continue;
+        }
+
+        sa_family_t family = ifa->ifa_addr->sa_family;
+        if (family != AF_INET && family != AF_INET6) {
+            continue;
+        }
+
+        NSString *interfaceName = [NSString stringWithUTF8String:ifa->ifa_name ?: ""];
+        if ([interfaceName hasPrefix:@"en"]) {
+            hasWiFi = YES;
+            break;
+        }
+
+        if ([interfaceName hasPrefix:@"pdp_ip"]) {
+            hasCellular = YES;
+        }
+    }
+
+    freeifaddrs(ifaList);
+    if (hasWiFi) {
+        return @"wifi";
+    }
+
+    if (hasCellular) {
+        return @"cellularbars";
+    }
+
+    return @"wifi";
+}
+
+- (BOOL)prefersStatusBarHidden {
+    return YES;
+}
+
+- (void)layoutOverlayViewForCurrentBounds {
+    if (_overlayView == nil || _overlayView.hidden) {
+        return;
+    }
+
+    CGRect bounds = self.view.bounds;
+    UIEdgeInsets safeAreaInsets = UIEdgeInsetsZero;
+    if (@available(iOS 11.0, *)) {
+        safeAreaInsets = self.view.safeAreaInsets;
+    }
+
+    CGFloat horizontalPadding = 0.0;
+    CGFloat verticalPadding = 0.0;
+    CGFloat availableWidth = MAX(bounds.size.width - safeAreaInsets.left - safeAreaInsets.right, 0.0);
+    CGFloat maxWidth = MAX(availableWidth - horizontalPadding * 2.0, 120.0);
+    CGFloat linePadding = _overlayView.textContainer.lineFragmentPadding * 2.0;
+    UIEdgeInsets textInsets = _overlayView.textContainerInset;
+    CGFloat maxTextWidth = MAX(maxWidth - textInsets.left - textInsets.right - linePadding, 1.0);
+
+    CGRect textRect = CGRectZero;
+    if (_overlayView.attributedText.length > 0) {
+        textRect = [_overlayView.attributedText boundingRectWithSize:CGSizeMake(maxTextWidth, CGFLOAT_MAX)
+                                                             options:(NSStringDrawingUsesLineFragmentOrigin | NSStringDrawingUsesFontLeading)
+                                                             context:nil];
+    }
+    else {
+        NSDictionary *attributes = @{
+            NSFontAttributeName: _overlayView.font ?: [UIFont systemFontOfSize:10.0]
+        };
+        NSString *overlayText = _overlayView.text ?: @"";
+        textRect = [overlayText boundingRectWithSize:CGSizeMake(maxTextWidth, CGFLOAT_MAX)
+                                             options:(NSStringDrawingUsesLineFragmentOrigin | NSStringDrawingUsesFontLeading)
+                                          attributes:attributes
+                                             context:nil];
+    }
+
+    CGFloat contentWidth = ceil(textRect.size.width) + textInsets.left + textInsets.right + linePadding;
+    CGFloat contentHeight = ceil(textRect.size.height) + textInsets.top + textInsets.bottom;
+    CGFloat overlayWidth = MIN(MAX(contentWidth, 44.0), maxWidth);
+    CGFloat overlayHeight = MAX(contentHeight, _overlayView.font.lineHeight + textInsets.top + textInsets.bottom);
+    CGFloat clampedMargin = MIN(MAX(_currentSessionPerformanceOverlayMargin, 0.0f), 150.0f);
+    CGFloat minX = safeAreaInsets.left + horizontalPadding;
+    CGFloat maxX = CGRectGetMaxX(bounds) - safeAreaInsets.right - horizontalPadding - overlayWidth;
+    CGFloat minY = safeAreaInsets.top + verticalPadding;
+    CGFloat maxY = CGRectGetMaxY(bounds) - safeAreaInsets.bottom - verticalPadding - overlayHeight;
+    CGFloat originX = safeAreaInsets.left + floor((availableWidth - overlayWidth) / 2.0);
+    CGFloat originY = minY + clampedMargin;
+
+    switch (_currentSessionPerformanceOverlayPositionSelection) {
+        case 1:
+            originX = minX;
+            originY = minY + clampedMargin;
+            break;
+        case 2:
+            originX = maxX;
+            originY = minY + clampedMargin;
+            break;
+        case 3:
+            originX = safeAreaInsets.left + floor((availableWidth - overlayWidth) / 2.0);
+            originY = maxY - clampedMargin;
+            break;
+        case 4:
+            originX = minX;
+            originY = maxY - clampedMargin;
+            break;
+        case 5:
+            originX = maxX;
+            originY = maxY - clampedMargin;
+            break;
+        case 0:
+        default:
+            break;
+    }
+
+    originX = MIN(MAX(originX, minX), maxX);
+    originY = MIN(MAX(originY, minY), maxY);
+
+    CGRect frame = CGRectMake(originX,
+                              originY,
+                              overlayWidth,
+                              overlayHeight);
+    _overlayView.frame = frame;
+}
+
+- (void)layoutStreamingSubviewsForCurrentBounds {
+    CGRect bounds = self.view.bounds;
+    BOOL preserveZoomedStreamFrame = (_scrollView != nil &&
+                                      _streamView.superview == _scrollView &&
+                                      _viewOnlyModeEnabled &&
+                                      _scrollView.zoomScale > 1.0f);
+    if (!preserveZoomedStreamFrame) {
+        _streamView.frame = bounds;
+    }
+
+    if (_renderView != nil && _extWindow == nil) {
+        _renderView.frame = bounds;
+        _renderView.bounds = bounds;
+    }
+
+    if (_scrollView != nil) {
+        _scrollView.frame = bounds;
+        if (!preserveZoomedStreamFrame) {
+            _scrollView.contentSize = _streamView.bounds.size;
+        }
+    }
+
+    [_stageLabel sizeToFit];
+    _stageLabel.center = CGPointMake(CGRectGetMidX(bounds), CGRectGetMidY(bounds));
+
+    [_spinner sizeToFit];
+    _spinner.center = CGPointMake(CGRectGetMidX(bounds),
+                                  CGRectGetMidY(bounds) - _stageLabel.frame.size.height - _spinner.frame.size.height);
+
+    if (_tipLabel.text.length > 0) {
+        CGSize tipTextSize = [_tipLabel sizeThatFits:CGSizeMake(CGRectGetWidth(bounds) - 40.0, CGFLOAT_MAX)];
+        CGFloat tipHorizontalPadding = 20.0;
+        CGFloat tipVerticalPadding = 10.0;
+        _tipLabel.frame = CGRectMake(0,
+                                     0,
+                                     ceil(tipTextSize.width + tipHorizontalPadding * 2.0),
+                                     ceil(tipTextSize.height + tipVerticalPadding * 2.0));
+    }
+
+    CGFloat tipTopInset = 18.0;
+    if (@available(iOS 11.0, *)) {
+        tipTopInset += self.view.safeAreaInsets.top;
+    }
+    _tipLabel.center = CGPointMake(CGRectGetMidX(bounds),
+                                   tipTopInset + CGRectGetHeight(_tipLabel.bounds) * 0.5);
+
+    [self layoutOverlayViewForCurrentBounds];
+    [self layoutFloatingMenuButtonForCurrentBounds];
+}
+
+- (CGFloat)floatingMenuMinimumCenterYForBounds:(CGRect)bounds {
+    CGFloat safeTop = 0.0f;
+    if (@available(iOS 11.0, *)) {
+        safeTop = self.view.safeAreaInsets.top;
+    }
+    return safeTop + kStreamFloatingMenuExpandedMargin + [self floatingMenuButtonSize] * 0.5f;
+}
+
+- (CGFloat)floatingMenuMaximumCenterYForBounds:(CGRect)bounds {
+    CGFloat safeBottom = 0.0f;
+    if (@available(iOS 11.0, *)) {
+        safeBottom = self.view.safeAreaInsets.bottom;
+    }
+    return CGRectGetHeight(bounds) - safeBottom - kStreamFloatingMenuExpandedMargin - [self floatingMenuButtonSize] * 0.5f;
+}
+
+- (CGFloat)floatingMenuButtonSize {
+    return UIDevice.currentDevice.userInterfaceIdiom == UIUserInterfaceIdiomPhone ? kStreamFloatingMenuPhoneButtonSize : kStreamFloatingMenuPadButtonSize;
+}
+
+- (CGFloat)floatingMenuExpandedCenterXForBounds:(CGRect)bounds anchoredRight:(BOOL)anchoredRight {
+    if (anchoredRight) {
+        return CGRectGetWidth(bounds) - kStreamFloatingMenuExpandedMargin - [self floatingMenuButtonSize] * 0.5f;
+    }
+
+    return kStreamFloatingMenuExpandedMargin + [self floatingMenuButtonSize] * 0.5f;
+}
+
+- (CGFloat)floatingMenuCollapsedCenterXForBounds:(CGRect)bounds anchoredRight:(BOOL)anchoredRight {
+    if (anchoredRight) {
+        return CGRectGetWidth(bounds);
+    }
+
+    return 0.0f;
+}
+
+- (void)invalidateFloatingMenuDormancyTimer {
+    [_floatingMenuDormancyTimer invalidate];
+    _floatingMenuDormancyTimer = nil;
+}
+
+- (void)handleFloatingMenuButtonTouchUpInside:(id)sender {
+    [self invalidateFloatingMenuDormancyTimer];
+
+    if (_floatingMenuCollapsed) {
+        [self setFloatingMenuCollapsed:NO animated:YES];
+        [self scheduleFloatingMenuAutoCollapse];
+        return;
+    }
+
+    [self showActionSheetWithTitle:@"游戏菜单" options:nil];
+    [self scheduleFloatingMenuAutoCollapse];
+}
+
+- (void)installFloatingMenuButtonIfNeeded {
+    if (_floatingMenuButton != nil) {
+        return;
+    }
+
+    CGFloat buttonSize = [self floatingMenuButtonSize];
+    _floatingMenuButton = [[UIControl alloc] initWithFrame:CGRectMake(0, 0, buttonSize, buttonSize)];
+    _floatingMenuButton.backgroundColor = [UIColor clearColor];
+    _floatingMenuButton.layer.cornerRadius = buttonSize * 0.5f;
+    _floatingMenuButton.layer.borderWidth = 1.0f;
+    _floatingMenuButton.layer.borderColor = [[UIColor whiteColor] colorWithAlphaComponent:0.92].CGColor;
+    _floatingMenuButton.layer.shadowColor = [UIColor blackColor].CGColor;
+    _floatingMenuButton.layer.shadowOpacity = 0.24f;
+    _floatingMenuButton.layer.shadowRadius = 10.0f;
+    _floatingMenuButton.layer.shadowOffset = CGSizeMake(0, 6);
+    _floatingMenuButton.alpha = kStreamFloatingMenuExpandedAlpha;
+    _floatingMenuButton.clipsToBounds = NO;
+    _floatingMenuButton.exclusiveTouch = YES;
+    [_floatingMenuButton addTarget:self action:@selector(handleFloatingMenuButtonTouchUpInside:) forControlEvents:UIControlEventTouchUpInside];
+
+    _floatingMenuIconView = [[UIImageView alloc] initWithFrame:CGRectZero];
+    _floatingMenuIconView.translatesAutoresizingMaskIntoConstraints = NO;
+    _floatingMenuIconView.contentMode = UIViewContentModeScaleAspectFill;
+    _floatingMenuIconView.clipsToBounds = YES;
+    _floatingMenuIconView.layer.cornerRadius = buttonSize * 0.5f;
+    _floatingMenuIconView.image = [UIImage imageNamed:@"AppIconRound"];
+    [_floatingMenuButton addSubview:_floatingMenuIconView];
+    [NSLayoutConstraint activateConstraints:@[
+        [_floatingMenuIconView.centerXAnchor constraintEqualToAnchor:_floatingMenuButton.centerXAnchor],
+        [_floatingMenuIconView.centerYAnchor constraintEqualToAnchor:_floatingMenuButton.centerYAnchor],
+        [_floatingMenuIconView.widthAnchor constraintEqualToAnchor:_floatingMenuButton.widthAnchor],
+        [_floatingMenuIconView.heightAnchor constraintEqualToAnchor:_floatingMenuButton.heightAnchor]
+    ]];
+
+    _floatingMenuLongPressRecognizer = [[UILongPressGestureRecognizer alloc] initWithTarget:self action:@selector(handleFloatingMenuPan:)];
+    _floatingMenuLongPressRecognizer.minimumPressDuration = 0.18;
+    _floatingMenuLongPressRecognizer.allowableMovement = CGFLOAT_MAX;
+    _floatingMenuLongPressRecognizer.cancelsTouchesInView = YES;
+    _floatingMenuLongPressRecognizer.delegate = self;
+    [self.view addGestureRecognizer:_floatingMenuLongPressRecognizer];
+
+    CGRect bounds = self.view.bounds;
+    _floatingMenuAnchoredRight = NO;
+    _floatingMenuCollapsed = NO;
+    _floatingMenuCenterY = CGRectGetHeight(bounds) * 0.25f;
+    _floatingMenuCenterY = MIN(MAX(_floatingMenuCenterY, [self floatingMenuMinimumCenterYForBounds:bounds]),
+                               [self floatingMenuMaximumCenterYForBounds:bounds]);
+    _floatingMenuButton.center = CGPointMake([self floatingMenuExpandedCenterXForBounds:bounds anchoredRight:NO],
+                                             _floatingMenuCenterY);
+
+    [self.view addSubview:_floatingMenuButton];
+    [self.view bringSubviewToFront:_floatingMenuButton];
+    [self scheduleFloatingMenuAutoCollapse];
+}
+
+- (BOOL)gestureRecognizerShouldBegin:(UIGestureRecognizer *)gestureRecognizer {
+    if (gestureRecognizer == _floatingMenuLongPressRecognizer) {
+        if (_floatingMenuButton == nil) {
+            return NO;
+        }
+
+        CGPoint location = [gestureRecognizer locationInView:self.view];
+        return CGRectContainsPoint(_floatingMenuButton.frame, location);
+    }
+
+    return YES;
+}
+
+- (BOOL)gestureRecognizer:(UIGestureRecognizer *)gestureRecognizer shouldRecognizeSimultaneouslyWithGestureRecognizer:(UIGestureRecognizer *)otherGestureRecognizer {
+    if (gestureRecognizer == _floatingMenuLongPressRecognizer || otherGestureRecognizer == _floatingMenuLongPressRecognizer) {
+        return YES;
+    }
+
+    return NO;
+}
+
+- (void)layoutFloatingMenuButtonForCurrentBounds {
+    if (_floatingMenuButton == nil) {
+        return;
+    }
+
+    CGRect bounds = self.view.bounds;
+    CGFloat minCenterY = [self floatingMenuMinimumCenterYForBounds:bounds];
+    CGFloat maxCenterY = [self floatingMenuMaximumCenterYForBounds:bounds];
+    if (_floatingMenuCenterY <= 0.0f) {
+        _floatingMenuCenterY = CGRectGetHeight(bounds) * 0.25f;
+    }
+    _floatingMenuCenterY = MIN(MAX(_floatingMenuCenterY, minCenterY), maxCenterY);
+
+    CGFloat centerX = _floatingMenuCollapsed ?
+        [self floatingMenuCollapsedCenterXForBounds:bounds anchoredRight:_floatingMenuAnchoredRight] :
+        [self floatingMenuExpandedCenterXForBounds:bounds anchoredRight:_floatingMenuAnchoredRight];
+
+    CGFloat buttonSize = [self floatingMenuButtonSize];
+    _floatingMenuButton.bounds = CGRectMake(0, 0, buttonSize, buttonSize);
+    _floatingMenuButton.center = CGPointMake(centerX, _floatingMenuCenterY);
+    [self.view bringSubviewToFront:_floatingMenuButton];
+}
+
+- (void)setFloatingMenuCollapsed:(BOOL)collapsed animated:(BOOL)animated {
+    if (_floatingMenuButton == nil) {
+        return;
+    }
+
+    _floatingMenuCollapsed = collapsed;
+    CGRect bounds = self.view.bounds;
+    CGFloat centerX = collapsed ?
+        [self floatingMenuCollapsedCenterXForBounds:bounds anchoredRight:_floatingMenuAnchoredRight] :
+        [self floatingMenuExpandedCenterXForBounds:bounds anchoredRight:_floatingMenuAnchoredRight];
+    CGFloat alpha = collapsed ? kStreamFloatingMenuCollapsedAlpha : kStreamFloatingMenuExpandedAlpha;
+    CGAffineTransform transform = collapsed ? CGAffineTransformMakeScale(0.92f, 0.92f) : CGAffineTransformIdentity;
+
+    void (^changes)(void) = ^{
+        self->_floatingMenuButton.center = CGPointMake(centerX, self->_floatingMenuCenterY);
+        self->_floatingMenuButton.alpha = alpha;
+        self->_floatingMenuButton.transform = transform;
+    };
+
+    if (animated) {
+        [UIView animateWithDuration:0.22
+                              delay:0.0
+                            options:UIViewAnimationOptionCurveEaseOut | UIViewAnimationOptionBeginFromCurrentState
+                         animations:changes
+                         completion:nil];
+    }
+    else {
+        changes();
+    }
+}
+
+- (void)scheduleFloatingMenuAutoCollapse {
+    [self invalidateFloatingMenuDormancyTimer];
+    _floatingMenuDormancyTimer = [NSTimer scheduledTimerWithTimeInterval:kStreamFloatingMenuAutoCollapseDelay
+                                                                  target:self
+                                                                selector:@selector(handleFloatingMenuDormancyTimer:)
+                                                                userInfo:nil
+                                                                 repeats:NO];
+}
+
+- (void)handleFloatingMenuDormancyTimer:(NSTimer *)timer {
+    [self setFloatingMenuCollapsed:YES animated:YES];
+}
+
+- (void)handleFloatingMenuPan:(UILongPressGestureRecognizer *)recognizer {
+    if (_floatingMenuButton == nil) {
+        return;
+    }
+
+    CGRect bounds = self.view.bounds;
+    CGFloat minCenterY = [self floatingMenuMinimumCenterYForBounds:bounds];
+    CGFloat maxCenterY = [self floatingMenuMaximumCenterYForBounds:bounds];
+    CGFloat minCenterX = [self floatingMenuExpandedCenterXForBounds:bounds anchoredRight:NO];
+    CGFloat maxCenterX = [self floatingMenuExpandedCenterXForBounds:bounds anchoredRight:YES];
+
+    switch (recognizer.state) {
+        case UIGestureRecognizerStateBegan:
+            _floatingMenuDragMoved = NO;
+            [_floatingMenuButton.layer removeAllAnimations];
+            _floatingMenuPanStartCenter = _floatingMenuButton.center;
+            [self invalidateFloatingMenuDormancyTimer];
+            if (_floatingMenuCollapsed) {
+                [self setFloatingMenuCollapsed:NO animated:NO];
+                _floatingMenuPanStartCenter = _floatingMenuButton.center;
+            }
+            else {
+                [self setFloatingMenuCollapsed:NO animated:NO];
+            }
+            {
+                CGPoint location = [recognizer locationInView:self.view];
+                _floatingMenuTouchOffset = CGPointMake(location.x - _floatingMenuButton.center.x,
+                                                       location.y - _floatingMenuButton.center.y);
+            }
+            break;
+
+        case UIGestureRecognizerStateChanged: {
+            CGPoint location = [recognizer locationInView:self.view];
+            CGPoint translation = CGPointMake(location.x - (_floatingMenuPanStartCenter.x + _floatingMenuTouchOffset.x),
+                                             location.y - (_floatingMenuPanStartCenter.y + _floatingMenuTouchOffset.y));
+            if (!_floatingMenuDragMoved && hypot(translation.x, translation.y) > 4.0f) {
+                _floatingMenuDragMoved = YES;
+            }
+            if (!_floatingMenuDragMoved) {
+                break;
+            }
+            CGPoint newCenter = CGPointMake(location.x - _floatingMenuTouchOffset.x,
+                                            location.y - _floatingMenuTouchOffset.y);
+            newCenter.x = MIN(MAX(newCenter.x, minCenterX), maxCenterX);
+            newCenter.y = MIN(MAX(newCenter.y, minCenterY), maxCenterY);
+            _floatingMenuButton.center = newCenter;
+            _floatingMenuCenterY = newCenter.y;
+            break;
+        }
+
+        case UIGestureRecognizerStateEnded:
+        case UIGestureRecognizerStateCancelled: {
+            if (!_floatingMenuDragMoved) {
+                break;
+            }
+
+            CGPoint location = [recognizer locationInView:self.view];
+            CGFloat midpointX = CGRectGetMidX(bounds);
+            _floatingMenuAnchoredRight = location.x >= midpointX;
+            _floatingMenuCenterY = MIN(MAX(_floatingMenuButton.center.y, minCenterY), maxCenterY);
+            [self setFloatingMenuCollapsed:NO animated:YES];
+            [self scheduleFloatingMenuAutoCollapse];
+            break;
+        }
+
+        default:
+            break;
+    }
 }
 
 - (void)viewDidAppear:(BOOL)animated
@@ -83,9 +613,6 @@
                                                    object: nil];
     }
     
-#if !TARGET_OS_TV
-    [[self revealViewController] setPrimaryViewController:self];
-#endif
 }
 
 #if TARGET_OS_TV
@@ -112,6 +639,11 @@
     self.previousBytes = 0;  // 初始化上次字节数为 0
     
     _settings = [[[DataManager alloc] init] getSettings];
+    _currentSessionTouchModeSelection = !_settings.absoluteTouchMode ? 0 : (_settings.multiTouchScreen ? 2 : 1);
+    _currentSessionVideoAlignmentSelection = MAX(0, MIN(_settings.videoAlignmentSelection, 2));
+    _currentSessionVideoAlignmentMargin = MAX(0.0f, MIN(_settings.videoAlignmentMargin, 150.0f));
+    _currentSessionPerformanceOverlayPositionSelection = MAX(0, MIN(_settings.performanceOverlayPositionSelection, 5));
+    _currentSessionPerformanceOverlayMargin = MAX(0.0f, MIN(_settings.performanceOverlayMargin, 150.0f));
     
     _stageLabel = [[UILabel alloc] init];
     [_stageLabel setUserInteractionEnabled:NO];
@@ -136,6 +668,8 @@
     _inactivityTimer = nil;
     
     _streamView = [[StreamView alloc] initWithFrame:self.view.frame];
+    [_streamView setVideoAlignmentMode:_currentSessionVideoAlignmentSelection];
+    [_streamView setVideoAlignmentMargin:_currentSessionVideoAlignmentMargin];
     
     //外接显示器
     if(_settings.externalMonitor){
@@ -144,6 +678,8 @@
     }
     
     [_streamView setupStreamView:_controllerSupport interactionDelegate:self config:self.streamConfig];
+    [_streamView setVideoAlignmentMode:_currentSessionVideoAlignmentSelection];
+    [_streamView setVideoAlignmentMargin:_currentSessionVideoAlignmentMargin];
     
 #if TARGET_OS_TV
     if (!_menuTapGestureRecognizer || !_menuDoubleTapGestureRecognizer || !_playPauseTapGestureRecognizer) {
@@ -181,9 +717,14 @@
     [_tipLabel setText:@"Tip: Swipe from the left edge to disconnect from your PC"];
 #endif
     
-    [_tipLabel sizeToFit];
     _tipLabel.textColor = [UIColor whiteColor];
     _tipLabel.textAlignment = NSTextAlignmentCenter;
+    _tipLabel.numberOfLines = 1;
+    _tipLabel.backgroundColor = [[UIColor blackColor] colorWithAlphaComponent:0.62];
+    _tipLabel.layer.cornerRadius = 16.0;
+    _tipLabel.layer.masksToBounds = YES;
+    _tipLabel.layer.borderWidth = 1.0;
+    _tipLabel.layer.borderColor = [[UIColor whiteColor] colorWithAlphaComponent:0.10].CGColor;
     _tipLabel.center = CGPointMake(self.view.frame.size.width / 2, self.view.frame.size.height * 0.9);
     
     //外接显示器
@@ -229,29 +770,37 @@
                                                object: nil];
 #endif
     
-    // Only enable scroll and zoom in absolute touch mode
-    if (_settings.absoluteTouchMode&&!_settings.multiTouchScreen) {
+    // Only wrap the stream in a scroll view for temporary view-only mode.
+    if (_viewOnlyModeEnabled) {
         _scrollView = [[UIScrollView alloc] initWithFrame:self.view.frame];
 #if !TARGET_OS_TV
-        [_scrollView.panGestureRecognizer setMinimumNumberOfTouches:2];
+        [_scrollView.panGestureRecognizer setMinimumNumberOfTouches:1];
 #endif
         [_scrollView setShowsHorizontalScrollIndicator:NO];
         [_scrollView setShowsVerticalScrollIndicator:NO];
         [_scrollView setDelegate:self];
+        [_scrollView setMinimumZoomScale:1.0f];
         [_scrollView setMaximumZoomScale:10.0f];
+        [_scrollView setScrollEnabled:YES];
+        [_scrollView.pinchGestureRecognizer setEnabled:YES];
         
-        // Add StreamView inside a UIScrollView for absolute mode
+        // Add StreamView inside a UIScrollView for view-only mode
         [_scrollView addSubview:_streamView];
         [self.view addSubview:_scrollView];
     }
     else {
-        // Add StreamView directly in relative mode
+        // Add StreamView directly during normal streaming interaction
         [self.view addSubview:_streamView];
     }
     
     [self.view addSubview:_stageLabel];
     [self.view addSubview:_spinner];
     [self.view addSubview:_tipLabel];
+    if (_settings.floatingMenuEnabled) {
+        [self installFloatingMenuButtonIfNeeded];
+    }
+
+    [self layoutStreamingSubviewsForCurrentBounds];
 }
 
 - (UIView *)viewForZoomingInScrollView:(UIScrollView *)scrollView {
@@ -268,6 +817,7 @@
             [_inactivityTimer invalidate];
             _inactivityTimer = nil;
         }
+        [self invalidateFloatingMenuDormancyTimer];
         [[NSNotificationCenter defaultCenter] removeObserver:self];
     }
 }
@@ -346,10 +896,18 @@
 
 - (void)updateStatsOverlay {
     //    NSString* overlayText = [self->_streamMan getStatsOverlayText];
-    NSString* overlayText = [NSString stringWithFormat:@"%@ %@",[self getInternetface],[self->_streamMan getStatsOverlayText]];
+    NSString* overlayText = [NSString stringWithFormat:@"%@ %@",
+                             [self getInternetface],
+                             [self->_streamMan getStatsOverlayTextWithExtendedMetrics:_extendedPerformanceMetricsEnabled]];
+    NSAttributedString *attributedText = [self statsOverlayAttributedTextForText:overlayText];
     
     dispatch_async(dispatch_get_main_queue(), ^{
-        [self updateOverlayText:overlayText];
+        if (self->_overlayView == nil) {
+            [self updateOverlayText:overlayText];
+        }
+        [self->_overlayView setAttributedText:attributedText];
+        [self->_overlayView setHidden:NO];
+        [self layoutOverlayViewForCurrentBounds];
     });
 }
 
@@ -387,28 +945,19 @@
     }
     
     if (text != nil) {
-        // We set our bounds to the maximum width in order to work around a bug where
-        // sizeToFit interacts badly with the UITextView's line breaks, causing the
-        // width to get smaller and smaller each time as more line breaks are inserted.
-        [_overlayView setBounds:CGRectMake(self.view.frame.origin.x,
-                                           _overlayView.frame.origin.y,
-                                           self.view.frame.size.width,
-                                           _overlayView.frame.size.height)];
+        [_overlayView setAttributedText:nil];
         [_overlayView setText:text];
-        [_overlayView sizeToFit];
-        [_overlayView setCenter:CGPointMake(self.view.frame.size.width / 2, _overlayView.frame.size.height / 2)];
         [_overlayView setHidden:NO];
-        
-        CGRect frame = _overlayView.frame;
-        frame.origin.y = 3.0;  // 设置顶部外边距为 4
-        _overlayView.frame = frame;  // 更新视图的位置
-        // 强制重新布局
-        [_overlayView setNeedsLayout];
-        [_overlayView layoutIfNeeded];
+        [self layoutOverlayViewForCurrentBounds];
     }
     else {
         [_overlayView setHidden:YES];
     }
+}
+
+- (void)viewDidLayoutSubviews {
+    [super viewDidLayoutSubviews];
+    [self layoutStreamingSubviewsForCurrentBounds];
 }
 
 - (void) returnToMainFrame {
@@ -417,6 +966,7 @@
     
     [_statsUpdateTimer invalidate];
     _statsUpdateTimer = nil;
+    [self invalidateFloatingMenuDormancyTimer];
     
     [self.navigationController popToRootViewControllerAnimated:YES];
     _extWindow = nil;
@@ -471,65 +1021,511 @@
 
 - (void)edgeSwiped {
     Log(LOG_I, @"User swiped to end stream");
-    NSArray *options = @[@"断开连接", @"切换性能信息", @"弹出软键盘"];
-    [self showActionSheetWithTitle:@"游戏菜单" options:options];
-    //    [self returnToMainFrame];
+    [self showActionSheetWithTitle:@"游戏菜单" options:nil];
 }
 
 
 - (void)showActionSheetWithTitle:(NSString *)title options:(NSArray<NSString *> *)options {
-    // 创建一个UIAlertController
+    if (@available(iOS 13.0, *)) {
+        NSMutableArray<StreamActionSheetItem *> *items = [NSMutableArray array];
+
+        StreamActionSheetItem *disconnectItem = [[StreamActionSheetItem alloc] init];
+        disconnectItem.identifier = @"disconnect";
+        disconnectItem.title = @"断开串流";
+        disconnectItem.subtitle = @"结束当前串流并返回应用列表";
+        disconnectItem.symbolName = @"xmark.circle";
+        disconnectItem.destructive = YES;
+        [items addObject:disconnectItem];
+
+        StreamActionSheetItem *quitStreamItem = [[StreamActionSheetItem alloc] init];
+        quitStreamItem.identifier = @"quit_app";
+        quitStreamItem.title = @"退出串流";
+        quitStreamItem.subtitle = @"退出当前应用并返回应用列表";
+        quitStreamItem.symbolName = @"rectangle.portrait.and.arrow.right";
+        quitStreamItem.destructive = YES;
+        [items addObject:quitStreamItem];
+
+        StreamActionSheetItem *statsItem = [[StreamActionSheetItem alloc] init];
+        statsItem.identifier = @"toggle_stats";
+        statsItem.title = @"性能信息";
+        statsItem.subtitle = @"切换当前帧率和网络状态浮层";
+        statsItem.symbolName = @"chart.bar.xaxis";
+        [items addObject:statsItem];
+
+        StreamActionSheetItem *keyboardItem = [[StreamActionSheetItem alloc] init];
+        keyboardItem.identifier = @"keyboard";
+        keyboardItem.title = @"手机键盘";
+        keyboardItem.subtitle = @"打开顶部功能键和系统输入法";
+        keyboardItem.symbolName = @"keyboard";
+        [items addObject:keyboardItem];
+
+        StreamActionSheetItem *virtualGamepadItem = [[StreamActionSheetItem alloc] init];
+        virtualGamepadItem.identifier = @"virtual_gamepad";
+        virtualGamepadItem.title = @"虚拟手柄";
+        virtualGamepadItem.subtitle = @"临时显示或隐藏屏幕虚拟手柄";
+        virtualGamepadItem.symbolName = @"gamecontroller";
+        [items addObject:virtualGamepadItem];
+
+        StreamActionSheetItem *shortcutItem = [[StreamActionSheetItem alloc] init];
+        shortcutItem.identifier = @"shortcuts";
+        shortcutItem.title = @"快捷键";
+        shortcutItem.subtitle = @"打开快捷键面板";
+        shortcutItem.symbolName = @"command.square";
+        [items addObject:shortcutItem];
+
+        StreamActionSheetItem *fullKeyboardItem = [[StreamActionSheetItem alloc] init];
+        fullKeyboardItem.identifier = @"full_keyboard";
+        fullKeyboardItem.title = @"全键盘";
+        fullKeyboardItem.subtitle = @"打开自定义完整键盘布局";
+        fullKeyboardItem.symbolName = @"keyboard";
+        [items addObject:fullKeyboardItem];
+
+        StreamActionSheetItem *viewOnlyItem = [[StreamActionSheetItem alloc] init];
+        viewOnlyItem.identifier = @"view_only";
+        viewOnlyItem.title = @"仅查看";
+        viewOnlyItem.subtitle = @"禁用控制，仅允许缩放和平移画面";
+        viewOnlyItem.symbolName = @"eye";
+        [items addObject:viewOnlyItem];
+
+        StreamActionSheetHostingViewController *controller = [[StreamActionSheetHostingViewController alloc] init];
+        controller.delegate = (id<StreamActionSheetHostingViewControllerDelegate>)self;
+        controller.touchModeSelection = @([self currentTouchModeSelection]);
+        controller.videoAlignmentSelection = @([self currentVideoAlignmentSelection]);
+        controller.videoAlignmentMargin = @(_currentSessionVideoAlignmentMargin);
+        controller.extendedPerformanceMetricsEnabled = _extendedPerformanceMetricsEnabled;
+        controller.performanceOverlayPositionSelection = @(_currentSessionPerformanceOverlayPositionSelection);
+        controller.performanceOverlayMargin = @(_currentSessionPerformanceOverlayMargin);
+        [controller configureWithTitle:title subtitle:@"游戏内快捷操作" items:items];
+        controller.modalPresentationStyle = UIModalPresentationOverFullScreen;
+
+        _streamActionSheetHostingViewController = controller;
+        [self presentViewController:controller animated:YES completion:nil];
+        return;
+    }
+
     UIAlertController *alertController = [UIAlertController alertControllerWithTitle:title
                                                                              message:nil
                                                                       preferredStyle:UIAlertControllerStyleActionSheet];
-    // 创建并添加选项
-    for (NSString *option in options) {
-        UIAlertAction *action = [UIAlertAction actionWithTitle:option
-                                                         style:UIAlertActionStyleDefault
-                                                       handler:^(UIAlertAction * _Nonnull action) {
-            //            NSLog(@"选项 %@", option);
-            if ([option isEqualToString:@"断开连接"]) {
-                // 执行选项1的操作
-                [self returnToMainFrame];
-            } else if ([option isEqualToString:@"切换性能信息"]) {
-                if(self->_statsUpdateTimer!=nil){
-                    if(self->_overlayView==nil){
-                        return;
-                    }
-                    if (self->_overlayView.hidden) {
-                        [self->_overlayView setHidden:NO];
-                        [self startHUD];
-                    } else {
-                        [self->_statsUpdateTimer invalidate];
-                        self->_statsUpdateTimer = nil;
-                        [self->_overlayView setHidden:YES];
-                    }
-                    return;
-                }
-                [self startHUD];
-                
-            } else if ([option isEqualToString:@"弹出软键盘"]) {
-                if(self->_streamView!=nil){
-                    [self->_streamView showKeyInputBoard];
-                }
-            }
-        }];
-        [alertController addAction:action];
-    }
-    // 添加取消按钮
-    UIAlertAction *cancelAction = [UIAlertAction actionWithTitle:@"取消"
-                                                           style:UIAlertActionStyleCancel
-                                                         handler:^(UIAlertAction * _Nonnull action) {
-        NSLog(@"取消按钮被点击");
-    }];
-    [alertController addAction:cancelAction];
-    // 在 iPad 上需要指定弹窗位置
-    if (UI_USER_INTERFACE_IDIOM() == UIUserInterfaceIdiomPad) {
-        alertController.popoverPresentationController.sourceView = self.view;
-        alertController.popoverPresentationController.sourceRect = CGRectMake(self.view.bounds.size.width / 2, self.view.bounds.size.height / 2, 1, 1);
-    }
-    // 显示弹窗
+    [alertController addAction:[UIAlertAction actionWithTitle:@"断开连接"
+                                                        style:UIAlertActionStyleDestructive
+                                                      handler:^(__unused UIAlertAction * _Nonnull action) {
+        [self returnToMainFrame];
+    }]];
+    [alertController addAction:[UIAlertAction actionWithTitle:@"切换性能信息"
+                                                        style:UIAlertActionStyleDefault
+                                                      handler:^(__unused UIAlertAction * _Nonnull action) {
+        [self handleStreamMenuActionWithIdentifier:@"toggle_stats"];
+    }]];
+    [alertController addAction:[UIAlertAction actionWithTitle:@"弹出软键盘"
+                                                        style:UIAlertActionStyleDefault
+                                                      handler:^(__unused UIAlertAction * _Nonnull action) {
+        [self handleStreamMenuActionWithIdentifier:@"keyboard"];
+    }]];
+    [alertController addAction:[UIAlertAction actionWithTitle:@"取消"
+                                                        style:UIAlertActionStyleCancel
+                                                      handler:nil]];
     [self presentViewController:alertController animated:YES completion:nil];
+}
+
+- (NSInteger)currentTouchModeSelection {
+    return _currentSessionTouchModeSelection;
+}
+
+- (NSInteger)currentVideoAlignmentSelection {
+    return _currentSessionVideoAlignmentSelection;
+}
+
+- (CGFloat)currentVideoAlignmentMargin {
+    return _currentSessionVideoAlignmentMargin;
+}
+
+- (void)applyTouchModeSelectionToCurrentSession:(NSInteger)selection {
+    BOOL absoluteTouchMode = NO;
+    BOOL multiTouchScreen = NO;
+
+    switch (selection) {
+        case 1:
+            absoluteTouchMode = YES;
+            multiTouchScreen = NO;
+            break;
+        case 2:
+            absoluteTouchMode = YES;
+            multiTouchScreen = YES;
+            break;
+        default:
+            absoluteTouchMode = NO;
+            multiTouchScreen = NO;
+            break;
+    }
+
+    _currentSessionTouchModeSelection = selection;
+    _settings.absoluteTouchMode = absoluteTouchMode;
+    _settings.multiTouchScreen = multiTouchScreen;
+
+    [_streamView applyTemporaryTouchModeWithAbsoluteTouchMode:absoluteTouchMode
+                                             multiTouchScreen:multiTouchScreen];
+    [self updateStreamingTouchModeLayout];
+    [_streamView resetAfterTemporaryTouchModeChange];
+}
+
+- (void)updateStreamingTouchModeLayout {
+    BOOL needsScrollView = _viewOnlyModeEnabled;
+
+        if (needsScrollView) {
+            if (_scrollView == nil) {
+                _scrollView = [[UIScrollView alloc] initWithFrame:self.view.bounds];
+            [_scrollView setShowsHorizontalScrollIndicator:NO];
+            [_scrollView setShowsVerticalScrollIndicator:NO];
+            [_scrollView setDelegate:self];
+            [_scrollView setMinimumZoomScale:1.0f];
+            [_scrollView setMaximumZoomScale:10.0f];
+            [_scrollView setMultipleTouchEnabled:YES];
+            [_scrollView setBackgroundColor:[UIColor clearColor]];
+        }
+
+#if !TARGET_OS_TV
+        [_scrollView.panGestureRecognizer setMinimumNumberOfTouches:(_viewOnlyModeEnabled ? 1 : 2)];
+#endif
+        [_scrollView setDelaysContentTouches:_viewOnlyModeEnabled];
+        [_scrollView setCanCancelContentTouches:_viewOnlyModeEnabled];
+        [_scrollView setScrollEnabled:_viewOnlyModeEnabled];
+        [_scrollView.pinchGestureRecognizer setEnabled:_viewOnlyModeEnabled];
+        if (!_viewOnlyModeEnabled) {
+            [_scrollView setZoomScale:1.0f animated:NO];
+            [_scrollView setContentOffset:CGPointZero animated:NO];
+        }
+
+        if (_scrollView.superview != self.view) {
+            [self.view insertSubview:_scrollView atIndex:0];
+        }
+
+        if (_streamView.superview != _scrollView) {
+            [_streamView removeFromSuperview];
+            [_scrollView addSubview:_streamView];
+        }
+    }
+    else {
+        if (_streamView.superview != self.view) {
+            [_streamView removeFromSuperview];
+            [self.view insertSubview:_streamView atIndex:0];
+        }
+
+        if (_scrollView != nil && _scrollView.superview == self.view) {
+            [_scrollView removeFromSuperview];
+        }
+    }
+
+    if (_stageLabel.superview == self.view) {
+        [self.view bringSubviewToFront:_stageLabel];
+    }
+    if (_spinner.superview == self.view) {
+        [self.view bringSubviewToFront:_spinner];
+    }
+    if (_tipLabel.superview == self.view) {
+        [self.view bringSubviewToFront:_tipLabel];
+    }
+    if (_overlayView != nil && _overlayView.superview == self.view) {
+        [self.view bringSubviewToFront:_overlayView];
+    }
+
+    [self layoutStreamingSubviewsForCurrentBounds];
+}
+
+- (void)applyVideoAlignmentSelectionToCurrentSession:(NSInteger)selection {
+    _currentSessionVideoAlignmentSelection = selection;
+    [_streamView setVideoAlignmentMode:(StreamViewVideoAlignmentMode)selection];
+    [self layoutStreamingSubviewsForCurrentBounds];
+}
+
+- (void)applyVideoAlignmentMarginToCurrentSession:(CGFloat)margin {
+    _currentSessionVideoAlignmentMargin = MAX(0.0f, MIN(margin, 150.0f));
+    [_streamView setVideoAlignmentMargin:_currentSessionVideoAlignmentMargin];
+    [self layoutStreamingSubviewsForCurrentBounds];
+}
+
+- (void)applyExtendedPerformanceMetricsEnabled:(BOOL)enabled {
+    _extendedPerformanceMetricsEnabled = enabled;
+
+    if (_overlayView != nil && !_overlayView.hidden) {
+        [self updateStatsOverlay];
+    }
+}
+
+- (void)applyPerformanceOverlayPositionSelectionToCurrentSession:(NSInteger)selection {
+    _currentSessionPerformanceOverlayPositionSelection = MAX(0, MIN(selection, 5));
+    [self layoutOverlayViewForCurrentBounds];
+}
+
+- (void)applyPerformanceOverlayMarginToCurrentSession:(CGFloat)margin {
+    _currentSessionPerformanceOverlayMargin = MAX(0.0f, MIN(margin, 150.0f));
+    [self layoutOverlayViewForCurrentBounds];
+}
+
+- (NSString *)touchModeTitleForSelection:(NSInteger)selection {
+    switch (selection) {
+        case 1:
+            return @"鼠标";
+        case 2:
+            return @"多点触控";
+        default:
+            return @"触控板";
+    }
+}
+
+- (void)showTemporaryTouchModeOverlayForSelection:(NSInteger)selection {
+    NSString *title = [self touchModeTitleForSelection:selection];
+    [self showTemporaryTipText:[NSString stringWithFormat:@"触控模式: %@", title]];
+}
+
+- (void)showTemporaryTipText:(NSString *)text {
+    if (@available(iOS 13.0, *)) {
+        if (_streamActionSheetHostingViewController != nil &&
+            _streamActionSheetHostingViewController.presentingViewController != nil) {
+            [_streamActionSheetHostingViewController showToastWithText:text];
+            return;
+        }
+    }
+
+    _tipLabel.text = text;
+    CGSize labelSize = [_tipLabel sizeThatFits:CGSizeMake(CGFLOAT_MAX, CGFLOAT_MAX)];
+    CGFloat horizontalPadding = 20.0;
+    CGFloat verticalPadding = 10.0;
+    _tipLabel.frame = CGRectMake(0,
+                                 0,
+                                 ceil(labelSize.width + horizontalPadding * 2.0),
+                                 ceil(labelSize.height + verticalPadding * 2.0));
+    _tipLabel.hidden = NO;
+    [self layoutStreamingSubviewsForCurrentBounds];
+
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(1.2 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+        self->_tipLabel.hidden = YES;
+    });
+}
+
+- (BOOL)isTemporaryVirtualGamepadVisible {
+    return [_streamView getCurrentOscState] != OnScreenControlsLevelOff;
+}
+
+- (void)toggleTemporaryVirtualGamepad {
+    BOOL shouldShowVirtualGamepad = ![self isTemporaryVirtualGamepadVisible];
+    [_streamView setTemporaryVirtualGamepadVisible:shouldShowVirtualGamepad];
+
+#if !TARGET_OS_TV
+    if (@available(iOS 11.0, *)) {
+        [self setNeedsUpdateOfHomeIndicatorAutoHidden];
+    }
+#endif
+}
+
+- (void)setViewOnlyModeEnabled:(BOOL)enabled {
+    if (_viewOnlyModeEnabled == enabled) {
+        return;
+    }
+
+    if (enabled) {
+        _viewOnlyModeEnabled = YES;
+        _viewOnlyHadScrollViewBeforeEntering = (_scrollView != nil && _scrollView.superview == self.view);
+        _viewOnlyRestoreZoomScale = (_scrollView != nil) ? _scrollView.zoomScale : 1.0f;
+        _viewOnlyRestoreContentOffset = (_scrollView != nil) ? _scrollView.contentOffset : CGPointZero;
+        _viewOnlyRestoreOscLevel = [_streamView getCurrentOscState];
+        [_streamView setViewOnlyModeEnabled:YES];
+        [_streamView setTemporaryOnScreenControlsLevel:OnScreenControlsLevelOff];
+        [self updateStreamingTouchModeLayout];
+        if (_scrollView != nil) {
+            [_scrollView setZoomScale:MAX(_viewOnlyRestoreZoomScale, 1.0f) animated:NO];
+            [_scrollView setContentOffset:_viewOnlyRestoreContentOffset animated:NO];
+        }
+        [self showTemporaryTipText:@"仅查看已开启"];
+        return;
+    }
+
+    _viewOnlyModeEnabled = NO;
+    [_streamView setViewOnlyModeEnabled:NO];
+    [self updateStreamingTouchModeLayout];
+    [_streamView setTemporaryOnScreenControlsLevel:_viewOnlyRestoreOscLevel];
+
+    if (_scrollView != nil) {
+        if (_viewOnlyHadScrollViewBeforeEntering) {
+            [_scrollView setZoomScale:MAX(_viewOnlyRestoreZoomScale, 1.0f) animated:NO];
+            [_scrollView setContentOffset:_viewOnlyRestoreContentOffset animated:NO];
+        } else {
+            [_scrollView setZoomScale:1.0f animated:NO];
+            [_scrollView setContentOffset:CGPointZero animated:NO];
+        }
+    }
+    [self showTemporaryTipText:@"仅查看已关闭"];
+}
+
+- (void)toggleViewOnlyMode {
+    [self setViewOnlyModeEnabled:!_viewOnlyModeEnabled];
+}
+
+- (NSArray<NSDictionary *> *)shortcutDefinitions {
+    NSArray<NSDictionary *> *definitions = @[
+        @{@"id": @"shortcut_escape", @"title": @"返回/关闭页面", @"subtitle": @"ESC", @"symbol": @"escape", @"primary": @[@0x1B], @"secondary": @[]},
+        @{@"id": @"shortcut_f11", @"title": @"网页全屏切换", @"subtitle": @"F11", @"symbol": @"macwindow.on.rectangle", @"primary": @[@0x7A], @"secondary": @[]},
+        @{@"id": @"shortcut_alt_f4", @"title": @"关闭应用", @"subtitle": @"Alt+F4", @"symbol": @"xmark.circle", @"primary": @[@0xA4, @0x73], @"secondary": @[]},
+        @{@"id": @"shortcut_alt_enter", @"title": @"窗口大小", @"subtitle": @"Alt+Enter", @"symbol": @"arrow.up.left.and.arrow.down.right", @"primary": @[@0xA4, @0x0D], @"secondary": @[]},
+        @{@"id": @"shortcut_shift_tab", @"title": @"Steam OverLay", @"subtitle": @"Shift+Tab", @"symbol": @"rectangle.on.rectangle", @"primary": @[@0xA0, @0x09], @"secondary": @[]},
+
+        @{@"id": @"shortcut_cursor_toggle", @"title": @"鼠标光标", @"subtitle": @"Ctrl+Alt+Shift+N", @"symbol": @"cursorarrow.motionlines", @"primary": @[@0xA2, @0xA4, @0xA0, @0x4E], @"secondary": @[]},
+        @{@"id": @"shortcut_shutdown", @"title": @"关机", @"subtitle": @"Win+X~U-U", @"symbol": @"power", @"primary": @[@0x5B, @0x58], @"secondary": @[@0x55, @0x55]},
+        @{@"id": @"shortcut_restart", @"title": @"重启", @"subtitle": @"Win+X~U-R", @"symbol": @"arrow.clockwise", @"primary": @[@0x5B, @0x58], @"secondary": @[@0x55, @0x52]},
+        @{@"id": @"shortcut_sleep", @"title": @"睡眠", @"subtitle": @"Win+X~U-S", @"symbol": @"moon.zzz", @"primary": @[@0x5B, @0x58], @"secondary": @[@0x55, @0x53]},
+        @{@"id": @"shortcut_logout", @"title": @"注销", @"subtitle": @"Win+X~U-I", @"symbol": @"person.crop.circle.badge.xmark", @"primary": @[@0x5B, @0x58], @"secondary": @[@0x55, @0x49]},
+
+        @{@"id": @"shortcut_copy", @"title": @"复制", @"subtitle": @"Ctrl+C", @"symbol": @"doc.on.doc", @"primary": @[@0xA2, @0x43], @"secondary": @[]},
+        @{@"id": @"shortcut_paste", @"title": @"粘贴", @"subtitle": @"Ctrl+V", @"symbol": @"doc.on.clipboard", @"primary": @[@0xA2, @0x56], @"secondary": @[]},
+        @{@"id": @"shortcut_cut", @"title": @"剪切", @"subtitle": @"Ctrl+X", @"symbol": @"scissors", @"primary": @[@0xA2, @0x58], @"secondary": @[]},
+        @{@"id": @"shortcut_monitor_1", @"title": @"切换显示器1", @"subtitle": @"Ctrl+Alt+Shift+F1", @"symbol": @"display.2", @"primary": @[@0xA2, @0xA4, @0xA0, @0x70], @"secondary": @[]},
+        @{@"id": @"shortcut_monitor_2", @"title": @"切换显示器2", @"subtitle": @"Ctrl+Alt+Shift+F12", @"symbol": @"display", @"primary": @[@0xA2, @0xA4, @0xA0, @0x7B], @"secondary": @[]},
+
+        @{@"id": @"shortcut_win", @"title": @"开始菜单", @"subtitle": @"Win", @"symbol": @"command", @"primary": @[@0x5B], @"secondary": @[]},
+        @{@"id": @"shortcut_hdr", @"title": @"HDR开关", @"subtitle": @"Win+Alt+B", @"symbol": @"sun.max", @"primary": @[@0x5B, @0xA4, @0x42], @"secondary": @[]},
+        @{@"id": @"shortcut_task_manager", @"title": @"任务管理器", @"subtitle": @"Ctrl+Shift+ESC", @"symbol": @"list.bullet.rectangle", @"primary": @[@0xA2, @0xA0, @0x1B], @"secondary": @[]},
+        @{@"id": @"shortcut_desktop", @"title": @"返回桌面", @"subtitle": @"Win+D", @"symbol": @"desktopcomputer", @"primary": @[@0x5B, @0x44], @"secondary": @[]},
+        @{@"id": @"shortcut_display_mode", @"title": @"显示器模式", @"subtitle": @"Win+P", @"symbol": @"rectangle.3.group", @"primary": @[@0x5B, @0x50], @"secondary": @[]},
+
+        @{@"id": @"shortcut_settings", @"title": @"Windows设置", @"subtitle": @"Win+I", @"symbol": @"gearshape", @"primary": @[@0x5B, @0x49], @"secondary": @[]},
+        @{@"id": @"shortcut_explorer", @"title": @"我的电脑", @"subtitle": @"Win+E", @"symbol": @"folder", @"primary": @[@0x5B, @0x45], @"secondary": @[]},
+        @{@"id": @"shortcut_mobility", @"title": @"移动中心", @"subtitle": @"Win+X", @"symbol": @"bolt.horizontal.circle", @"primary": @[@0x5B, @0x58], @"secondary": @[]},
+        @{@"id": @"shortcut_desktop_left", @"title": @"切换桌面左", @"subtitle": @"Win+Shift+Left", @"symbol": @"arrow.left.circle", @"primary": @[@0x5B, @0xA0, @0x25], @"secondary": @[]},
+        @{@"id": @"shortcut_desktop_right", @"title": @"切换桌面右", @"subtitle": @"Win+Shift+Right", @"symbol": @"arrow.right.circle", @"primary": @[@0x5B, @0xA0, @0x27], @"secondary": @[]}
+    ];
+
+    return definitions;
+}
+
+- (NSArray<StreamShortcutPanelItem *> *)shortcutItems {
+    NSArray<NSDictionary *> *definitions = [self shortcutDefinitions];
+
+    NSMutableArray<StreamShortcutPanelItem *> *items = [NSMutableArray arrayWithCapacity:definitions.count];
+    for (NSDictionary *definition in definitions) {
+        StreamShortcutPanelItem *item = [[StreamShortcutPanelItem alloc] init];
+        item.identifier = definition[@"id"];
+        item.title = definition[@"title"];
+        item.subtitle = definition[@"subtitle"] ?: @"";
+        item.symbolName = definition[@"symbol"];
+        [items addObject:item];
+    }
+    return items;
+}
+
+- (void)showShortcutPanel {
+    if (@available(iOS 13.0, *)) {
+        StreamShortcutPanelHostingViewController *controller = [[StreamShortcutPanelHostingViewController alloc] init];
+        controller.delegate = (id<StreamShortcutPanelHostingViewControllerDelegate>)self;
+        [controller configureWithTitle:@"快捷键" items:[self shortcutItems]];
+        controller.modalPresentationStyle = UIModalPresentationOverFullScreen;
+        _streamShortcutPanelHostingViewController = controller;
+        [self presentViewController:controller animated:YES completion:nil];
+    }
+}
+
+- (void)showVirtualKeyboardPanel {
+    if (@available(iOS 13.0, *)) {
+        StreamVirtualKeyboardPanelHostingViewController *controller = [[StreamVirtualKeyboardPanelHostingViewController alloc] init];
+        controller.delegate = (id<StreamVirtualKeyboardPanelHostingViewControllerDelegate>)self;
+        [controller configureWithTitle:@"全键盘"];
+        controller.modalPresentationStyle = UIModalPresentationOverFullScreen;
+        _streamVirtualKeyboardPanelHostingViewController = controller;
+        [self presentViewController:controller animated:YES completion:nil];
+    }
+}
+
+- (void)quitCurrentAppAndReturnToMainFrame {
+    [self->_spinner startAnimating];
+    self->_spinner.hidden = NO;
+    self->_stageLabel.text = @"正在退出应用...";
+    [self->_stageLabel sizeToFit];
+    self->_stageLabel.hidden = NO;
+    [self layoutStreamingSubviewsForCurrentBounds];
+
+    dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
+        HttpManager *httpManager = [[HttpManager alloc] initWithAddress:self.streamConfig.host
+                                                             httpsPort:self.streamConfig.httpsPort
+                                                            serverCert:self.streamConfig.serverCert];
+        HttpResponse *quitResponse = [[HttpResponse alloc] init];
+        HttpRequest *quitRequest = [HttpRequest requestForResponse:quitResponse
+                                                    withUrlRequest:[httpManager newQuitAppRequest]];
+
+        [httpManager executeRequestSynchronously:quitRequest];
+
+        dispatch_async(dispatch_get_main_queue(), ^{
+            [self->_spinner stopAnimating];
+            self->_spinner.hidden = YES;
+            self->_stageLabel.hidden = YES;
+
+            if (quitResponse.statusCode == 200) {
+                self->_suppressTerminationAlertForManualExit = YES;
+                [self returnToMainFrame];
+                return;
+            }
+
+            UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"退出应用失败"
+                                                                           message:@"当前应用未能成功退出。如果这个应用是从其他设备启动的，可能需要在那台设备上退出。"
+                                                                    preferredStyle:UIAlertControllerStyleAlert];
+            [alert addAction:[UIAlertAction actionWithTitle:@"知道了" style:UIAlertActionStyleDefault handler:nil]];
+            [self presentViewController:alert animated:YES completion:nil];
+        });
+    });
+}
+
+- (void)handleStreamMenuActionWithIdentifier:(NSString *)identifier {
+    if ([identifier isEqualToString:@"disconnect"]) {
+        [self returnToMainFrame];
+        return;
+    }
+
+    if ([identifier isEqualToString:@"quit_app"]) {
+        [self quitCurrentAppAndReturnToMainFrame];
+        return;
+    }
+
+    if ([identifier isEqualToString:@"toggle_stats"]) {
+        if (self->_statsUpdateTimer != nil) {
+            if (self->_overlayView == nil) {
+                return;
+            }
+            if (self->_overlayView.hidden) {
+                [self->_overlayView setHidden:NO];
+                [self startHUD];
+            }
+            else {
+                [self->_statsUpdateTimer invalidate];
+                self->_statsUpdateTimer = nil;
+                [self->_overlayView setHidden:YES];
+            }
+            return;
+        }
+
+        [self startHUD];
+        return;
+    }
+
+    if ([identifier isEqualToString:@"keyboard"] && self->_streamView != nil) {
+        [self->_streamView showKeyInputBoard];
+        return;
+    }
+
+    if ([identifier isEqualToString:@"virtual_gamepad"] && self->_streamView != nil) {
+        [self toggleTemporaryVirtualGamepad];
+        return;
+    }
+
+    if ([identifier isEqualToString:@"shortcuts"]) {
+        [self showShortcutPanel];
+        return;
+    }
+
+    if ([identifier isEqualToString:@"full_keyboard"]) {
+        [self showVirtualKeyboardPanel];
+        return;
+    }
+
+    if ([identifier isEqualToString:@"view_only"]) {
+        [self toggleViewOnlyMode];
+    }
 }
 
 - (void) startHUD {
@@ -564,6 +1560,15 @@
 
 - (void)connectionTerminated:(int)errorCode {
     Log(LOG_I, @"Connection terminated: %d", errorCode);
+
+    if (_suppressTerminationAlertForManualExit) {
+        dispatch_async(dispatch_get_main_queue(), ^{
+            self->_suppressTerminationAlertForManualExit = NO;
+            [self returnToMainFrame];
+        });
+        [_streamMan stopStream];
+        return;
+    }
     
     unsigned int portFlags = LiGetPortFlagsFromTerminationErrorCode(errorCode);
     unsigned int portTestResults = LiTestClientConnectivity(CONN_TEST_SERVER, 443, portFlags);
@@ -649,8 +1654,7 @@
         NSString* lowerCase = [NSString stringWithFormat:@"%s in progress...", stageName];
         NSString* titleCase = [[[lowerCase substringToIndex:1] uppercaseString] stringByAppendingString:[lowerCase substringFromIndex:1]];
         [self->_stageLabel setText:titleCase];
-        [self->_stageLabel sizeToFit];
-        self->_stageLabel.center = CGPointMake(self.view.frame.size.width / 2, self->_stageLabel.center.y);
+        [self layoutStreamingSubviewsForCurrentBounds];
     });
 }
 
@@ -876,6 +1880,14 @@
     return YES;
 }
 
+- (UIInterfaceOrientationMask)supportedInterfaceOrientations {
+    if ([UIDevice currentDevice].userInterfaceIdiom == UIUserInterfaceIdiomPad) {
+        return UIInterfaceOrientationMaskAll;
+    }
+
+    return UIInterfaceOrientationMaskAllButUpsideDown;
+}
+
 - (BOOL)prefersPointerLocked {
     // Pointer lock breaks the UIKit mouse APIs, which is a problem because
     // GCMouse is horribly broken on iOS 14.0 for certain mice. Only lock
@@ -941,6 +1953,88 @@
 
     // 返回输入字节和输出字节的总和
     return iBytes + oBytes;
+}
+
+- (void)streamActionSheetHostingViewController:(StreamActionSheetHostingViewController *)controller didSelectActionWithIdentifier:(NSString *)identifier {
+    _streamActionSheetHostingViewController = nil;
+    [controller dismissViewControllerAnimated:YES completion:^{
+        [self handleStreamMenuActionWithIdentifier:identifier];
+    }];
+}
+
+- (void)streamActionSheetHostingViewController:(StreamActionSheetHostingViewController *)controller didChangeTouchModeSelection:(NSInteger)selection {
+    [self applyTouchModeSelectionToCurrentSession:selection];
+}
+
+- (void)streamActionSheetHostingViewController:(StreamActionSheetHostingViewController *)controller didChangeVideoAlignmentSelection:(NSInteger)selection {
+    (void)controller;
+    [self applyVideoAlignmentSelectionToCurrentSession:selection];
+}
+
+- (void)streamActionSheetHostingViewController:(StreamActionSheetHostingViewController *)controller didChangeVideoAlignmentMargin:(double)margin {
+    (void)controller;
+    [self applyVideoAlignmentMarginToCurrentSession:(CGFloat)margin];
+}
+
+- (void)streamActionSheetHostingViewController:(StreamActionSheetHostingViewController *)controller didChangeExtendedPerformanceMetricsEnabled:(BOOL)enabled {
+    (void)controller;
+    [self applyExtendedPerformanceMetricsEnabled:enabled];
+}
+
+- (void)streamActionSheetHostingViewController:(StreamActionSheetHostingViewController *)controller didChangePerformanceOverlayPositionSelection:(NSInteger)selection {
+    (void)controller;
+    [self applyPerformanceOverlayPositionSelectionToCurrentSession:selection];
+}
+
+- (void)streamActionSheetHostingViewController:(StreamActionSheetHostingViewController *)controller didChangePerformanceOverlayMargin:(double)margin {
+    (void)controller;
+    [self applyPerformanceOverlayMarginToCurrentSession:(CGFloat)margin];
+}
+
+- (void)streamActionSheetHostingViewControllerDidCancel:(StreamActionSheetHostingViewController *)controller {
+    _streamActionSheetHostingViewController = nil;
+
+    [controller dismissViewControllerAnimated:YES completion:nil];
+}
+
+- (void)streamShortcutPanelHostingViewControllerDidCancel:(StreamShortcutPanelHostingViewController *)controller {
+    _streamShortcutPanelHostingViewController = nil;
+    [controller dismissViewControllerAnimated:YES completion:nil];
+}
+
+- (void)streamShortcutPanelHostingViewController:(StreamShortcutPanelHostingViewController *)controller didSelectItemWithIdentifier:(NSString *)identifier {
+    (void)controller;
+    for (NSDictionary *definition in [self shortcutDefinitions]) {
+        if (![definition[@"id"] isEqualToString:identifier]) {
+            continue;
+        }
+
+        NSArray<NSNumber *> *primary = definition[@"primary"] ?: @[];
+        NSArray<NSNumber *> *secondary = definition[@"secondary"] ?: @[];
+        [_streamView sendShortcutPrimaryKeyCodes:primary secondaryKeyCodes:secondary];
+        break;
+    }
+}
+
+- (void)streamVirtualKeyboardPanelHostingViewControllerDidCancel:(StreamVirtualKeyboardPanelHostingViewController *)controller {
+    _streamVirtualKeyboardPanelHostingViewController = nil;
+    [controller dismissViewControllerAnimated:YES completion:nil];
+}
+
+- (void)streamVirtualKeyboardPanelHostingViewController:(StreamVirtualKeyboardPanelHostingViewController *)controller didSubmitKeyCodes:(NSArray<NSNumber *> *)keyCodes {
+    (void)controller;
+    if (keyCodes.count == 0) {
+        return;
+    }
+
+    [_streamView sendShortcutPrimaryKeyCodes:keyCodes secondaryKeyCodes:@[]];
+}
+
+- (void)streamVirtualKeyboardPanelHostingViewControllerDidRequestSystemKeyboard:(StreamVirtualKeyboardPanelHostingViewController *)controller {
+    _streamVirtualKeyboardPanelHostingViewController = nil;
+    [controller dismissViewControllerAnimated:YES completion:^{
+        [self->_streamView showKeyInputBoard];
+    }];
 }
 
 @end

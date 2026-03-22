@@ -20,8 +20,7 @@
 @implementation LayoutOnScreenControlsViewController {
     BOOL isToolbarHidden;
     OSCProfilesManager *profilesManager;
-    __weak IBOutlet NSLayoutConstraint *toolbarTopConstraintiPhone;
-    __weak IBOutlet NSLayoutConstraint *toolbarTopConstraintiPad;
+    NSLayoutConstraint *toolbarTopConstraint;
 }
 
 @synthesize trashCanButton;
@@ -31,20 +30,20 @@
 @synthesize chevronView;
 @synthesize chevronImageView;
 
+- (void)loadView {
+    UIView *rootView = [[UIView alloc] initWithFrame:[UIScreen mainScreen].bounds];
+    rootView.backgroundColor = [UIColor colorWithRed:0.1215686275 green:0.1294117647 blue:0.1411764706 alpha:1.0];
+    self.view = rootView;
+}
+
 - (void) viewDidLoad {
     [super viewDidLoad];
     
     profilesManager = [OSCProfilesManager sharedManager];
+    [self buildToolbarIfNeeded];
 
     isToolbarHidden = NO;   // keeps track if the toolbar is hidden up above the screen so that we know whether to hide or show it when the user taps the toolbar's hide/show button
             
-    /* add curve to bottom of chevron tab view */
-    UIBezierPath *maskPath = [UIBezierPath bezierPathWithRoundedRect:self.chevronView.bounds byRoundingCorners:(UIRectCornerBottomLeft | UIRectCornerBottomRight) cornerRadii:CGSizeMake(10.0, 10.0)];
-    CAShapeLayer *maskLayer = [[CAShapeLayer alloc] init];
-    maskLayer.frame = self.view.bounds;
-    maskLayer.path  = maskPath.CGPath;
-    self.chevronView.layer.mask = maskLayer;
-    
     /* Add swipe gesture to toolbar to allow user to swipe it up and off screen */
     UISwipeGestureRecognizer *swipeUp = [[UISwipeGestureRecognizer alloc] initWithTarget:self action:@selector(moveToolbar:)];
     swipeUp.direction = UISwipeGestureRecognizerDirectionUp;
@@ -95,6 +94,18 @@
     });
 }
 
+- (void)viewDidLayoutSubviews {
+    [super viewDidLayoutSubviews];
+
+    UIBezierPath *maskPath = [UIBezierPath bezierPathWithRoundedRect:self.chevronView.bounds
+                                                   byRoundingCorners:(UIRectCornerBottomLeft | UIRectCornerBottomRight)
+                                                         cornerRadii:CGSizeMake(10.0, 10.0)];
+    CAShapeLayer *maskLayer = [[CAShapeLayer alloc] init];
+    maskLayer.frame = self.chevronView.bounds;
+    maskLayer.path = maskPath.CGPath;
+    self.chevronView.layer.mask = maskLayer;
+}
+
 
 #pragma mark - Class Helper Functions
 
@@ -110,11 +121,9 @@
 
 /* animates the toolbar up and off the screen or back down onto the screen */
 - (void) moveToolbar:(UISwipeGestureRecognizer *)sender {
-    BOOL isPad = [[UIDevice currentDevice].model hasPrefix:@"iPad"];
-    NSLayoutConstraint *toolbarTopConstraint = isPad ? self->toolbarTopConstraintiPad : self->toolbarTopConstraintiPhone;
     if (isToolbarHidden == NO) {
         [UIView animateWithDuration:0.2 animations:^{   // animates toolbar up and off screen
-            toolbarTopConstraint.constant -= self.toolbarRootView.frame.size.height;
+            self->toolbarTopConstraint.constant = -self.toolbarRootView.frame.size.height;
             [self.view layoutIfNeeded];
 
         }
@@ -127,7 +136,7 @@
     }
     else {
         [UIView animateWithDuration:0.2 animations:^{   // animates the toolbar back down into the screen
-            toolbarTopConstraint.constant += self.toolbarRootView.frame.size.height;
+            self->toolbarTopConstraint.constant = 0;
             [self.view layoutIfNeeded];
         }
         completion:^(BOOL finished) {
@@ -137,6 +146,98 @@
             }
         }];
     }
+}
+
+- (UIButton *)toolbarButtonWithTitle:(NSString *)title action:(SEL)action {
+    UIButton *button = [UIButton buttonWithType:UIButtonTypeSystem];
+    button.translatesAutoresizingMaskIntoConstraints = NO;
+    [button setTitle:title forState:UIControlStateNormal];
+    [button addTarget:self action:action forControlEvents:UIControlEventTouchUpInside];
+    button.titleLabel.font = [UIFont systemFontOfSize:15.0 weight:UIFontWeightSemibold];
+    [button setTitleColor:[UIColor colorWithRed:0.9529411765 green:0.9764705882 blue:1.0 alpha:1.0] forState:UIControlStateNormal];
+    button.backgroundColor = [UIColor colorWithWhite:1.0 alpha:0.05];
+    button.layer.cornerRadius = 10.0;
+    button.contentEdgeInsets = UIEdgeInsetsMake(10.0, 12.0, 10.0, 12.0);
+    return button;
+}
+
+- (void)buildToolbarIfNeeded {
+    if (self.toolbarRootView != nil) {
+        return;
+    }
+
+    ToolBarContainerView *toolbarView = [[ToolBarContainerView alloc] init];
+    toolbarView.translatesAutoresizingMaskIntoConstraints = NO;
+    toolbarView.backgroundColor = [UIColor colorWithRed:0.1215686275 green:0.1294117647 blue:0.1411764706 alpha:0.92];
+    toolbarView.layer.cornerRadius = 18.0;
+    toolbarView.clipsToBounds = NO;
+
+    UIStackView *stackView = [[UIStackView alloc] init];
+    stackView.translatesAutoresizingMaskIntoConstraints = NO;
+    stackView.axis = UILayoutConstraintAxisHorizontal;
+    stackView.spacing = 10.0;
+    stackView.distribution = UIStackViewDistributionFillEqually;
+    stackView.alignment = UIStackViewAlignmentFill;
+
+    UIButton *trashButton = [self toolbarButtonWithTitle:@"删除" action:@selector(trashCanTapped:)];
+    UIButton *undoButton = [self toolbarButtonWithTitle:@"撤销" action:@selector(undoTapped:)];
+    UIButton *saveButton = [self toolbarButtonWithTitle:@"保存" action:@selector(saveTapped:)];
+    UIButton *loadButton = [self toolbarButtonWithTitle:@"加载" action:@selector(loadTapped:)];
+    UIButton *closeButton = [self toolbarButtonWithTitle:@"关闭" action:@selector(closeTapped:)];
+
+    [stackView addArrangedSubview:trashButton];
+    [stackView addArrangedSubview:undoButton];
+    [stackView addArrangedSubview:saveButton];
+    [stackView addArrangedSubview:loadButton];
+    [stackView addArrangedSubview:closeButton];
+
+    UIView *chevronContainerView = [[UIView alloc] init];
+    chevronContainerView.translatesAutoresizingMaskIntoConstraints = NO;
+    chevronContainerView.backgroundColor = toolbarView.backgroundColor;
+    chevronContainerView.layer.cornerRadius = 10.0;
+    chevronContainerView.clipsToBounds = YES;
+
+    UIImageView *chevronIconView = [[UIImageView alloc] initWithImage:[UIImage systemImageNamed:@"chevron.compact.up"]];
+    chevronIconView.translatesAutoresizingMaskIntoConstraints = NO;
+    chevronIconView.tintColor = [UIColor colorWithRed:0.9529411765 green:0.9764705882 blue:1.0 alpha:1.0];
+    chevronIconView.contentMode = UIViewContentModeScaleAspectFit;
+
+    [chevronContainerView addSubview:chevronIconView];
+    [toolbarView addSubview:stackView];
+    [toolbarView addSubview:chevronContainerView];
+    [self.view addSubview:toolbarView];
+
+    UILayoutGuide *safeArea = self.view.safeAreaLayoutGuide;
+    toolbarTopConstraint = [toolbarView.topAnchor constraintEqualToAnchor:safeArea.topAnchor];
+
+    [NSLayoutConstraint activateConstraints:@[
+        toolbarTopConstraint,
+        [toolbarView.leadingAnchor constraintEqualToAnchor:self.view.leadingAnchor constant:12.0],
+        [toolbarView.trailingAnchor constraintEqualToAnchor:self.view.trailingAnchor constant:-12.0],
+
+        [stackView.topAnchor constraintEqualToAnchor:toolbarView.topAnchor constant:12.0],
+        [stackView.leadingAnchor constraintEqualToAnchor:toolbarView.leadingAnchor constant:12.0],
+        [stackView.trailingAnchor constraintEqualToAnchor:toolbarView.trailingAnchor constant:-12.0],
+        [stackView.heightAnchor constraintEqualToConstant:44.0],
+        [stackView.bottomAnchor constraintEqualToAnchor:toolbarView.bottomAnchor constant:-12.0],
+
+        [chevronContainerView.centerXAnchor constraintEqualToAnchor:toolbarView.centerXAnchor],
+        [chevronContainerView.topAnchor constraintEqualToAnchor:toolbarView.bottomAnchor constant:-2.0],
+        [chevronContainerView.widthAnchor constraintEqualToConstant:72.0],
+        [chevronContainerView.heightAnchor constraintEqualToConstant:22.0],
+
+        [chevronIconView.centerXAnchor constraintEqualToAnchor:chevronContainerView.centerXAnchor],
+        [chevronIconView.centerYAnchor constraintEqualToAnchor:chevronContainerView.centerYAnchor],
+        [chevronIconView.widthAnchor constraintEqualToConstant:28.0],
+        [chevronIconView.heightAnchor constraintEqualToConstant:16.0]
+    ]];
+
+    self.toolbarRootView = toolbarView;
+    self.toolbarStackView = stackView;
+    self.chevronView = chevronContainerView;
+    self.chevronImageView = chevronIconView;
+    self.trashCanButton = trashButton;
+    self.undoButton = undoButton;
 }
 
 /**
@@ -155,11 +256,11 @@
 
 #pragma mark - UIButton Actions
 
-- (IBAction) closeTapped:(id)sender {
+- (void)closeTapped:(id)sender {
     [self dismissViewControllerAnimated:YES completion:nil];
 }
 
-- (IBAction) trashCanTapped:(id)sender {
+- (void)trashCanTapped:(id)sender {
     UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"提示" message:@"将按钮拖放到“删除按钮”上以将其从界面中删除" preferredStyle:UIAlertControllerStyleAlert];
 
     UIAlertAction *ok = [UIAlertAction actionWithTitle:@"OK" style:UIAlertActionStyleDefault handler:nil];
@@ -167,7 +268,7 @@
     [self presentViewController:alert animated:YES completion:nil];
 }
 
-- (IBAction) undoTapped:(id)sender {
+- (void)undoTapped:(id)sender {
     if ([self.layoutOSC.layoutChanges count] > 0) { // check if there are layout changes to roll back to
         OnScreenButtonState *buttonState = [self.layoutOSC.layoutChanges lastObject];   //  Get the 'OnScreenButtonState' object that contains the name, position, and visiblity state of the button the user last moved
         
@@ -207,7 +308,7 @@
 }
 
 /* show pop up notification that lets users choose to save the current OSC layout configuration as a profile they can load when they want. User can also choose to cancel out of this pop up */
-- (IBAction) saveTapped:(id)sender {
+- (void)saveTapped:(id)sender {
     UIAlertController * inputNameAlertController = [UIAlertController alertControllerWithTitle: @"输入配置文件名称保存" message: @"" preferredStyle:UIAlertControllerStyleAlert];
     [inputNameAlertController addTextFieldWithConfigurationHandler:^(UITextField *textField) {  // pop up notification with text field where user can enter the text they wish to name their OSC layout profile
         textField.placeholder = @"name";
@@ -272,17 +373,9 @@
 }
 
 /* Presents the view controller that lists all OSC profiles the user can choose from */
-- (IBAction) loadTapped:(id)sender {
-    UIStoryboard *storyboard;
-    BOOL isIPhone = ([UIDevice currentDevice].userInterfaceIdiom == UIUserInterfaceIdiomPhone);
-    if (isIPhone) {
-        storyboard = [UIStoryboard storyboardWithName:@"iPhone" bundle:nil];
-    }
-    else {
-        storyboard = [UIStoryboard storyboardWithName:@"iPad" bundle:nil];
-    }
-    
-    OSCProfilesTableViewController *vc = [storyboard   instantiateViewControllerWithIdentifier:@"OSCProfilesTableViewController"] ;
+- (void)loadTapped:(id)sender {
+    OSCProfilesTableViewController *vc = [[OSCProfilesTableViewController alloc] init];
+    vc.modalPresentationStyle = UIModalPresentationFullScreen;
     
     vc.didDismissOSCProfilesTVC = ^() {   // a block that will be called when the modally presented 'OSCProfilesTableViewController' VC is dismissed. By the time the 'OSCProfilesTableViewController' VC is dismissed the user would have potentially selected a different OSC profile with a different layout and they want to see this layout on this 'LayoutOnScreenControlsViewController.' This block of code will load the profile and then hide/show and move each OSC button to their appropriate position
         [self.layoutOSC updateControls];  // creates and saves a 'Default' OSC profile or loads the one the user selected on the previous screen
@@ -301,16 +394,12 @@
 
 - (void) touchesBegan:(NSSet *)touches withEvent:(UIEvent *)event {
     for (UITouch* touch in touches) {
-        
+        UIView *touchView = touch.view;
         CGPoint touchLocation = [touch locationInView:self.view];
-        touchLocation = [[touch view] convertPoint:touchLocation toView:nil];
         CALayer *layer = [self.view.layer hitTest:touchLocation];
-        
-        if (layer == self.toolbarRootView.layer ||
-            layer == self.chevronView.layer ||
-            layer == self.chevronImageView.layer ||
-            layer == self.toolbarStackView.layer ||
-            layer == self.view.layer) {  // don't let user move toolbar or toolbar UI buttons, toolbar's chevron 'pull tab', or the layer associated with this VC's view
+        if (touchView == nil ||
+            [touchView isDescendantOfView:self.toolbarRootView] ||
+            layer == self.view.layer) {
             return;
         }
     }

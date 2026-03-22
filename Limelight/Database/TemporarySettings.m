@@ -9,12 +9,27 @@
 #import "TemporarySettings.h"
 #import "OnScreenControls.h"
 
+NSString * const StreamPreferenceVideoAlignmentSelectionKey = @"StreamPreferenceVideoAlignmentSelection";
+NSString * const StreamPreferenceVideoAlignmentMarginKey = @"StreamPreferenceVideoAlignmentMargin";
+NSString * const StreamPreferencePerformanceOverlayPositionSelectionKey = @"StreamPreferencePerformanceOverlayPositionSelection";
+NSString * const StreamPreferencePerformanceOverlayMarginKey = @"StreamPreferencePerformanceOverlayMargin";
+NSString * const StreamPreferenceFloatingMenuEnabledKey = @"StreamPreferenceFloatingMenuEnabled";
+
 @implementation TemporarySettings
 
 - (id) initFromSettings:(Settings*)settings {
     self = [self init];
     
     self.parent = settings;
+
+    NSDictionary *streamPreferenceDefaults = @{
+        StreamPreferenceVideoAlignmentSelectionKey: @(0),
+        StreamPreferenceVideoAlignmentMarginKey: @(0.0),
+        StreamPreferencePerformanceOverlayPositionSelectionKey: @(0),
+        StreamPreferencePerformanceOverlayMarginKey: @(6.0),
+        StreamPreferenceFloatingMenuEnabledKey: @(NO)
+    };
+    [[NSUserDefaults standardUserDefaults] registerDefaults:streamPreferenceDefaults];
     
 #if TARGET_OS_TV
     // Apply default values from our Root.plist
@@ -95,6 +110,11 @@
     self.virtualDisplayMode=settings.virtualDisplayMode;
 #endif
     self.uniqueId = settings.uniqueId;
+    self.videoAlignmentSelection = [[NSUserDefaults standardUserDefaults] integerForKey:StreamPreferenceVideoAlignmentSelectionKey];
+    self.videoAlignmentMargin = (CGFloat)[[NSUserDefaults standardUserDefaults] doubleForKey:StreamPreferenceVideoAlignmentMarginKey];
+    self.performanceOverlayPositionSelection = [[NSUserDefaults standardUserDefaults] integerForKey:StreamPreferencePerformanceOverlayPositionSelectionKey];
+    self.performanceOverlayMargin = (CGFloat)[[NSUserDefaults standardUserDefaults] doubleForKey:StreamPreferencePerformanceOverlayMarginKey];
+    self.floatingMenuEnabled = [[NSUserDefaults standardUserDefaults] boolForKey:StreamPreferenceFloatingMenuEnabledKey];
     
     return self;
 }

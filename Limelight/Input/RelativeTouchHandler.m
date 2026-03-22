@@ -30,9 +30,13 @@ static const int REFERENCE_HEIGHT = 720;
 }
 
 - (id)initWithView:(StreamView*)view {
+    return [self initWithView:view settings:[[[DataManager alloc] init] getSettings]];
+}
+
+- (id)initWithView:(StreamView*)view settings:(TemporarySettings*)settings {
     self = [self init];
     self->view = view;
-    self->settings= [[[DataManager alloc] init] getSettings];
+    self->settings = settings ?: [[[DataManager alloc] init] getSettings];
 #if TARGET_OS_TV
     remotePressRecognizer = [[UITapGestureRecognizer alloc] initWithTarget:self action:@selector(remoteButtonPressed:)];
     remotePressRecognizer.allowedPressTypes = @[@(UIPressTypeSelect)];

@@ -12,7 +12,7 @@ NS_ASSUME_NONNULL_BEGIN
 
 @interface ProfileTableViewCell : UITableViewCell
 
-@property (weak, nonatomic) IBOutlet UILabel *name;
+- (void)configureWithName:(NSString *)name;
 
 @end
 

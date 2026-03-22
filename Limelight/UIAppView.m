@@ -84,6 +84,19 @@ static UIImage* noImage;
     return self;
 }
 
+- (void)applyDisplaySize:(CGSize)size {
+    CGSize sanitizedSize = CGSizeMake(MAX(size.width, 44.0), MAX(size.height, 44.0));
+    self.frame = CGRectMake(0, 0, sanitizedSize.width, sanitizedSize.height);
+    _appImage.frame = self.bounds;
+
+    if (_appLabel != nil) {
+        CGFloat preferredFontSize = MAX(14.0, MIN(24.0, sanitizedSize.width * 0.16));
+        _appLabel.font = [UIFont systemFontOfSize:preferredFontSize];
+    }
+
+    [self positionSubviews];
+}
+
 - (void)didMoveToSuperview {
     // Start our update loop when we are added to our cell
     if (self.superview != nil) {

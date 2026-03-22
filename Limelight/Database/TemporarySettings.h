@@ -8,6 +8,12 @@
 
 #import "Settings+CoreDataClass.h"
 
+FOUNDATION_EXTERN NSString * const StreamPreferenceVideoAlignmentSelectionKey;
+FOUNDATION_EXTERN NSString * const StreamPreferenceVideoAlignmentMarginKey;
+FOUNDATION_EXTERN NSString * const StreamPreferencePerformanceOverlayPositionSelectionKey;
+FOUNDATION_EXTERN NSString * const StreamPreferencePerformanceOverlayMarginKey;
+FOUNDATION_EXTERN NSString * const StreamPreferenceFloatingMenuEnabledKey;
+
 @interface TemporarySettings : NSObject
 
 @property (nonatomic, retain) Settings * parent;
@@ -42,6 +48,11 @@
 @property (nonatomic) BOOL enableTouchSensitivity;
 @property (nonatomic) BOOL touchSensitivityGlobal;
 @property (nonatomic, retain) NSNumber * touchSensitivity;
+@property (nonatomic) NSInteger videoAlignmentSelection;
+@property (nonatomic) CGFloat videoAlignmentMargin;
+@property (nonatomic) NSInteger performanceOverlayPositionSelection;
+@property (nonatomic) CGFloat performanceOverlayMargin;
+@property (nonatomic) BOOL floatingMenuEnabled;
 
 - (id) initFromSettings:(Settings*)settings;
 
