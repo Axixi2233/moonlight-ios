@@ -18,6 +18,20 @@
 
 static const double X1_MOUSE_SPEED_DIVISOR = 2.5;
 NSString * const StreamViewBoundsDidChangeNotification = @"StreamViewBoundsDidChangeNotification";
+NSString * const StreamViewVirtualButtonsDidChangeNotification = @"StreamViewVirtualButtonsDidChangeNotification";
+NSString * const StreamViewVirtualButtonSelectionDidChangeNotification = @"StreamViewVirtualButtonSelectionDidChangeNotification";
+static NSString * const kVirtualButtonShapeCircle = @"circle";
+static NSString * const kVirtualButtonShapeRoundedRect = @"roundedRect";
+static NSString * const kVirtualControlJoystick = @"joystick";
+static NSString * const kVirtualControlDPad = @"dpad";
+
+typedef NS_OPTIONS(NSUInteger, StreamVirtualDirectionMask) {
+    StreamVirtualDirectionMaskNone  = 0,
+    StreamVirtualDirectionMaskUp    = 1 << 0,
+    StreamVirtualDirectionMaskDown  = 1 << 1,
+    StreamVirtualDirectionMaskLeft  = 1 << 2,
+    StreamVirtualDirectionMaskRight = 1 << 3,
+};
 
 @interface KeyboardAccessoryScrollView : UIScrollView
 @end
@@ -26,6 +40,423 @@ NSString * const StreamViewBoundsDidChangeNotification = @"StreamViewBoundsDidCh
 
 - (BOOL)touchesShouldCancelInContentView:(UIView *)view {
     return YES;
+}
+
+@end
+
+@interface StreamVirtualDirectionalControl : UIControl
+@property(nonatomic, copy) NSString *controlAction;
+@property(nonatomic, assign) BOOL editingEnabled;
+@property(nonatomic, assign) BOOL selectedForEditing;
+@property(nonatomic, assign) CGFloat controlOpacity;
+@property(nonatomic, copy) dispatch_block_t selectionHandler;
+@property(nonatomic, copy) void (^directionMaskChangedHandler)(StreamVirtualDirectionMask previousMask, StreamVirtualDirectionMask currentMask);
+- (void)configureWithDescriptor:(NSDictionary<NSString *, id> *)descriptor;
+- (void)resetInteractionState;
+@end
+
+@implementation StreamVirtualDirectionalControl {
+    UIView *_baseView;
+    UIView *_knobView;
+    UIView *_centerDotView;
+    NSArray<UILabel *> *_directionLabels;
+    UIPanGestureRecognizer *_interactionPanGestureRecognizer;
+    UITapGestureRecognizer *_selectionTapGestureRecognizer;
+    StreamVirtualDirectionMask _currentMask;
+    CGPoint _normalizedVector;
+}
+
+- (instancetype)initWithFrame:(CGRect)frame {
+    self = [super initWithFrame:frame];
+    if (self != nil) {
+        self.backgroundColor = [UIColor clearColor];
+        self.exclusiveTouch = YES;
+
+        _baseView = [[UIView alloc] initWithFrame:CGRectZero];
+        _baseView.userInteractionEnabled = NO;
+        [self addSubview:_baseView];
+
+        NSMutableArray<UILabel *> *labels = [NSMutableArray arrayWithCapacity:4];
+        for (NSInteger index = 0; index < 4; index++) {
+            UILabel *label = [[UILabel alloc] initWithFrame:CGRectZero];
+            label.textAlignment = NSTextAlignmentCenter;
+            label.textColor = [UIColor whiteColor];
+            label.font = [UIFont systemFontOfSize:13.0f weight:UIFontWeightSemibold];
+            label.userInteractionEnabled = NO;
+            [_baseView addSubview:label];
+            [labels addObject:label];
+        }
+        _directionLabels = [labels copy];
+
+        _knobView = [[UIView alloc] initWithFrame:CGRectZero];
+        _knobView.userInteractionEnabled = NO;
+        [_baseView addSubview:_knobView];
+
+        _centerDotView = [[UIView alloc] initWithFrame:CGRectZero];
+        _centerDotView.userInteractionEnabled = NO;
+        [_baseView addSubview:_centerDotView];
+
+        _interactionPanGestureRecognizer = [[UIPanGestureRecognizer alloc] initWithTarget:self action:@selector(handleInteractionPan:)];
+        [self addGestureRecognizer:_interactionPanGestureRecognizer];
+
+        _selectionTapGestureRecognizer = [[UITapGestureRecognizer alloc] initWithTarget:self action:@selector(handleSelectionTap:)];
+        _selectionTapGestureRecognizer.enabled = NO;
+        [self addGestureRecognizer:_selectionTapGestureRecognizer];
+
+        _controlAction = @"";
+        _controlOpacity = 0.52f;
+        _currentMask = StreamVirtualDirectionMaskNone;
+        _normalizedVector = CGPointZero;
+    }
+    return self;
+}
+
+- (BOOL)isJoystick {
+    return [_controlAction hasPrefix:@"joystick_"];
+}
+
+- (BOOL)usesWASDMapping {
+    return [_controlAction hasSuffix:@"_wasd"];
+}
+
+- (void)setEditingEnabled:(BOOL)editingEnabled {
+    _editingEnabled = editingEnabled;
+    _interactionPanGestureRecognizer.enabled = NO;
+    _selectionTapGestureRecognizer.enabled = editingEnabled;
+    [self updateVisualState];
+}
+
+- (void)setSelectedForEditing:(BOOL)selectedForEditing {
+    _selectedForEditing = selectedForEditing;
+    [self updateVisualState];
+}
+
+- (void)setControlOpacity:(CGFloat)controlOpacity {
+    _controlOpacity = controlOpacity;
+    [self updateVisualState];
+}
+
+- (void)configureWithDescriptor:(NSDictionary<NSString *,id> *)descriptor {
+    NSString *controlAction = descriptor[@"controlAction"];
+    if ([controlAction isKindOfClass:[NSString class]] && controlAction.length > 0) {
+        self.controlAction = controlAction;
+    }
+
+    NSArray<NSString *> *labels = [self usesWASDMapping] ? @[ @"W", @"S", @"A", @"D" ] : @[ @"↑", @"↓", @"←", @"→" ];
+    [_directionLabels enumerateObjectsUsingBlock:^(UILabel *label, NSUInteger idx, BOOL *stop) {
+        label.text = idx < labels.count ? labels[idx] : @"";
+    }];
+
+    [self updateVisualState];
+    [self setNeedsLayout];
+}
+
+- (void)layoutSubviews {
+    [super layoutSubviews];
+
+    CGFloat side = MIN(CGRectGetWidth(self.bounds), CGRectGetHeight(self.bounds));
+    CGRect baseFrame = CGRectMake((CGRectGetWidth(self.bounds) - side) * 0.5f,
+                                  (CGRectGetHeight(self.bounds) - side) * 0.5f,
+                                  side,
+                                  side);
+    _baseView.frame = baseFrame;
+
+    CGFloat centerX = CGRectGetMidX(_baseView.bounds);
+    CGFloat centerY = CGRectGetMidY(_baseView.bounds);
+
+    UILabel *upLabel = _directionLabels.count > 0 ? _directionLabels[0] : nil;
+    UILabel *downLabel = _directionLabels.count > 1 ? _directionLabels[1] : nil;
+    UILabel *leftLabel = _directionLabels.count > 2 ? _directionLabels[2] : nil;
+    UILabel *rightLabel = _directionLabels.count > 3 ? _directionLabels[3] : nil;
+
+    if ([self isJoystick]) {
+        CGFloat labelSize = floor(side * 0.24f);
+        CGFloat inset = floor(side * 0.12f);
+        CGFloat knobSide = floor(side * 0.28f);
+        CGFloat centerDotSide = floor(side * 0.10f);
+
+        upLabel.frame = CGRectMake(centerX - labelSize * 0.5f, inset, labelSize, labelSize);
+        downLabel.frame = CGRectMake(centerX - labelSize * 0.5f, CGRectGetHeight(_baseView.bounds) - inset - labelSize, labelSize, labelSize);
+        leftLabel.frame = CGRectMake(inset, centerY - labelSize * 0.5f, labelSize, labelSize);
+        rightLabel.frame = CGRectMake(CGRectGetWidth(_baseView.bounds) - inset - labelSize, centerY - labelSize * 0.5f, labelSize, labelSize);
+
+        _centerDotView.bounds = CGRectMake(0, 0, centerDotSide, centerDotSide);
+        _centerDotView.center = CGPointMake(centerX, centerY);
+        _centerDotView.layer.cornerRadius = centerDotSide * 0.5f;
+
+        _knobView.bounds = CGRectMake(0, 0, knobSide, knobSide);
+        _knobView.layer.cornerRadius = knobSide * 0.5f;
+        CGFloat travelRadius = MAX((side * 0.5f) - (knobSide * 0.5f) - (side * 0.12f), 0.0f);
+        _knobView.center = CGPointMake(centerX + _normalizedVector.x * travelRadius,
+                                       centerY + _normalizedVector.y * travelRadius);
+    }
+    else {
+        CGFloat buttonSide = floor(side * 0.24f);
+        CGFloat inset = floor(side * 0.12f);
+
+        upLabel.frame = CGRectMake(centerX - buttonSide * 0.5f,
+                                   inset,
+                                   buttonSide,
+                                   buttonSide);
+        downLabel.frame = CGRectMake(centerX - buttonSide * 0.5f,
+                                     CGRectGetHeight(_baseView.bounds) - inset - buttonSide,
+                                     buttonSide,
+                                     buttonSide);
+        leftLabel.frame = CGRectMake(inset,
+                                     centerY - buttonSide * 0.5f,
+                                     buttonSide,
+                                     buttonSide);
+        rightLabel.frame = CGRectMake(CGRectGetWidth(_baseView.bounds) - inset - buttonSide,
+                                      centerY - buttonSide * 0.5f,
+                                      buttonSide,
+                                      buttonSide);
+
+        _centerDotView.bounds = CGRectZero;
+        _centerDotView.center = CGPointMake(centerX, centerY);
+        _knobView.bounds = CGRectZero;
+        _knobView.center = CGPointMake(centerX, centerY);
+    }
+
+    for (UILabel *label in _directionLabels) {
+        label.layer.cornerRadius = CGRectGetWidth(label.bounds) * 0.5f;
+    }
+}
+
+- (void)resetInteractionState {
+    [self updateDirectionMask:StreamVirtualDirectionMaskNone normalizedVector:CGPointZero];
+}
+
+- (void)handleSelectionTap:(UITapGestureRecognizer *)gestureRecognizer {
+    if (!self.editingEnabled) {
+        return;
+    }
+
+    if (self.selectionHandler != nil) {
+        self.selectionHandler();
+    }
+}
+
+- (void)handleInteractionPan:(UIPanGestureRecognizer *)gestureRecognizer {
+    if (self.editingEnabled) {
+        return;
+    }
+
+    CGPoint location = [gestureRecognizer locationInView:_baseView];
+    if (gestureRecognizer.state == UIGestureRecognizerStateEnded || gestureRecognizer.state == UIGestureRecognizerStateCancelled || gestureRecognizer.state == UIGestureRecognizerStateFailed) {
+        [self updateDirectionMask:StreamVirtualDirectionMaskNone normalizedVector:CGPointZero];
+        return;
+    }
+
+    CGFloat halfWidth = CGRectGetWidth(_baseView.bounds) * 0.5f;
+    CGFloat halfHeight = CGRectGetHeight(_baseView.bounds) * 0.5f;
+    if (halfWidth <= 0.0f || halfHeight <= 0.0f) {
+        return;
+    }
+
+    CGFloat rawX = (location.x - halfWidth) / halfWidth;
+    CGFloat rawY = (location.y - halfHeight) / halfHeight;
+    rawX = MIN(MAX(rawX, -1.0f), 1.0f);
+    rawY = MIN(MAX(rawY, -1.0f), 1.0f);
+
+    CGFloat magnitude = sqrt((rawX * rawX) + (rawY * rawY));
+    CGFloat deadZone = [self isJoystick] ? 0.28f : 0.24f;
+    if (magnitude < deadZone) {
+        [self updateDirectionMask:StreamVirtualDirectionMaskNone normalizedVector:CGPointZero];
+        return;
+    }
+
+    StreamVirtualDirectionMask mask = StreamVirtualDirectionMaskNone;
+    if (rawX <= -0.32f) {
+        mask |= StreamVirtualDirectionMaskLeft;
+    }
+    else if (rawX >= 0.32f) {
+        mask |= StreamVirtualDirectionMaskRight;
+    }
+
+    if (rawY <= -0.32f) {
+        mask |= StreamVirtualDirectionMaskUp;
+    }
+    else if (rawY >= 0.32f) {
+        mask |= StreamVirtualDirectionMaskDown;
+    }
+
+    CGPoint normalizedVector = CGPointMake(rawX / MAX(magnitude, 1.0f), rawY / MAX(magnitude, 1.0f));
+    if (![self isJoystick]) {
+        normalizedVector = CGPointZero;
+    }
+    [self updateDirectionMask:mask normalizedVector:normalizedVector];
+}
+
+- (StreamVirtualDirectionMask)directionMaskForDPadLocation:(CGPoint)location {
+    CGFloat centerX = CGRectGetMidX(_baseView.bounds);
+    CGFloat centerY = CGRectGetMidY(_baseView.bounds);
+    CGFloat deltaX = location.x - centerX;
+    CGFloat deltaY = location.y - centerY;
+    CGFloat distance = hypot(deltaX, deltaY);
+    CGFloat deadZone = CGRectGetWidth(_baseView.bounds) * 0.14f;
+
+    if (distance < deadZone) {
+        return StreamVirtualDirectionMaskNone;
+    }
+
+    if (fabs(deltaX) > fabs(deltaY)) {
+        return deltaX < 0.0f ? StreamVirtualDirectionMaskLeft : StreamVirtualDirectionMaskRight;
+    }
+
+    return deltaY < 0.0f ? StreamVirtualDirectionMaskUp : StreamVirtualDirectionMaskDown;
+}
+
+- (void)updateTrackingForLocation:(CGPoint)location gestureDriven:(BOOL)gestureDriven {
+    CGFloat halfWidth = CGRectGetWidth(_baseView.bounds) * 0.5f;
+    CGFloat halfHeight = CGRectGetHeight(_baseView.bounds) * 0.5f;
+    if (halfWidth <= 0.0f || halfHeight <= 0.0f) {
+        return;
+    }
+
+    if (![self isJoystick]) {
+        if (gestureDriven) {
+            return;
+        }
+        [self updateDirectionMask:[self directionMaskForDPadLocation:location] normalizedVector:CGPointZero];
+        return;
+    }
+
+    CGFloat rawX = (location.x - halfWidth) / halfWidth;
+    CGFloat rawY = (location.y - halfHeight) / halfHeight;
+    rawX = MIN(MAX(rawX, -1.0f), 1.0f);
+    rawY = MIN(MAX(rawY, -1.0f), 1.0f);
+
+    CGFloat magnitude = sqrt((rawX * rawX) + (rawY * rawY));
+    CGFloat deadZone = 0.28f;
+    if (magnitude < deadZone) {
+        [self updateDirectionMask:StreamVirtualDirectionMaskNone normalizedVector:CGPointZero];
+        return;
+    }
+
+    StreamVirtualDirectionMask mask = StreamVirtualDirectionMaskNone;
+    if (rawX <= -0.32f) {
+        mask |= StreamVirtualDirectionMaskLeft;
+    }
+    else if (rawX >= 0.32f) {
+        mask |= StreamVirtualDirectionMaskRight;
+    }
+
+    if (rawY <= -0.32f) {
+        mask |= StreamVirtualDirectionMaskUp;
+    }
+    else if (rawY >= 0.32f) {
+        mask |= StreamVirtualDirectionMaskDown;
+    }
+
+    CGPoint normalizedVector = CGPointMake(rawX / MAX(magnitude, 1.0f), rawY / MAX(magnitude, 1.0f));
+    [self updateDirectionMask:mask normalizedVector:normalizedVector];
+}
+
+- (BOOL)beginTrackingWithTouch:(UITouch *)touch withEvent:(UIEvent *)event {
+    (void)event;
+    if (self.editingEnabled) {
+        return [super beginTrackingWithTouch:touch withEvent:event];
+    }
+
+    CGPoint location = [touch locationInView:_baseView];
+    [self updateTrackingForLocation:location gestureDriven:NO];
+    return YES;
+}
+
+- (BOOL)continueTrackingWithTouch:(UITouch *)touch withEvent:(UIEvent *)event {
+    (void)event;
+    if (self.editingEnabled) {
+        return [super continueTrackingWithTouch:touch withEvent:event];
+    }
+
+    if ([self isJoystick]) {
+        CGPoint location = [touch locationInView:_baseView];
+        [self updateTrackingForLocation:location gestureDriven:NO];
+    }
+    return YES;
+}
+
+- (void)endTrackingWithTouch:(UITouch *)touch withEvent:(UIEvent *)event {
+    (void)touch;
+    (void)event;
+    [super endTrackingWithTouch:touch withEvent:event];
+    if (!self.editingEnabled) {
+        [self updateDirectionMask:StreamVirtualDirectionMaskNone normalizedVector:CGPointZero];
+    }
+}
+
+- (void)cancelTrackingWithEvent:(UIEvent *)event {
+    [super cancelTrackingWithEvent:event];
+    if (!self.editingEnabled) {
+        [self updateDirectionMask:StreamVirtualDirectionMaskNone normalizedVector:CGPointZero];
+    }
+}
+
+- (void)updateDirectionMask:(StreamVirtualDirectionMask)newMask normalizedVector:(CGPoint)normalizedVector {
+    StreamVirtualDirectionMask previousMask = _currentMask;
+    _currentMask = newMask;
+    _normalizedVector = normalizedVector;
+    [self updateVisualState];
+    [self setNeedsLayout];
+
+    if (self.directionMaskChangedHandler != nil && previousMask != newMask) {
+        self.directionMaskChangedHandler(previousMask, newMask);
+    }
+}
+
+- (void)updateVisualState {
+    BOOL joystick = [self isJoystick];
+    CGFloat borderWidth = self.editingEnabled ? (self.selectedForEditing ? 2.0f : 1.3f) : 1.0f;
+    UIColor *editingBorderColor = self.editingEnabled ?
+        (self.selectedForEditing ? [UIColor colorWithRed:0.60 green:0.55 blue:0.98 alpha:1.0] : [[UIColor colorWithRed:0.50 green:0.45 blue:0.94 alpha:1.0] colorWithAlphaComponent:0.86]) :
+        [[UIColor whiteColor] colorWithAlphaComponent:0.14];
+    UIColor *fillColor = self.editingEnabled ?
+        (self.selectedForEditing ? [UIColor colorWithRed:0.19 green:0.19 blue:0.25 alpha:0.90] : [[UIColor blackColor] colorWithAlphaComponent:self.controlOpacity]) :
+        [[UIColor blackColor] colorWithAlphaComponent:self.controlOpacity];
+
+    _baseView.backgroundColor = fillColor;
+    _baseView.layer.borderWidth = borderWidth;
+    _baseView.layer.borderColor = editingBorderColor.CGColor;
+    _baseView.layer.cornerRadius = CGRectGetWidth(self.bounds) * 0.5f;
+
+    UIColor *joystickActiveFill = [UIColor clearColor];
+    UIColor *dpadActiveFill = [[UIColor whiteColor] colorWithAlphaComponent:0.10f];
+    UIColor *inactiveFill = [UIColor clearColor];
+    UIColor *textColor = joystick ? [UIColor colorWithWhite:1.0 alpha:0.88] : [UIColor colorWithWhite:1.0 alpha:0.88];
+
+    UILabel *upLabel = _directionLabels.count > 0 ? _directionLabels[0] : nil;
+    UILabel *downLabel = _directionLabels.count > 1 ? _directionLabels[1] : nil;
+    UILabel *leftLabel = _directionLabels.count > 2 ? _directionLabels[2] : nil;
+    UILabel *rightLabel = _directionLabels.count > 3 ? _directionLabels[3] : nil;
+    NSArray<NSDictionary *> *states = @[
+        @{ @"label": upLabel ?: [UILabel new], @"active": @((_currentMask & StreamVirtualDirectionMaskUp) != 0) },
+        @{ @"label": downLabel ?: [UILabel new], @"active": @((_currentMask & StreamVirtualDirectionMaskDown) != 0) },
+        @{ @"label": leftLabel ?: [UILabel new], @"active": @((_currentMask & StreamVirtualDirectionMaskLeft) != 0) },
+        @{ @"label": rightLabel ?: [UILabel new], @"active": @((_currentMask & StreamVirtualDirectionMaskRight) != 0) }
+    ];
+
+    for (NSDictionary *state in states) {
+        UILabel *label = state[@"label"];
+        BOOL active = [state[@"active"] boolValue];
+        label.textColor = active ? [UIColor whiteColor] : textColor;
+        label.backgroundColor = active ? (joystick ? joystickActiveFill : dpadActiveFill) : inactiveFill;
+        label.layer.cornerRadius = CGRectGetWidth(label.bounds) * 0.5f;
+        label.layer.masksToBounds = YES;
+        label.layer.borderWidth = joystick ? 0.0f : 0.8f;
+        label.layer.borderColor = [[UIColor whiteColor] colorWithAlphaComponent:(active ? 0.92f : 0.72f)].CGColor;
+        label.layer.shadowColor = [UIColor blackColor].CGColor;
+        label.layer.shadowOpacity = 0.0f;
+        label.layer.shadowRadius = 0.0f;
+        label.layer.shadowOffset = CGSizeMake(0, 4);
+        label.transform = (!joystick && active) ? CGAffineTransformMakeScale(0.92f, 0.92f) : CGAffineTransformIdentity;
+    }
+
+    _centerDotView.hidden = !joystick;
+    _centerDotView.backgroundColor = [[UIColor whiteColor] colorWithAlphaComponent:0.34];
+    _knobView.hidden = !joystick;
+    _knobView.backgroundColor = [[UIColor whiteColor] colorWithAlphaComponent:0.18];
+    _knobView.layer.borderWidth = 0.8f;
+    _knobView.layer.borderColor = [[UIColor whiteColor] colorWithAlphaComponent:0.22].CGColor;
 }
 
 @end
@@ -69,6 +500,13 @@ NSString * const StreamViewBoundsDidChangeNotification = @"StreamViewBoundsDidCh
     CGFloat videoAlignmentMargin;
     BOOL viewOnlyModeEnabled;
     OnScreenControlsLevel requestedOnScreenControlsLevel;
+    UIView *virtualButtonsContainerView;
+    NSArray<UIView *> *virtualButtons;
+    NSArray<NSDictionary<NSString *, id> *> *virtualButtonDescriptors;
+    BOOL temporaryVirtualButtonsVisible;
+    BOOL temporaryVirtualButtonsEditingEnabled;
+    NSString *selectedVirtualButtonIdentifier;
+    NSMutableSet<NSString *> *lockedMouseActionIdentifiers;
 }
 
 - (BOOL)shouldUseFullOnScreenControlsForCurrentOrientation {
@@ -115,6 +553,8 @@ NSString * const StreamViewBoundsDidChangeNotification = @"StreamViewBoundsDidCh
     self->settings = [[[DataManager alloc] init] getSettings];
     self->controllerSupport = controllerSupport;
     self.multipleTouchEnabled = YES;
+    virtualButtonDescriptors = [[self builtInVirtualButtonDescriptors] copy];
+    lockedMouseActionIdentifiers = [[NSMutableSet alloc] init];
     
     self->touchManager = [[TouchScreenManager alloc] init];
     
@@ -235,6 +675,8 @@ NSString * const StreamViewBoundsDidChangeNotification = @"StreamViewBoundsDidCh
 - (void)layoutSubviews {
     [super layoutSubviews];
 
+    [self layoutVirtualButtonsOverlay];
+
     if (!CGSizeEqualToSize(lastPostedBoundsSize, self.bounds.size)) {
         [self applyRequestedOnScreenControlsLevel];
         lastPostedBoundsSize = self.bounds.size;
@@ -287,6 +729,723 @@ NSString * const StreamViewBoundsDidChangeNotification = @"StreamViewBoundsDidCh
     else {
         return [onScreenControls getLevel];
     }
+}
+
+- (NSArray<NSDictionary<NSString *, id> *> *)builtInVirtualButtonDescriptors {
+    return @[
+        @{ @"title": @"ESC", @"primary": @[ @(0x1B) ], @"shape": kVirtualButtonShapeRoundedRect, @"scale": @1.0, @"widthScale": @1.0, @"heightScale": @1.0 },
+        @{ @"title": @"Tab", @"primary": @[ @(0x09) ], @"shape": kVirtualButtonShapeRoundedRect, @"scale": @1.0, @"widthScale": @1.0, @"heightScale": @1.0 },
+        @{ @"title": @"Enter", @"primary": @[ @(0x0D) ], @"shape": kVirtualButtonShapeRoundedRect, @"scale": @1.0, @"widthScale": @1.0, @"heightScale": @1.0 },
+        @{ @"title": @"Win", @"primary": @[ @(0x5B) ], @"shape": kVirtualButtonShapeRoundedRect, @"scale": @1.0, @"widthScale": @1.0, @"heightScale": @1.0 },
+        @{ @"title": @"Alt+Tab", @"primary": @[ @(0x12), @(0x09) ], @"shape": kVirtualButtonShapeRoundedRect, @"scale": @1.0, @"widthScale": @1.0, @"heightScale": @1.0 },
+        @{ @"title": @"Ctrl+Shift+Esc", @"primary": @[ @(0x11), @(0x10), @(0x1B) ], @"shape": kVirtualButtonShapeRoundedRect, @"scale": @1.0, @"widthScale": @1.0, @"heightScale": @1.0 }
+    ];
+}
+
+- (NSArray<NSDictionary<NSString *, id> *> *)activeVirtualButtonDescriptors {
+    if (virtualButtonDescriptors.count > 0) {
+        return virtualButtonDescriptors;
+    }
+
+    return @[];
+}
+
+- (BOOL)isDirectionalVirtualButtonDescriptor:(NSDictionary<NSString *, id> *)descriptor {
+    NSString *controlAction = descriptor[@"controlAction"];
+    return [controlAction isKindOfClass:[NSString class]] && controlAction.length > 0;
+}
+
+- (BOOL)isJoystickDirectionalControlDescriptor:(NSDictionary<NSString *, id> *)descriptor {
+    NSString *controlAction = descriptor[@"controlAction"];
+    return [controlAction isKindOfClass:[NSString class]] && [controlAction hasPrefix:@"joystick_"];
+}
+
+- (void)rebuildVirtualButtonsOverlay {
+    if (virtualButtonsContainerView == nil) {
+        return;
+    }
+
+    for (UIView *button in virtualButtons) {
+        if ([button isKindOfClass:[UIButton class]]) {
+            NSTimer *scrollTimer = objc_getAssociatedObject(button, "virtualScrollTimer");
+            [scrollTimer invalidate];
+        }
+        else if ([button isKindOfClass:[StreamVirtualDirectionalControl class]]) {
+            [(StreamVirtualDirectionalControl *)button resetInteractionState];
+        }
+        [button removeFromSuperview];
+    }
+
+    NSMutableArray<UIView *> *buttons = [NSMutableArray array];
+    [[self activeVirtualButtonDescriptors] enumerateObjectsUsingBlock:^(NSDictionary<NSString *,id> *descriptor, NSUInteger idx, BOOL *stop) {
+        UIView *controlView = nil;
+
+        if ([self isDirectionalVirtualButtonDescriptor:descriptor]) {
+            StreamVirtualDirectionalControl *directionalControl = [[StreamVirtualDirectionalControl alloc] initWithFrame:CGRectZero];
+            directionalControl.translatesAutoresizingMaskIntoConstraints = NO;
+            __weak typeof(self) weakSelf = self;
+            directionalControl.selectionHandler = ^{
+                __strong typeof(weakSelf) strongSelf = weakSelf;
+                if (strongSelf == nil) { return; }
+                [strongSelf selectVirtualButtonWithIdentifier:descriptor[@"id"] descriptor:descriptor];
+            };
+            directionalControl.directionMaskChangedHandler = ^(StreamVirtualDirectionMask previousMask, StreamVirtualDirectionMask currentMask) {
+                __strong typeof(weakSelf) strongSelf = weakSelf;
+                if (strongSelf == nil) { return; }
+                [strongSelf applyDirectionalControlAction:descriptor[@"controlAction"] previousMask:previousMask currentMask:currentMask];
+            };
+            [directionalControl configureWithDescriptor:descriptor];
+            controlView = directionalControl;
+        }
+        else {
+            UIButton *button = [UIButton buttonWithType:UIButtonTypeCustom];
+            button.translatesAutoresizingMaskIntoConstraints = NO;
+            button.backgroundColor = [[UIColor blackColor] colorWithAlphaComponent:0.52];
+            button.layer.borderWidth = temporaryVirtualButtonsEditingEnabled ? 1.3f : 1.0f;
+            button.clipsToBounds = YES;
+            [button setTitle:descriptor[@"title"] forState:UIControlStateNormal];
+            [button setTitleColor:[UIColor whiteColor] forState:UIControlStateNormal];
+            button.titleLabel.adjustsFontSizeToFitWidth = YES;
+            button.titleLabel.minimumScaleFactor = 0.60f;
+            [button addTarget:self action:@selector(virtualShortcutButtonTapped:) forControlEvents:UIControlEventTouchUpInside];
+            [button addTarget:self action:@selector(virtualMouseButtonPressDown:) forControlEvents:UIControlEventTouchDown];
+            [button addTarget:self action:@selector(virtualMouseButtonPressRelease:) forControlEvents:UIControlEventTouchUpInside];
+            [button addTarget:self action:@selector(virtualMouseButtonPressRelease:) forControlEvents:UIControlEventTouchUpOutside];
+            [button addTarget:self action:@selector(virtualMouseButtonPressRelease:) forControlEvents:UIControlEventTouchCancel];
+            [button addTarget:self action:@selector(virtualMouseButtonPressDown:) forControlEvents:UIControlEventTouchDragEnter];
+            [button addTarget:self action:@selector(virtualMouseButtonPressRelease:) forControlEvents:UIControlEventTouchDragExit];
+            [button addTarget:self action:@selector(toolbarButtonPressDown:) forControlEvents:UIControlEventTouchDown];
+            [button addTarget:self action:@selector(toolbarButtonPressRelease:) forControlEvents:UIControlEventTouchUpInside];
+            [button addTarget:self action:@selector(toolbarButtonPressRelease:) forControlEvents:UIControlEventTouchUpOutside];
+            [button addTarget:self action:@selector(toolbarButtonPressRelease:) forControlEvents:UIControlEventTouchCancel];
+            [button addTarget:self action:@selector(toolbarButtonPressDown:) forControlEvents:UIControlEventTouchDragEnter];
+            [button addTarget:self action:@selector(toolbarButtonPressRelease:) forControlEvents:UIControlEventTouchDragExit];
+            objc_setAssociatedObject(button, "virtualPrimaryKeyCodes", descriptor[@"primary"], OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+            objc_setAssociatedObject(button, "virtualSecondaryKeyCodes", descriptor[@"secondary"], OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+            controlView = button;
+        }
+
+        UIPanGestureRecognizer *panGestureRecognizer = [[UIPanGestureRecognizer alloc] initWithTarget:self action:@selector(handleVirtualButtonPan:)];
+        panGestureRecognizer.enabled = temporaryVirtualButtonsEditingEnabled;
+        [controlView addGestureRecognizer:panGestureRecognizer];
+        objc_setAssociatedObject(controlView, "virtualIdentifier", descriptor[@"id"], OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+        [virtualButtonsContainerView addSubview:controlView];
+        [buttons addObject:controlView];
+    }];
+
+    virtualButtons = [buttons copy];
+    virtualButtonsContainerView.hidden = !temporaryVirtualButtonsVisible || virtualButtons.count == 0;
+    [self layoutVirtualButtonsOverlay];
+}
+
+- (void)ensureVirtualButtonsOverlayIfNeeded {
+    if (virtualButtonsContainerView != nil) {
+        return;
+    }
+
+    virtualButtonsContainerView = [[UIView alloc] initWithFrame:CGRectZero];
+    virtualButtonsContainerView.backgroundColor = [UIColor clearColor];
+    virtualButtonsContainerView.hidden = YES;
+    [self addSubview:virtualButtonsContainerView];
+    [self rebuildVirtualButtonsOverlay];
+}
+
+- (BOOL)isCircularVirtualButtonDescriptor:(NSDictionary<NSString *, id> *)descriptor {
+    NSString *shape = descriptor[@"shape"];
+    return [shape isEqualToString:kVirtualButtonShapeCircle];
+}
+
+- (CGSize)virtualButtonSizeForDescriptor:(NSDictionary<NSString *, id> *)descriptor {
+    BOOL isPad = UIDevice.currentDevice.userInterfaceIdiom == UIUserInterfaceIdiomPad;
+    CGFloat baseRoundedWidth = isPad ? 118.0f : 96.0f;
+    CGFloat baseRoundedHeight = isPad ? 52.0f : 46.0f;
+    CGFloat baseCircleSide = isPad ? 60.0f : 52.0f;
+    CGFloat baseDirectionalSide = isPad ? 138.0f : 116.0f;
+
+    if ([self isDirectionalVirtualButtonDescriptor:descriptor]) {
+        BOOL isCircle = [self isCircularVirtualButtonDescriptor:descriptor];
+        if (isCircle) {
+            NSNumber *scaleNumber = descriptor[@"scale"];
+            CGFloat scale = MIN(MAX(scaleNumber != nil ? scaleNumber.doubleValue : 1.0, 0.50), 2.00);
+            CGFloat side = baseDirectionalSide * scale;
+            return CGSizeMake(side, side);
+        }
+
+        NSNumber *widthScaleNumber = descriptor[@"widthScale"];
+        NSNumber *heightScaleNumber = descriptor[@"heightScale"];
+        CGFloat widthScale = MIN(MAX(widthScaleNumber != nil ? widthScaleNumber.doubleValue : 1.0, 0.50), 2.00);
+        CGFloat heightScale = MIN(MAX(heightScaleNumber != nil ? heightScaleNumber.doubleValue : 1.0, 0.50), 2.00);
+        return CGSizeMake(baseDirectionalSide * widthScale, baseDirectionalSide * heightScale);
+    }
+
+    if ([self isCircularVirtualButtonDescriptor:descriptor]) {
+        NSNumber *scaleNumber = descriptor[@"scale"];
+        CGFloat scale = MIN(MAX(scaleNumber != nil ? scaleNumber.doubleValue : 1.0, 0.50), 2.00);
+        CGFloat side = baseCircleSide * scale;
+        return CGSizeMake(side, side);
+    }
+
+    NSNumber *widthScaleNumber = descriptor[@"widthScale"];
+    NSNumber *heightScaleNumber = descriptor[@"heightScale"];
+    CGFloat widthScale = MIN(MAX(widthScaleNumber != nil ? widthScaleNumber.doubleValue : 1.0, 0.50), 2.00);
+    CGFloat heightScale = MIN(MAX(heightScaleNumber != nil ? heightScaleNumber.doubleValue : 1.0, 0.50), 2.00);
+    return CGSizeMake(baseRoundedWidth * widthScale, baseRoundedHeight * heightScale);
+}
+
+- (NSArray<NSNumber *> *)keyCodesForDirectionalControlAction:(NSString *)controlAction mask:(StreamVirtualDirectionMask)mask {
+    if (![controlAction isKindOfClass:[NSString class]] || controlAction.length == 0 || mask == StreamVirtualDirectionMaskNone) {
+        return @[];
+    }
+
+    BOOL usesWASD = [controlAction hasSuffix:@"_wasd"];
+    NSNumber *up = @(usesWASD ? 0x57 : 0x26);
+    NSNumber *down = @(usesWASD ? 0x53 : 0x28);
+    NSNumber *left = @(usesWASD ? 0x41 : 0x25);
+    NSNumber *right = @(usesWASD ? 0x44 : 0x27);
+    NSMutableArray<NSNumber *> *keyCodes = [NSMutableArray array];
+
+    if ((mask & StreamVirtualDirectionMaskUp) != 0) {
+        [keyCodes addObject:up];
+    }
+    if ((mask & StreamVirtualDirectionMaskDown) != 0) {
+        [keyCodes addObject:down];
+    }
+    if ((mask & StreamVirtualDirectionMaskLeft) != 0) {
+        [keyCodes addObject:left];
+    }
+    if ((mask & StreamVirtualDirectionMaskRight) != 0) {
+        [keyCodes addObject:right];
+    }
+    return keyCodes;
+}
+
+- (void)applyDirectionalControlAction:(NSString *)controlAction
+                         previousMask:(StreamVirtualDirectionMask)previousMask
+                          currentMask:(StreamVirtualDirectionMask)currentMask {
+    NSArray<NSNumber *> *previousKeyCodes = [self keyCodesForDirectionalControlAction:controlAction mask:previousMask];
+    NSArray<NSNumber *> *currentKeyCodes = [self keyCodesForDirectionalControlAction:controlAction mask:currentMask];
+
+    for (NSNumber *keyCode in [previousKeyCodes reverseObjectEnumerator]) {
+        if (![currentKeyCodes containsObject:keyCode]) {
+            LiSendKeyboardEvent((short)[keyCode integerValue], KEY_ACTION_UP, 0);
+        }
+    }
+
+    for (NSNumber *keyCode in currentKeyCodes) {
+        if (![previousKeyCodes containsObject:keyCode]) {
+            LiSendKeyboardEvent((short)[keyCode integerValue], KEY_ACTION_DOWN, 0);
+        }
+    }
+}
+
+- (void)selectVirtualButtonWithIdentifier:(NSString *)identifier descriptor:(NSDictionary<NSString *, id> *)descriptor {
+    selectedVirtualButtonIdentifier = [identifier copy];
+    [self rebuildVirtualButtonsOverlay];
+    [[NSNotificationCenter defaultCenter] postNotificationName:StreamViewVirtualButtonSelectionDidChangeNotification
+                                                        object:self
+                                                      userInfo:@{
+                                                        @"identifier": selectedVirtualButtonIdentifier ?: @"",
+                                                        @"descriptor": descriptor ?: @{}
+                                                      }];
+}
+
+- (UIImage *)virtualMouseButtonImageForAction:(NSString *)mouseAction {
+    NSString *assetName = nil;
+    NSString *fallbackSystemName = nil;
+
+    if ([mouseAction isEqualToString:@"mouse_left"]) {
+        assetName = @"ic_mouse_left";
+        fallbackSystemName = @"cursorarrow.click";
+    }
+    else if ([mouseAction isEqualToString:@"mouse_right"]) {
+        assetName = @"ic_mouse_right";
+        fallbackSystemName = @"cursorarrow.rays";
+    }
+    else if ([mouseAction isEqualToString:@"mouse_middle"]) {
+        assetName = @"ic_mouse_middle";
+        fallbackSystemName = @"circle.grid.2x1";
+    }
+    else if ([mouseAction isEqualToString:@"mouse_scroll_up"]) {
+        assetName = @"ic_mouse_scroll_up";
+        fallbackSystemName = @"arrow.up.to.line";
+    }
+    else if ([mouseAction isEqualToString:@"mouse_scroll_down"]) {
+        assetName = @"ic_mouse_scroll_down";
+        fallbackSystemName = @"arrow.down.to.line";
+    }
+    else if ([mouseAction isEqualToString:@"mouse_left_lock"]) {
+        assetName = @"ic_mouse_left_p";
+        fallbackSystemName = @"cursorarrow.click";
+    }
+    else if ([mouseAction isEqualToString:@"mouse_right_lock"]) {
+        assetName = @"ic_mouse_right_p";
+        fallbackSystemName = @"cursorarrow.rays";
+    }
+
+    UIImage *assetImage = assetName.length > 0 ? [UIImage imageNamed:assetName] : nil;
+    if (assetImage != nil) {
+        return [assetImage imageWithRenderingMode:UIImageRenderingModeAlwaysOriginal];
+    }
+
+    if (@available(iOS 13.0, *)) {
+        UIImageSymbolConfiguration *configuration = [UIImageSymbolConfiguration configurationWithPointSize:18 weight:UIImageSymbolWeightSemibold];
+        UIImage *image = [UIImage systemImageNamed:fallbackSystemName withConfiguration:configuration];
+        if (image != nil) {
+            return [image imageWithTintColor:[UIColor whiteColor] renderingMode:UIImageRenderingModeAlwaysOriginal];
+        }
+    }
+
+    return nil;
+}
+
+- (int)virtualMouseButtonValueForAction:(NSString *)mouseAction {
+    if ([mouseAction isEqualToString:@"mouse_left"] || [mouseAction isEqualToString:@"mouse_left_lock"]) {
+        return BUTTON_LEFT;
+    }
+    else if ([mouseAction isEqualToString:@"mouse_right"] || [mouseAction isEqualToString:@"mouse_right_lock"]) {
+        return BUTTON_RIGHT;
+    }
+    else if ([mouseAction isEqualToString:@"mouse_middle"]) {
+        return BUTTON_MIDDLE;
+    }
+
+    return 0;
+}
+
+- (BOOL)isLockingMouseAction:(NSString *)mouseAction {
+    return [mouseAction isEqualToString:@"mouse_left_lock"] || [mouseAction isEqualToString:@"mouse_right_lock"];
+}
+
+- (void)releaseLockedMouseActionsNotPresentInDescriptors:(NSArray<NSDictionary<NSString *, id> *> *)descriptors {
+    NSMutableSet<NSString *> *availableActions = [NSMutableSet set];
+    for (NSDictionary<NSString *, id> *descriptor in descriptors) {
+        NSString *mouseAction = descriptor[@"mouseAction"];
+        if ([mouseAction isKindOfClass:[NSString class]] && mouseAction.length > 0) {
+            [availableActions addObject:mouseAction];
+        }
+    }
+
+    for (NSString *mouseAction in [lockedMouseActionIdentifiers allObjects]) {
+        if (descriptors != nil && [availableActions containsObject:mouseAction]) {
+            continue;
+        }
+
+        int mouseButton = [self virtualMouseButtonValueForAction:mouseAction];
+        if (mouseButton != 0) {
+            LiSendMouseButtonEvent(BUTTON_ACTION_RELEASE, mouseButton);
+        }
+        [lockedMouseActionIdentifiers removeObject:mouseAction];
+    }
+}
+
+- (void)applyAppearanceForVirtualButton:(UIButton *)button
+                             descriptor:(NSDictionary<NSString *, id> *)descriptor
+                                   size:(CGSize)size {
+    BOOL isCircle = [self isCircularVirtualButtonDescriptor:descriptor];
+    BOOL isSelected = selectedVirtualButtonIdentifier != nil && [selectedVirtualButtonIdentifier isEqualToString:descriptor[@"id"]];
+    NSString *mouseAction = descriptor[@"mouseAction"];
+    BOOL isMouseButton = [mouseAction isKindOfClass:[NSString class]] && mouseAction.length > 0;
+    BOOL isLockedMouseButton = isMouseButton && [self isLockingMouseAction:mouseAction] && [lockedMouseActionIdentifiers containsObject:mouseAction];
+    NSNumber *opacityNumber = descriptor[@"opacity"];
+    CGFloat buttonOpacity = MIN(MAX(opacityNumber != nil ? opacityNumber.doubleValue : 0.52, 0.05), 1.0);
+    button.layer.cornerRadius = isCircle ? size.width * 0.5f : MIN(size.height * 0.32f, 18.0f);
+    CGFloat mouseInset = floor(MIN(size.width, size.height) * 0.22f);
+    button.contentEdgeInsets = isMouseButton ? UIEdgeInsetsMake(mouseInset, mouseInset, mouseInset, mouseInset) : (isCircle ? UIEdgeInsetsZero : UIEdgeInsetsMake(0, 12, 0, 12));
+    button.imageEdgeInsets = isMouseButton ? UIEdgeInsetsZero : UIEdgeInsetsZero;
+    button.titleLabel.font = [UIFont systemFontOfSize:(isCircle ? 12.0f : 13.0f) weight:UIFontWeightSemibold];
+    button.imageView.contentMode = UIViewContentModeScaleAspectFit;
+    button.tintColor = [UIColor whiteColor];
+
+    if (isMouseButton) {
+        [button setTitle:nil forState:UIControlStateNormal];
+        [button setImage:[self virtualMouseButtonImageForAction:mouseAction] forState:UIControlStateNormal];
+    }
+    else {
+        [button setTitle:descriptor[@"title"] forState:UIControlStateNormal];
+        [button setImage:nil forState:UIControlStateNormal];
+    }
+
+    if (temporaryVirtualButtonsEditingEnabled) {
+        button.layer.borderWidth = isSelected ? 2.0f : 1.3f;
+        button.layer.borderColor = (isSelected ? [UIColor colorWithRed:0.60 green:0.55 blue:0.98 alpha:1.0] : [[UIColor colorWithRed:0.50 green:0.45 blue:0.94 alpha:1.0] colorWithAlphaComponent:0.86]).CGColor;
+        UIColor *editingBackgroundColor = isSelected ? [UIColor colorWithRed:0.19 green:0.19 blue:0.25 alpha:0.90] : [[UIColor blackColor] colorWithAlphaComponent:buttonOpacity];
+        button.backgroundColor = editingBackgroundColor;
+    }
+    else {
+        button.layer.borderWidth = 1.0f;
+        button.layer.borderColor = (isLockedMouseButton ? [UIColor colorWithRed:0.60 green:0.55 blue:0.98 alpha:0.94] : [[UIColor whiteColor] colorWithAlphaComponent:0.14]).CGColor;
+        button.backgroundColor = isLockedMouseButton ? [UIColor colorWithRed:0.22 green:0.20 blue:0.33 alpha:0.94] : [[UIColor blackColor] colorWithAlphaComponent:buttonOpacity];
+    }
+}
+
+- (void)layoutVirtualButtonsOverlay {
+    if (virtualButtonsContainerView == nil) {
+        return;
+    }
+
+    if (virtualButtons.count == 0) {
+        virtualButtonsContainerView.frame = CGRectZero;
+        return;
+    }
+
+    CGFloat defaultButtonWidth = UIDevice.currentDevice.userInterfaceIdiom == UIUserInterfaceIdiomPad ? 118.0f : 96.0f;
+    CGFloat defaultButtonHeight = UIDevice.currentDevice.userInterfaceIdiom == UIUserInterfaceIdiomPad ? 52.0f : 46.0f;
+    CGFloat horizontalSpacing = 10.0f;
+    CGFloat verticalSpacing = 10.0f;
+    NSInteger columnCount = 2;
+    NSInteger rowCount = (NSInteger)ceil((double)virtualButtons.count / (double)columnCount);
+
+    CGFloat safeTop = 0.0f;
+    CGFloat safeBottom = 0.0f;
+    CGFloat safeLeft = 0.0f;
+    CGFloat safeRight = 0.0f;
+    if (@available(iOS 11.0, *)) {
+        safeTop = self.safeAreaInsets.top;
+        safeBottom = self.safeAreaInsets.bottom;
+        safeLeft = self.safeAreaInsets.left;
+        safeRight = self.safeAreaInsets.right;
+    }
+
+    virtualButtonsContainerView.frame = self.bounds;
+
+    [virtualButtons enumerateObjectsUsingBlock:^(UIView *button, NSUInteger idx, BOOL *stop) {
+        NSDictionary<NSString *, id> *descriptor = idx < self->virtualButtonDescriptors.count ? self->virtualButtonDescriptors[idx] : nil;
+        CGSize buttonSize = [self virtualButtonSizeForDescriptor:descriptor ?: @{}];
+        CGFloat buttonWidth = buttonSize.width;
+        CGFloat buttonHeight = buttonSize.height;
+        CGFloat minCenterX = safeLeft + 12.0f + buttonWidth * 0.5f;
+        CGFloat maxCenterX = CGRectGetWidth(self.bounds) - safeRight - 12.0f - buttonWidth * 0.5f;
+        CGFloat minCenterY = safeTop + 12.0f + buttonHeight * 0.5f;
+        CGFloat maxCenterY = CGRectGetHeight(self.bounds) - safeBottom - 20.0f - buttonHeight * 0.5f;
+
+        CGFloat centerX = 0.0f;
+        CGFloat centerY = 0.0f;
+        NSNumber *storedX = descriptor[@"xRatio"];
+        NSNumber *storedY = descriptor[@"yRatio"];
+        if (storedX != nil && storedY != nil) {
+            centerX = minCenterX + (maxCenterX - minCenterX) * MIN(MAX(storedX.doubleValue, 0.0), 1.0);
+            centerY = minCenterY + (maxCenterY - minCenterY) * MIN(MAX(storedY.doubleValue, 0.0), 1.0);
+        }
+        else {
+            NSInteger row = (NSInteger)idx / columnCount;
+            NSInteger column = (NSInteger)idx % columnCount;
+            CGFloat containerWidth = columnCount * defaultButtonWidth + (columnCount - 1) * horizontalSpacing;
+            CGFloat containerHeight = rowCount * defaultButtonHeight + MAX(rowCount - 1, 0) * verticalSpacing;
+            CGFloat originX = MAX(safeLeft + 12.0f, CGRectGetWidth(self.bounds) - safeRight - 16.0f - containerWidth) + column * (defaultButtonWidth + horizontalSpacing);
+            CGFloat originY = MAX(safeTop + 12.0f, CGRectGetHeight(self.bounds) - safeBottom - 24.0f - containerHeight) + row * (defaultButtonHeight + verticalSpacing);
+            centerX = originX + buttonWidth * 0.5f;
+            centerY = originY + buttonHeight * 0.5f;
+            [self updateVirtualButtonDescriptorAtIndex:idx center:CGPointMake(centerX, centerY) buttonSize:CGSizeMake(buttonWidth, buttonHeight) notify:NO];
+        }
+
+        button.bounds = CGRectMake(0, 0, buttonWidth, buttonHeight);
+        if ([button isKindOfClass:[UIButton class]]) {
+            [self applyAppearanceForVirtualButton:(UIButton *)button descriptor:descriptor ?: @{} size:buttonSize];
+            objc_setAssociatedObject(button, "virtualMouseAction", descriptor[@"mouseAction"], OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+        }
+        else if ([button isKindOfClass:[StreamVirtualDirectionalControl class]]) {
+            StreamVirtualDirectionalControl *directionalControl = (StreamVirtualDirectionalControl *)button;
+            directionalControl.editingEnabled = self->temporaryVirtualButtonsEditingEnabled;
+            directionalControl.selectedForEditing = selectedVirtualButtonIdentifier != nil && [selectedVirtualButtonIdentifier isEqualToString:descriptor[@"id"]];
+            directionalControl.controlOpacity = MIN(MAX([descriptor[@"opacity"] doubleValue], 0.05), 1.0);
+            [directionalControl configureWithDescriptor:descriptor ?: @{}];
+        }
+        button.center = CGPointMake(MIN(MAX(centerX, minCenterX), maxCenterX),
+                                    MIN(MAX(centerY, minCenterY), maxCenterY));
+        button.alpha = temporaryVirtualButtonsEditingEnabled ? 0.98f : 1.0f;
+    }];
+
+    [self bringSubviewToFront:virtualButtonsContainerView];
+}
+
+- (void)virtualShortcutButtonTapped:(UIButton *)sender {
+    if (temporaryVirtualButtonsEditingEnabled) {
+        NSString *identifier = objc_getAssociatedObject(sender, "virtualIdentifier");
+        NSUInteger index = [virtualButtons indexOfObject:sender];
+        NSDictionary *descriptor = index != NSNotFound && index < virtualButtonDescriptors.count ? virtualButtonDescriptors[index] : nil;
+        [self selectVirtualButtonWithIdentifier:identifier descriptor:descriptor];
+        return;
+    }
+
+    NSString *mouseAction = objc_getAssociatedObject(sender, "virtualMouseAction");
+    if ([mouseAction isKindOfClass:[NSString class]] && [self isLockingMouseAction:mouseAction]) {
+        int mouseButton = [self virtualMouseButtonValueForAction:mouseAction];
+        if (mouseButton == 0) {
+            return;
+        }
+
+        if ([lockedMouseActionIdentifiers containsObject:mouseAction]) {
+            LiSendMouseButtonEvent(BUTTON_ACTION_RELEASE, mouseButton);
+            [lockedMouseActionIdentifiers removeObject:mouseAction];
+        }
+        else {
+            LiSendMouseButtonEvent(BUTTON_ACTION_PRESS, mouseButton);
+            [lockedMouseActionIdentifiers addObject:mouseAction];
+        }
+        [self rebuildVirtualButtonsOverlay];
+    }
+}
+
+- (void)virtualMouseButtonPressDown:(UIButton *)sender {
+    if (temporaryVirtualButtonsEditingEnabled) {
+        return;
+    }
+
+    NSString *mouseAction = objc_getAssociatedObject(sender, "virtualMouseAction");
+    if ([mouseAction isKindOfClass:[NSString class]] && mouseAction.length > 0) {
+        if ([self isLockingMouseAction:mouseAction]) {
+            return;
+        }
+        if ([mouseAction isEqualToString:@"mouse_scroll_up"] || [mouseAction isEqualToString:@"mouse_scroll_down"]) {
+            NSTimer *existingTimer = objc_getAssociatedObject(sender, "virtualScrollTimer");
+            if (existingTimer != nil) {
+                return;
+            }
+
+            LiSendScrollEvent([mouseAction isEqualToString:@"mouse_scroll_up"] ? 1 : -1);
+            NSTimer *scrollTimer = [NSTimer scheduledTimerWithTimeInterval:0.10
+                                                                    target:self
+                                                                  selector:@selector(virtualScrollTimerFired:)
+                                                                  userInfo:@{
+                                                                    @"mouseAction": mouseAction,
+                                                                    @"button": sender
+                                                                  }
+                                                                   repeats:YES];
+            objc_setAssociatedObject(sender, "virtualScrollTimer", scrollTimer, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+            return;
+        }
+
+        NSNumber *isPressedNumber = objc_getAssociatedObject(sender, "virtualMousePressed");
+        if (isPressedNumber.boolValue) {
+            return;
+        }
+
+        int mouseButton = [self virtualMouseButtonValueForAction:mouseAction];
+
+        if (mouseButton == 0) {
+            return;
+        }
+
+        objc_setAssociatedObject(sender, "virtualMousePressed", @(YES), OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+        LiSendMouseButtonEvent(BUTTON_ACTION_PRESS, mouseButton);
+        return;
+    }
+
+    NSNumber *isPressedNumber = objc_getAssociatedObject(sender, "virtualKeyboardPressed");
+    if (isPressedNumber.boolValue) {
+        return;
+    }
+
+    NSArray<NSNumber *> *primaryKeyCodes = objc_getAssociatedObject(sender, "virtualPrimaryKeyCodes");
+    if (![primaryKeyCodes isKindOfClass:[NSArray class]] || primaryKeyCodes.count == 0) {
+        return;
+    }
+
+    for (NSNumber *keyCode in primaryKeyCodes) {
+        LiSendKeyboardEvent((short)[keyCode integerValue], KEY_ACTION_DOWN, 0);
+    }
+    objc_setAssociatedObject(sender, "virtualKeyboardPressed", @(YES), OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+}
+
+- (void)virtualMouseButtonPressRelease:(UIButton *)sender {
+    NSString *mouseAction = objc_getAssociatedObject(sender, "virtualMouseAction");
+    if ([mouseAction isKindOfClass:[NSString class]] && mouseAction.length > 0) {
+        if ([self isLockingMouseAction:mouseAction]) {
+            return;
+        }
+        if ([mouseAction isEqualToString:@"mouse_scroll_up"] || [mouseAction isEqualToString:@"mouse_scroll_down"]) {
+            NSTimer *scrollTimer = objc_getAssociatedObject(sender, "virtualScrollTimer");
+            [scrollTimer invalidate];
+            objc_setAssociatedObject(sender, "virtualScrollTimer", nil, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+            return;
+        }
+
+        NSNumber *isPressedNumber = objc_getAssociatedObject(sender, "virtualMousePressed");
+        if (!isPressedNumber.boolValue) {
+            return;
+        }
+
+        int mouseButton = [self virtualMouseButtonValueForAction:mouseAction];
+
+        if (mouseButton != 0) {
+            LiSendMouseButtonEvent(BUTTON_ACTION_RELEASE, mouseButton);
+        }
+        objc_setAssociatedObject(sender, "virtualMousePressed", @(NO), OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+        return;
+    }
+
+    NSNumber *isPressedNumber = objc_getAssociatedObject(sender, "virtualKeyboardPressed");
+    if (!isPressedNumber.boolValue) {
+        return;
+    }
+
+    NSArray<NSNumber *> *primaryKeyCodes = objc_getAssociatedObject(sender, "virtualPrimaryKeyCodes");
+    for (NSNumber *keyCode in [primaryKeyCodes reverseObjectEnumerator]) {
+        LiSendKeyboardEvent((short)[keyCode integerValue], KEY_ACTION_UP, 0);
+    }
+    objc_setAssociatedObject(sender, "virtualKeyboardPressed", @(NO), OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+}
+
+- (void)virtualScrollTimerFired:(NSTimer *)timer {
+    NSDictionary *userInfo = timer.userInfo;
+    NSString *mouseAction = userInfo[@"mouseAction"];
+    UIButton *button = userInfo[@"button"];
+    if (![button isKindOfClass:[UIButton class]]) {
+        [timer invalidate];
+        return;
+    }
+
+    if (![mouseAction isKindOfClass:[NSString class]] || mouseAction.length == 0) {
+        [timer invalidate];
+        objc_setAssociatedObject(button, "virtualScrollTimer", nil, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+        return;
+    }
+
+    LiSendScrollEvent([mouseAction isEqualToString:@"mouse_scroll_up"] ? 1 : -1);
+}
+
+- (void)handleVirtualButtonPan:(UIPanGestureRecognizer *)gestureRecognizer {
+#if !TARGET_OS_TV
+    if (!temporaryVirtualButtonsEditingEnabled) {
+        return;
+    }
+
+    UIView *button = gestureRecognizer.view;
+    if (![button isKindOfClass:[UIView class]]) {
+        return;
+    }
+
+    CGPoint translation = [gestureRecognizer translationInView:virtualButtonsContainerView];
+    if (gestureRecognizer.state == UIGestureRecognizerStateChanged || gestureRecognizer.state == UIGestureRecognizerStateEnded) {
+        CGFloat buttonWidth = CGRectGetWidth(button.bounds);
+        CGFloat buttonHeight = CGRectGetHeight(button.bounds);
+        CGFloat safeTop = 0.0f;
+        CGFloat safeBottom = 0.0f;
+        CGFloat safeLeft = 0.0f;
+        CGFloat safeRight = 0.0f;
+        if (@available(iOS 11.0, *)) {
+            safeTop = self.safeAreaInsets.top;
+            safeBottom = self.safeAreaInsets.bottom;
+            safeLeft = self.safeAreaInsets.left;
+            safeRight = self.safeAreaInsets.right;
+        }
+
+        CGFloat minCenterX = safeLeft + 12.0f + buttonWidth * 0.5f;
+        CGFloat maxCenterX = CGRectGetWidth(self.bounds) - safeRight - 12.0f - buttonWidth * 0.5f;
+        CGFloat minCenterY = safeTop + 12.0f + buttonHeight * 0.5f;
+        CGFloat maxCenterY = CGRectGetHeight(self.bounds) - safeBottom - 20.0f - buttonHeight * 0.5f;
+
+        CGPoint center = CGPointMake(button.center.x + translation.x, button.center.y + translation.y);
+        center.x = MIN(MAX(center.x, minCenterX), maxCenterX);
+        center.y = MIN(MAX(center.y, minCenterY), maxCenterY);
+        button.center = center;
+        [gestureRecognizer setTranslation:CGPointZero inView:virtualButtonsContainerView];
+
+        NSUInteger index = [virtualButtons indexOfObject:button];
+        if (index != NSNotFound) {
+            [self updateVirtualButtonDescriptorAtIndex:index center:center buttonSize:CGSizeMake(buttonWidth, buttonHeight) notify:(gestureRecognizer.state == UIGestureRecognizerStateEnded)];
+        }
+    }
+#endif
+}
+
+- (void)updateVirtualButtonDescriptorAtIndex:(NSUInteger)index center:(CGPoint)center buttonSize:(CGSize)buttonSize notify:(BOOL)notify {
+    if (index >= virtualButtonDescriptors.count) {
+        return;
+    }
+
+    CGFloat safeTop = 0.0f;
+    CGFloat safeBottom = 0.0f;
+    CGFloat safeLeft = 0.0f;
+    CGFloat safeRight = 0.0f;
+    if (@available(iOS 11.0, *)) {
+        safeTop = self.safeAreaInsets.top;
+        safeBottom = self.safeAreaInsets.bottom;
+        safeLeft = self.safeAreaInsets.left;
+        safeRight = self.safeAreaInsets.right;
+    }
+
+    CGFloat minCenterX = safeLeft + 12.0f + buttonSize.width * 0.5f;
+    CGFloat maxCenterX = CGRectGetWidth(self.bounds) - safeRight - 12.0f - buttonSize.width * 0.5f;
+    CGFloat minCenterY = safeTop + 12.0f + buttonSize.height * 0.5f;
+    CGFloat maxCenterY = CGRectGetHeight(self.bounds) - safeBottom - 20.0f - buttonSize.height * 0.5f;
+    CGFloat widthRange = MAX(maxCenterX - minCenterX, 1.0f);
+    CGFloat heightRange = MAX(maxCenterY - minCenterY, 1.0f);
+    CGFloat xRatio = MIN(MAX((center.x - minCenterX) / widthRange, 0.0f), 1.0f);
+    CGFloat yRatio = MIN(MAX((center.y - minCenterY) / heightRange, 0.0f), 1.0f);
+
+    NSMutableArray *updatedDescriptors = [virtualButtonDescriptors mutableCopy];
+    NSMutableDictionary *updatedDescriptor = [virtualButtonDescriptors[index] mutableCopy];
+    updatedDescriptor[@"xRatio"] = @(xRatio);
+    updatedDescriptor[@"yRatio"] = @(yRatio);
+    updatedDescriptors[index] = updatedDescriptor;
+    virtualButtonDescriptors = [updatedDescriptors copy];
+
+    if (notify) {
+        [[NSNotificationCenter defaultCenter] postNotificationName:StreamViewVirtualButtonsDidChangeNotification object:self userInfo:@{ @"descriptors": virtualButtonDescriptors ?: @[] }];
+    }
+}
+
+- (void)setTemporaryVirtualButtonsVisible:(BOOL)visible {
+#if !TARGET_OS_TV
+    [self ensureVirtualButtonsOverlayIfNeeded];
+    temporaryVirtualButtonsVisible = visible;
+    if (!visible) {
+        [self releaseLockedMouseActionsNotPresentInDescriptors:nil];
+        for (UIView *button in virtualButtons) {
+            if ([button isKindOfClass:[StreamVirtualDirectionalControl class]]) {
+                [(StreamVirtualDirectionalControl *)button resetInteractionState];
+            }
+        }
+    }
+    virtualButtonsContainerView.hidden = !visible || virtualButtons.count == 0;
+    if (visible && virtualButtons.count > 0) {
+        [self layoutVirtualButtonsOverlay];
+        [self bringSubviewToFront:virtualButtonsContainerView];
+    }
+#endif
+}
+
+- (void)setTemporaryVirtualButtonDescriptors:(NSArray<NSDictionary<NSString *,id> *> *)descriptors {
+#if !TARGET_OS_TV
+    virtualButtonDescriptors = [descriptors copy] ?: @[];
+    [self releaseLockedMouseActionsNotPresentInDescriptors:virtualButtonDescriptors];
+    if (virtualButtonsContainerView != nil) {
+        [self rebuildVirtualButtonsOverlay];
+    }
+#endif
+}
+
+- (BOOL)isTemporaryVirtualButtonsVisible {
+    return temporaryVirtualButtonsVisible;
+}
+
+- (void)setTemporaryVirtualButtonsEditingEnabled:(BOOL)enabled {
+#if !TARGET_OS_TV
+    temporaryVirtualButtonsEditingEnabled = enabled;
+    [self ensureVirtualButtonsOverlayIfNeeded];
+    if (enabled) {
+        temporaryVirtualButtonsVisible = YES;
+    }
+    else {
+        selectedVirtualButtonIdentifier = nil;
+        [[NSNotificationCenter defaultCenter] postNotificationName:StreamViewVirtualButtonSelectionDidChangeNotification
+                                                            object:self
+                                                          userInfo:@{
+                                                            @"identifier": @"",
+                                                            @"descriptor": @{}
+                                                          }];
+    }
+    [self rebuildVirtualButtonsOverlay];
+#endif
+}
+
+- (BOOL)isTemporaryVirtualButtonsEditingEnabled {
+    return temporaryVirtualButtonsEditingEnabled;
+}
+
+- (NSArray<NSDictionary<NSString *,id> *> *)currentTemporaryVirtualButtonDescriptors {
+    return [virtualButtonDescriptors copy] ?: @[];
 }
 
 - (void)setTemporaryVirtualGamepadVisible:(BOOL)visible {

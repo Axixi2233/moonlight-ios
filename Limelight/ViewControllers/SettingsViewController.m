@@ -324,6 +324,7 @@ BOOL isCustomResolution(CGSize res) {
     snapshot.performanceOverlayPositionSelection = currentSettings.performanceOverlayPositionSelection;
     snapshot.performanceOverlayMargin = (NSInteger)currentSettings.performanceOverlayMargin;
     snapshot.floatingMenuEnabled = currentSettings.floatingMenuEnabled;
+    snapshot.virtualButtonSchemeSelection = currentSettings.virtualButtonSchemeSelection;
 
     return snapshot;
 }
@@ -380,7 +381,8 @@ BOOL isCustomResolution(CGSize res) {
                 videoAlignmentMargin:snapshot.videoAlignmentMargin
 performanceOverlayPositionSelection:snapshot.performanceOverlayPositionSelection
          performanceOverlayMargin:snapshot.performanceOverlayMargin
-               floatingMenuEnabled:snapshot.floatingMenuEnabled];
+               floatingMenuEnabled:snapshot.floatingMenuEnabled
+       virtualButtonSchemeSelection:snapshot.virtualButtonSchemeSelection];
 }
 
 - (void)presentLayoutOnScreenControlsIfNeeded {

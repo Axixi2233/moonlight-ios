@@ -50,6 +50,7 @@ final class SettingsFormSnapshot: NSObject {
     var performanceOverlayPositionSelection: Int = 0
     var performanceOverlayMargin: Int = 6
     var floatingMenuEnabled: Bool = false
+    var virtualButtonSchemeSelection: Int = 0
 }
 
 @objc protocol SettingsHostingViewControllerDelegate: NSObjectProtocol {
@@ -107,6 +108,7 @@ private final class SettingsFormViewModel: ObservableObject {
     @Published var performanceOverlayPositionSelection: Int = 0
     @Published var performanceOverlayMargin: Double = 6
     @Published var floatingMenuEnabled: Bool = false
+    @Published var virtualButtonSchemeSelection: Int = 0
 
     func apply(snapshot: SettingsFormSnapshot) {
         bitrateValues = snapshot.bitrateValues.map { $0.intValue }
@@ -155,6 +157,7 @@ private final class SettingsFormViewModel: ObservableObject {
         performanceOverlayPositionSelection = snapshot.performanceOverlayPositionSelection
         performanceOverlayMargin = Double(snapshot.performanceOverlayMargin)
         floatingMenuEnabled = snapshot.floatingMenuEnabled
+        virtualButtonSchemeSelection = snapshot.virtualButtonSchemeSelection
     }
 
     func currentSnapshot() -> SettingsFormSnapshot {
@@ -199,6 +202,7 @@ private final class SettingsFormViewModel: ObservableObject {
         snapshot.performanceOverlayPositionSelection = performanceOverlayPositionSelection
         snapshot.performanceOverlayMargin = Int(performanceOverlayMargin.rounded())
         snapshot.floatingMenuEnabled = floatingMenuEnabled
+        snapshot.virtualButtonSchemeSelection = virtualButtonSchemeSelection
         return snapshot
     }
 
@@ -522,6 +526,14 @@ private struct SettingsRootView: View {
                     Toggle("性能信息", isOn: $model.statsOverlay).font(.headline)
                     Toggle("悬浮球", isOn: $model.floatingMenuEnabled).font(.headline)
                     choiceSection(
+                        title: "虚拟按钮方案",
+                        subtitle: model.virtualButtonSchemeTitle,
+                        options: Array(model.virtualButtonSchemeTitles.enumerated()),
+                        selectedIndex: model.virtualButtonSchemeSelection
+                    ) { index in
+                        model.virtualButtonSchemeSelection = index
+                    } isDisabled: { _ in false }
+                    choiceSection(
                         title: "性能信息位置",
                         subtitle: model.performanceOverlayPositionTitle,
                         options: Array(model.performanceOverlayPositionTitles.enumerated()),
@@ -715,6 +727,17 @@ private extension SettingsFormViewModel {
             return "顶部居中"
         }
         return performanceOverlayPositionTitles[performanceOverlayPositionSelection]
+    }
+
+    var virtualButtonSchemeTitles: [String] {
+        ["方案 1", "方案 2", "方案 3", "方案 4", "方案 5"]
+    }
+
+    var virtualButtonSchemeTitle: String {
+        guard virtualButtonSchemeTitles.indices.contains(virtualButtonSchemeSelection) else {
+            return "方案 1"
+        }
+        return virtualButtonSchemeTitles[virtualButtonSchemeSelection]
     }
 }
 

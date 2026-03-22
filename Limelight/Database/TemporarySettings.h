@@ -13,6 +13,7 @@ FOUNDATION_EXTERN NSString * const StreamPreferenceVideoAlignmentMarginKey;
 FOUNDATION_EXTERN NSString * const StreamPreferencePerformanceOverlayPositionSelectionKey;
 FOUNDATION_EXTERN NSString * const StreamPreferencePerformanceOverlayMarginKey;
 FOUNDATION_EXTERN NSString * const StreamPreferenceFloatingMenuEnabledKey;
+FOUNDATION_EXTERN NSString * const StreamPreferenceVirtualButtonSchemeSelectionKey;
 
 @interface TemporarySettings : NSObject
 
@@ -53,6 +54,7 @@ FOUNDATION_EXTERN NSString * const StreamPreferenceFloatingMenuEnabledKey;
 @property (nonatomic) NSInteger performanceOverlayPositionSelection;
 @property (nonatomic) CGFloat performanceOverlayMargin;
 @property (nonatomic) BOOL floatingMenuEnabled;
+@property (nonatomic) NSInteger virtualButtonSchemeSelection;
 
 - (id) initFromSettings:(Settings*)settings;
 

@@ -14,6 +14,7 @@ NSString * const StreamPreferenceVideoAlignmentMarginKey = @"StreamPreferenceVid
 NSString * const StreamPreferencePerformanceOverlayPositionSelectionKey = @"StreamPreferencePerformanceOverlayPositionSelection";
 NSString * const StreamPreferencePerformanceOverlayMarginKey = @"StreamPreferencePerformanceOverlayMargin";
 NSString * const StreamPreferenceFloatingMenuEnabledKey = @"StreamPreferenceFloatingMenuEnabled";
+NSString * const StreamPreferenceVirtualButtonSchemeSelectionKey = @"StreamPreferenceVirtualButtonSchemeSelection";
 
 @implementation TemporarySettings
 
@@ -27,7 +28,8 @@ NSString * const StreamPreferenceFloatingMenuEnabledKey = @"StreamPreferenceFloa
         StreamPreferenceVideoAlignmentMarginKey: @(0.0),
         StreamPreferencePerformanceOverlayPositionSelectionKey: @(0),
         StreamPreferencePerformanceOverlayMarginKey: @(6.0),
-        StreamPreferenceFloatingMenuEnabledKey: @(NO)
+        StreamPreferenceFloatingMenuEnabledKey: @(NO),
+        StreamPreferenceVirtualButtonSchemeSelectionKey: @(0)
     };
     [[NSUserDefaults standardUserDefaults] registerDefaults:streamPreferenceDefaults];
     
@@ -115,6 +117,7 @@ NSString * const StreamPreferenceFloatingMenuEnabledKey = @"StreamPreferenceFloa
     self.performanceOverlayPositionSelection = [[NSUserDefaults standardUserDefaults] integerForKey:StreamPreferencePerformanceOverlayPositionSelectionKey];
     self.performanceOverlayMargin = (CGFloat)[[NSUserDefaults standardUserDefaults] doubleForKey:StreamPreferencePerformanceOverlayMarginKey];
     self.floatingMenuEnabled = [[NSUserDefaults standardUserDefaults] boolForKey:StreamPreferenceFloatingMenuEnabledKey];
+    self.virtualButtonSchemeSelection = [[NSUserDefaults standardUserDefaults] integerForKey:StreamPreferenceVirtualButtonSchemeSelectionKey];
     
     return self;
 }

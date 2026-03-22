@@ -33,7 +33,7 @@
 - (id)initWithRefreshRate:(float)arg1 videoDynamicRange:(int)arg2;
 @end
 
-@interface StreamFrameViewController () <StreamActionSheetHostingViewControllerDelegate, StreamShortcutPanelHostingViewControllerDelegate, StreamVirtualKeyboardPanelHostingViewControllerDelegate, UIGestureRecognizerDelegate>
+@interface StreamFrameViewController () <StreamActionSheetHostingViewControllerDelegate, StreamShortcutPanelHostingViewControllerDelegate, StreamVirtualKeyboardPanelHostingViewControllerDelegate, StreamVirtualButtonsPanelHostingViewControllerDelegate, UIGestureRecognizerDelegate>
 @end
 
 static const CGFloat kStreamFloatingMenuPhoneButtonSize = 44.0f;
@@ -63,6 +63,7 @@ static const CGFloat kStreamFloatingMenuExpandedAlpha = 0.96f;
     StreamActionSheetHostingViewController *_streamActionSheetHostingViewController;
     StreamShortcutPanelHostingViewController *_streamShortcutPanelHostingViewController;
     StreamVirtualKeyboardPanelHostingViewController *_streamVirtualKeyboardPanelHostingViewController;
+    StreamVirtualButtonsPanelHostingViewController *_streamVirtualButtonsPanelHostingViewController;
     NSInteger _currentSessionTouchModeSelection;
     NSInteger _currentSessionVideoAlignmentSelection;
     CGFloat _currentSessionVideoAlignmentMargin;
@@ -85,6 +86,23 @@ static const CGFloat kStreamFloatingMenuExpandedAlpha = 0.96f;
     CGPoint _floatingMenuPanStartCenter;
     CGPoint _floatingMenuTouchOffset;
     BOOL _floatingMenuDragMoved;
+    NSMutableArray<NSDictionary *> *_virtualButtonDefinitions;
+    UIView *_virtualButtonEditorView;
+    UILabel *_virtualButtonEditorTitleLabel;
+    UISegmentedControl *_virtualButtonEditorShapeControl;
+    UILabel *_virtualButtonEditorScaleValueLabel;
+    UISlider *_virtualButtonEditorScaleSlider;
+    UILabel *_virtualButtonEditorWidthValueLabel;
+    UISlider *_virtualButtonEditorWidthSlider;
+    UILabel *_virtualButtonEditorHeightValueLabel;
+    UISlider *_virtualButtonEditorHeightSlider;
+    UIButton *_virtualButtonEditorCloseButton;
+    UIButton *_virtualButtonEditorDeleteButton;
+    UIButton *_virtualButtonEditorSaveButton;
+    NSString *_selectedVirtualButtonIdentifier;
+    CGFloat _currentSessionVirtualButtonOpacity;
+    NSInteger _currentSessionVirtualButtonSchemeSelection;
+    BOOL _currentSessionVirtualButtonLayoutPortrait;
     
 #if !TARGET_OS_TV
     UIScreenEdgePanGestureRecognizer *_exitSwipeRecognizer;
@@ -318,6 +336,7 @@ static const CGFloat kStreamFloatingMenuExpandedAlpha = 0.96f;
                                    tipTopInset + CGRectGetHeight(_tipLabel.bounds) * 0.5);
 
     [self layoutOverlayViewForCurrentBounds];
+    [self layoutVirtualButtonEditorForCurrentBounds];
     [self layoutFloatingMenuButtonForCurrentBounds];
 }
 
@@ -639,6 +658,9 @@ static const CGFloat kStreamFloatingMenuExpandedAlpha = 0.96f;
     self.previousBytes = 0;  // 初始化上次字节数为 0
     
     _settings = [[[DataManager alloc] init] getSettings];
+    _currentSessionVirtualButtonSchemeSelection = _settings.virtualButtonSchemeSelection;
+    _currentSessionVirtualButtonLayoutPortrait = [self isVirtualButtonLayoutPortraitForSize:self.view.bounds.size];
+    [self loadVirtualButtonDefinitionsFromCurrentScheme];
     _currentSessionTouchModeSelection = !_settings.absoluteTouchMode ? 0 : (_settings.multiTouchScreen ? 2 : 1);
     _currentSessionVideoAlignmentSelection = MAX(0, MIN(_settings.videoAlignmentSelection, 2));
     _currentSessionVideoAlignmentMargin = MAX(0.0f, MIN(_settings.videoAlignmentMargin, 150.0f));
@@ -680,6 +702,7 @@ static const CGFloat kStreamFloatingMenuExpandedAlpha = 0.96f;
     [_streamView setupStreamView:_controllerSupport interactionDelegate:self config:self.streamConfig];
     [_streamView setVideoAlignmentMode:_currentSessionVideoAlignmentSelection];
     [_streamView setVideoAlignmentMargin:_currentSessionVideoAlignmentMargin];
+    [self applyVirtualButtonDefinitionsToStreamView];
     
 #if TARGET_OS_TV
     if (!_menuTapGestureRecognizer || !_menuDoubleTapGestureRecognizer || !_playPauseTapGestureRecognizer) {
@@ -755,6 +778,15 @@ static const CGFloat kStreamFloatingMenuExpandedAlpha = 0.96f;
                                              selector: @selector(applicationDidEnterBackground:)
                                                  name: UIApplicationDidEnterBackgroundNotification
                                                object: nil];
+
+    [[NSNotificationCenter defaultCenter] addObserver:self
+                                             selector:@selector(streamVirtualButtonsDidChange:)
+                                                 name:StreamViewVirtualButtonsDidChangeNotification
+                                               object:_streamView];
+    [[NSNotificationCenter defaultCenter] addObserver:self
+                                             selector:@selector(handleVirtualButtonSelectionDidChange:)
+                                                 name:StreamViewVirtualButtonSelectionDidChangeNotification
+                                               object:_streamView];
     
 #if 0
     // FIXME: This doesn't work reliably on iPad for some reason. Showing and hiding the keyboard
@@ -796,6 +828,7 @@ static const CGFloat kStreamFloatingMenuExpandedAlpha = 0.96f;
     [self.view addSubview:_stageLabel];
     [self.view addSubview:_spinner];
     [self.view addSubview:_tipLabel];
+    [self installVirtualButtonEditorIfNeeded];
     if (_settings.floatingMenuEnabled) {
         [self installFloatingMenuButtonIfNeeded];
     }
@@ -960,6 +993,31 @@ static const CGFloat kStreamFloatingMenuExpandedAlpha = 0.96f;
     [self layoutStreamingSubviewsForCurrentBounds];
 }
 
+- (void)viewWillTransitionToSize:(CGSize)size withTransitionCoordinator:(id<UIViewControllerTransitionCoordinator>)coordinator {
+    [super viewWillTransitionToSize:size withTransitionCoordinator:coordinator];
+
+    BOOL nextPortrait = [self isVirtualButtonLayoutPortraitForSize:size];
+    BOOL orientationChanged = nextPortrait != _currentSessionVirtualButtonLayoutPortrait;
+
+    if (orientationChanged) {
+        [self persistCurrentVirtualButtonScheme];
+    }
+
+    [coordinator animateAlongsideTransition:^(id<UIViewControllerTransitionCoordinatorContext> context) {
+        (void)context;
+        [self layoutStreamingSubviewsForCurrentBounds];
+    } completion:^(id<UIViewControllerTransitionCoordinatorContext> context) {
+        (void)context;
+        if (orientationChanged) {
+            [self switchVirtualButtonLayoutToPortrait:nextPortrait preserveCurrentLayoutAsFallback:YES];
+            [self applyVirtualButtonDefinitionsToStreamView];
+            [self refreshVirtualButtonsPanelIfNeeded];
+            [self refreshVirtualButtonEditorForCurrentSelection];
+        }
+        [self layoutStreamingSubviewsForCurrentBounds];
+    }];
+}
+
 - (void) returnToMainFrame {
     // Reset display mode back to default
     [self updatePreferredDisplayMode:NO];
@@ -1065,6 +1123,20 @@ static const CGFloat kStreamFloatingMenuExpandedAlpha = 0.96f;
         virtualGamepadItem.subtitle = @"临时显示或隐藏屏幕虚拟手柄";
         virtualGamepadItem.symbolName = @"gamecontroller";
         [items addObject:virtualGamepadItem];
+
+        StreamActionSheetItem *virtualButtonsItem = [[StreamActionSheetItem alloc] init];
+        virtualButtonsItem.identifier = @"virtual_buttons";
+        virtualButtonsItem.title = @"虚拟按键";
+        virtualButtonsItem.subtitle = @"显示或隐藏测试虚拟按键";
+        virtualButtonsItem.symbolName = @"square.grid.2x2";
+        [items addObject:virtualButtonsItem];
+
+        StreamActionSheetItem *manageVirtualButtonsItem = [[StreamActionSheetItem alloc] init];
+        manageVirtualButtonsItem.identifier = @"manage_virtual_buttons";
+        manageVirtualButtonsItem.title = @"编辑虚拟按键";
+        manageVirtualButtonsItem.subtitle = @"添加或删除当前串流会话的虚拟按键";
+        manageVirtualButtonsItem.symbolName = @"square.and.pencil";
+        [items addObject:manageVirtualButtonsItem];
 
         StreamActionSheetItem *shortcutItem = [[StreamActionSheetItem alloc] init];
         shortcutItem.identifier = @"shortcuts";
@@ -1227,6 +1299,9 @@ static const CGFloat kStreamFloatingMenuExpandedAlpha = 0.96f;
     if (_overlayView != nil && _overlayView.superview == self.view) {
         [self.view bringSubviewToFront:_overlayView];
     }
+    if (_virtualButtonEditorView != nil && _virtualButtonEditorView.superview == self.view) {
+        [self.view bringSubviewToFront:_virtualButtonEditorView];
+    }
 
     [self layoutStreamingSubviewsForCurrentBounds];
 }
@@ -1358,6 +1433,439 @@ static const CGFloat kStreamFloatingMenuExpandedAlpha = 0.96f;
 
 - (void)toggleViewOnlyMode {
     [self setViewOnlyModeEnabled:!_viewOnlyModeEnabled];
+}
+
+- (NSArray<NSDictionary *> *)defaultVirtualButtonDefinitions {
+    return @[
+        @{@"id": @"virtual_button_escape", @"title": @"ESC", @"subtitle": @"ESC", @"primary": @[@0x1B], @"secondary": @[], @"shape": @"roundedRect", @"scale": @1.0, @"widthScale": @1.0, @"heightScale": @1.0},
+        @{@"id": @"virtual_button_tab", @"title": @"Tab", @"subtitle": @"Tab", @"primary": @[@0x09], @"secondary": @[], @"shape": @"roundedRect", @"scale": @1.0, @"widthScale": @1.0, @"heightScale": @1.0},
+        @{@"id": @"virtual_button_enter", @"title": @"Enter", @"subtitle": @"Enter", @"primary": @[@0x0D], @"secondary": @[], @"shape": @"roundedRect", @"scale": @1.0, @"widthScale": @1.0, @"heightScale": @1.0},
+        @{@"id": @"virtual_button_win", @"title": @"Win", @"subtitle": @"Win", @"primary": @[@0x5B], @"secondary": @[], @"shape": @"roundedRect", @"scale": @1.0, @"widthScale": @1.0, @"heightScale": @1.0},
+        @{@"id": @"virtual_button_alt_tab", @"title": @"Alt+Tab", @"subtitle": @"Alt + Tab", @"primary": @[@0x12, @0x09], @"secondary": @[], @"shape": @"roundedRect", @"scale": @1.0, @"widthScale": @1.0, @"heightScale": @1.0},
+        @{@"id": @"virtual_button_ctrl_shift_esc", @"title": @"任务管理器", @"subtitle": @"Ctrl + Shift + ESC", @"primary": @[@0x11, @0x10, @0x1B], @"secondary": @[], @"shape": @"roundedRect", @"scale": @1.0, @"widthScale": @1.0, @"heightScale": @1.0}
+    ];
+}
+
+- (NSInteger)currentVirtualButtonSchemeSelection {
+    return MAX(0, MIN(_currentSessionVirtualButtonSchemeSelection, 4));
+}
+
+- (BOOL)isVirtualButtonLayoutPortraitForSize:(CGSize)size {
+    if (size.width <= 0.0f || size.height <= 0.0f) {
+        CGSize fallbackSize = UIScreen.mainScreen.bounds.size;
+        return fallbackSize.height >= fallbackSize.width;
+    }
+
+    return size.height >= size.width;
+}
+
+- (void)switchVirtualButtonLayoutToPortrait:(BOOL)portrait preserveCurrentLayoutAsFallback:(BOOL)preserveCurrentLayoutAsFallback {
+    NSArray<NSDictionary *> *fallbackDefinitions = preserveCurrentLayoutAsFallback ? [[self virtualButtonDefinitions] copy] : nil;
+    CGFloat fallbackOpacity = [self currentVirtualButtonOpacity];
+    DataManager *dataManager = [[DataManager alloc] init];
+    NSInteger schemeSelection = [self currentVirtualButtonSchemeSelection];
+    NSArray<NSDictionary *> *savedDefinitions = [dataManager virtualButtonDefinitionsForSchemeSelection:schemeSelection
+                                                                                              portrait:portrait];
+
+    _currentSessionVirtualButtonLayoutPortrait = portrait;
+    if (savedDefinitions != nil) {
+        _virtualButtonDefinitions = [savedDefinitions mutableCopy];
+    }
+    else if (fallbackDefinitions.count > 0) {
+        _virtualButtonDefinitions = [fallbackDefinitions mutableCopy];
+    }
+    else {
+        _virtualButtonDefinitions = [[self defaultVirtualButtonDefinitions] mutableCopy];
+    }
+
+    _currentSessionVirtualButtonOpacity = [dataManager virtualButtonOpacityForSchemeSelection:schemeSelection];
+    if (_currentSessionVirtualButtonOpacity <= 0.0f) {
+        _currentSessionVirtualButtonOpacity = fallbackOpacity;
+    }
+}
+
+- (void)persistCurrentVirtualButtonScheme {
+    DataManager *dataManager = [[DataManager alloc] init];
+    [dataManager saveVirtualButtonDefinitions:[self virtualButtonDefinitions]
+                                     opacity:[self currentVirtualButtonOpacity]
+                          forSchemeSelection:[self currentVirtualButtonSchemeSelection]
+                                    portrait:_currentSessionVirtualButtonLayoutPortrait];
+}
+
+- (void)loadVirtualButtonDefinitionsFromCurrentScheme {
+    [self switchVirtualButtonLayoutToPortrait:_currentSessionVirtualButtonLayoutPortrait preserveCurrentLayoutAsFallback:NO];
+}
+
+- (NSMutableArray<NSDictionary *> *)virtualButtonDefinitions {
+    if (_virtualButtonDefinitions == nil) {
+        [self loadVirtualButtonDefinitionsFromCurrentScheme];
+    }
+
+    return _virtualButtonDefinitions;
+}
+
+- (NSArray<StreamVirtualButtonPanelItem *> *)virtualButtonPanelItems {
+    NSArray<NSDictionary *> *definitions = [self virtualButtonDefinitions];
+    NSMutableArray<StreamVirtualButtonPanelItem *> *items = [NSMutableArray arrayWithCapacity:definitions.count];
+    for (NSDictionary *definition in definitions) {
+        StreamVirtualButtonPanelItem *item = [[StreamVirtualButtonPanelItem alloc] init];
+        item.identifier = definition[@"id"] ?: @"";
+        item.title = definition[@"title"] ?: @"";
+        item.subtitle = definition[@"subtitle"] ?: @"";
+        item.shape = definition[@"shape"] ?: @"roundedRect";
+        item.scale = definition[@"scale"] ?: @1.0;
+        item.widthScale = definition[@"widthScale"] ?: @1.0;
+        item.heightScale = definition[@"heightScale"] ?: @1.0;
+        [items addObject:item];
+    }
+    return items;
+}
+
+- (CGFloat)currentVirtualButtonOpacity {
+    if (_currentSessionVirtualButtonOpacity <= 0.0f) {
+        _currentSessionVirtualButtonOpacity = 0.52f;
+    }
+    return _currentSessionVirtualButtonOpacity;
+}
+
+- (void)applyVirtualButtonDefinitionsToStreamView {
+    if (_streamView == nil) {
+        return;
+    }
+
+    CGFloat opacity = [self currentVirtualButtonOpacity];
+    NSMutableArray<NSDictionary *> *descriptors = [NSMutableArray arrayWithCapacity:[self virtualButtonDefinitions].count];
+    for (NSDictionary *definition in [self virtualButtonDefinitions]) {
+        NSMutableDictionary *updatedDefinition = [definition mutableCopy];
+        updatedDefinition[@"opacity"] = @(opacity);
+        [descriptors addObject:updatedDefinition];
+    }
+
+    [_streamView setTemporaryVirtualButtonDescriptors:descriptors];
+}
+
+- (NSDictionary *)selectedVirtualButtonDefinition {
+    if (_selectedVirtualButtonIdentifier.length == 0) {
+        return nil;
+    }
+
+    NSUInteger index = [[self virtualButtonDefinitions] indexOfObjectPassingTest:^BOOL(NSDictionary *definition, NSUInteger idx, BOOL *stop) {
+        return [definition[@"id"] isEqualToString:self->_selectedVirtualButtonIdentifier];
+    }];
+    if (index == NSNotFound) {
+        return nil;
+    }
+
+    return [[self virtualButtonDefinitions] objectAtIndex:index];
+}
+
+- (void)installVirtualButtonEditorIfNeeded {
+    if (_virtualButtonEditorView != nil) {
+        return;
+    }
+
+    _virtualButtonEditorView = [[UIView alloc] initWithFrame:CGRectZero];
+    _virtualButtonEditorView.backgroundColor = [[UIColor blackColor] colorWithAlphaComponent:0.72];
+    _virtualButtonEditorView.layer.cornerRadius = 18.0f;
+    _virtualButtonEditorView.layer.masksToBounds = YES;
+    _virtualButtonEditorView.layer.borderWidth = 1.0f;
+    _virtualButtonEditorView.layer.borderColor = [[UIColor whiteColor] colorWithAlphaComponent:0.12].CGColor;
+    _virtualButtonEditorView.hidden = YES;
+
+    _virtualButtonEditorTitleLabel = [[UILabel alloc] initWithFrame:CGRectZero];
+    _virtualButtonEditorTitleLabel.textColor = [UIColor whiteColor];
+    _virtualButtonEditorTitleLabel.font = [UIFont systemFontOfSize:15.0f weight:UIFontWeightSemibold];
+    [_virtualButtonEditorView addSubview:_virtualButtonEditorTitleLabel];
+
+    _virtualButtonEditorShapeControl = [[UISegmentedControl alloc] initWithItems:@[@"圆角矩形", @"圆形"]];
+    [_virtualButtonEditorShapeControl addTarget:self action:@selector(handleVirtualButtonEditorShapeChanged:) forControlEvents:UIControlEventValueChanged];
+    [_virtualButtonEditorView addSubview:_virtualButtonEditorShapeControl];
+
+    UILabel *scaleLabel = [[UILabel alloc] initWithFrame:CGRectZero];
+    scaleLabel.tag = 9101;
+    scaleLabel.text = @"尺寸";
+    scaleLabel.textColor = [[UIColor whiteColor] colorWithAlphaComponent:0.74];
+    scaleLabel.font = [UIFont systemFontOfSize:12.0f weight:UIFontWeightMedium];
+    [_virtualButtonEditorView addSubview:scaleLabel];
+
+    _virtualButtonEditorScaleValueLabel = [[UILabel alloc] initWithFrame:CGRectZero];
+    _virtualButtonEditorScaleValueLabel.textColor = [[UIColor whiteColor] colorWithAlphaComponent:0.66];
+    _virtualButtonEditorScaleValueLabel.font = [UIFont systemFontOfSize:11.0f weight:UIFontWeightSemibold];
+    _virtualButtonEditorScaleValueLabel.textAlignment = NSTextAlignmentRight;
+    [_virtualButtonEditorView addSubview:_virtualButtonEditorScaleValueLabel];
+
+    _virtualButtonEditorScaleSlider = [[UISlider alloc] initWithFrame:CGRectZero];
+    _virtualButtonEditorScaleSlider.minimumValue = 0.5f;
+    _virtualButtonEditorScaleSlider.maximumValue = 2.0f;
+    [_virtualButtonEditorScaleSlider addTarget:self action:@selector(handleVirtualButtonEditorScaleChanged:) forControlEvents:UIControlEventValueChanged];
+    [_virtualButtonEditorView addSubview:_virtualButtonEditorScaleSlider];
+
+    UILabel *widthLabel = [[UILabel alloc] initWithFrame:CGRectZero];
+    widthLabel.tag = 9102;
+    widthLabel.text = @"宽度";
+    widthLabel.textColor = [[UIColor whiteColor] colorWithAlphaComponent:0.74];
+    widthLabel.font = [UIFont systemFontOfSize:12.0f weight:UIFontWeightMedium];
+    [_virtualButtonEditorView addSubview:widthLabel];
+
+    _virtualButtonEditorWidthValueLabel = [[UILabel alloc] initWithFrame:CGRectZero];
+    _virtualButtonEditorWidthValueLabel.textColor = [[UIColor whiteColor] colorWithAlphaComponent:0.66];
+    _virtualButtonEditorWidthValueLabel.font = [UIFont systemFontOfSize:11.0f weight:UIFontWeightSemibold];
+    _virtualButtonEditorWidthValueLabel.textAlignment = NSTextAlignmentRight;
+    [_virtualButtonEditorView addSubview:_virtualButtonEditorWidthValueLabel];
+
+    _virtualButtonEditorWidthSlider = [[UISlider alloc] initWithFrame:CGRectZero];
+    _virtualButtonEditorWidthSlider.minimumValue = 0.5f;
+    _virtualButtonEditorWidthSlider.maximumValue = 2.0f;
+    [_virtualButtonEditorWidthSlider addTarget:self action:@selector(handleVirtualButtonEditorWidthChanged:) forControlEvents:UIControlEventValueChanged];
+    [_virtualButtonEditorView addSubview:_virtualButtonEditorWidthSlider];
+
+    UILabel *heightLabel = [[UILabel alloc] initWithFrame:CGRectZero];
+    heightLabel.tag = 9103;
+    heightLabel.text = @"高度";
+    heightLabel.textColor = [[UIColor whiteColor] colorWithAlphaComponent:0.74];
+    heightLabel.font = [UIFont systemFontOfSize:12.0f weight:UIFontWeightMedium];
+    [_virtualButtonEditorView addSubview:heightLabel];
+
+    _virtualButtonEditorHeightValueLabel = [[UILabel alloc] initWithFrame:CGRectZero];
+    _virtualButtonEditorHeightValueLabel.textColor = [[UIColor whiteColor] colorWithAlphaComponent:0.66];
+    _virtualButtonEditorHeightValueLabel.font = [UIFont systemFontOfSize:11.0f weight:UIFontWeightSemibold];
+    _virtualButtonEditorHeightValueLabel.textAlignment = NSTextAlignmentRight;
+    [_virtualButtonEditorView addSubview:_virtualButtonEditorHeightValueLabel];
+
+    _virtualButtonEditorHeightSlider = [[UISlider alloc] initWithFrame:CGRectZero];
+    _virtualButtonEditorHeightSlider.minimumValue = 0.5f;
+    _virtualButtonEditorHeightSlider.maximumValue = 2.0f;
+    [_virtualButtonEditorHeightSlider addTarget:self action:@selector(handleVirtualButtonEditorHeightChanged:) forControlEvents:UIControlEventValueChanged];
+    [_virtualButtonEditorView addSubview:_virtualButtonEditorHeightSlider];
+
+    _virtualButtonEditorSaveButton = [UIButton buttonWithType:UIButtonTypeSystem];
+    [_virtualButtonEditorSaveButton setTitle:@"保存" forState:UIControlStateNormal];
+    _virtualButtonEditorSaveButton.titleLabel.font = [UIFont systemFontOfSize:13.0f weight:UIFontWeightSemibold];
+    [_virtualButtonEditorSaveButton setTitleColor:[UIColor whiteColor] forState:UIControlStateNormal];
+    _virtualButtonEditorSaveButton.backgroundColor = [[UIColor colorWithRed:0.50f green:0.45f blue:0.94f alpha:1.0f] colorWithAlphaComponent:0.92f];
+    _virtualButtonEditorSaveButton.layer.cornerRadius = 11.0f;
+    [_virtualButtonEditorSaveButton addTarget:self action:@selector(handleVirtualButtonEditorSaveTapped:) forControlEvents:UIControlEventTouchUpInside];
+    [_virtualButtonEditorView addSubview:_virtualButtonEditorSaveButton];
+
+    _virtualButtonEditorCloseButton = [UIButton buttonWithType:UIButtonTypeSystem];
+    [_virtualButtonEditorCloseButton setTitle:@"关闭" forState:UIControlStateNormal];
+    _virtualButtonEditorCloseButton.titleLabel.font = [UIFont systemFontOfSize:13.0f weight:UIFontWeightSemibold];
+    [_virtualButtonEditorCloseButton setTitleColor:[UIColor whiteColor] forState:UIControlStateNormal];
+    _virtualButtonEditorCloseButton.backgroundColor = [[UIColor whiteColor] colorWithAlphaComponent:0.10f];
+    _virtualButtonEditorCloseButton.layer.cornerRadius = 11.0f;
+    _virtualButtonEditorCloseButton.layer.borderWidth = 1.0f;
+    _virtualButtonEditorCloseButton.layer.borderColor = [[UIColor whiteColor] colorWithAlphaComponent:0.12f].CGColor;
+    [_virtualButtonEditorCloseButton addTarget:self action:@selector(handleVirtualButtonEditorCloseTapped:) forControlEvents:UIControlEventTouchUpInside];
+    [_virtualButtonEditorView addSubview:_virtualButtonEditorCloseButton];
+
+    _virtualButtonEditorDeleteButton = [UIButton buttonWithType:UIButtonTypeSystem];
+    [_virtualButtonEditorDeleteButton setTitle:@"删除" forState:UIControlStateNormal];
+    _virtualButtonEditorDeleteButton.titleLabel.font = [UIFont systemFontOfSize:13.0f weight:UIFontWeightSemibold];
+    [_virtualButtonEditorDeleteButton setTitleColor:[UIColor whiteColor] forState:UIControlStateNormal];
+    _virtualButtonEditorDeleteButton.backgroundColor = [[UIColor colorWithRed:0.86f green:0.34f blue:0.36f alpha:1.0f] colorWithAlphaComponent:0.92f];
+    _virtualButtonEditorDeleteButton.layer.cornerRadius = 11.0f;
+    [_virtualButtonEditorDeleteButton addTarget:self action:@selector(handleVirtualButtonEditorDeleteTapped:) forControlEvents:UIControlEventTouchUpInside];
+    [_virtualButtonEditorView addSubview:_virtualButtonEditorDeleteButton];
+
+    [self.view addSubview:_virtualButtonEditorView];
+}
+
+- (void)layoutVirtualButtonEditorForCurrentBounds {
+    if (_virtualButtonEditorView == nil || _virtualButtonEditorView.hidden) {
+        return;
+    }
+
+    CGRect bounds = self.view.bounds;
+    UIEdgeInsets safeInsets = UIEdgeInsetsZero;
+    if (@available(iOS 11.0, *)) {
+        safeInsets = self.view.safeAreaInsets;
+    }
+
+    CGFloat panelWidth = UIDevice.currentDevice.userInterfaceIdiom == UIUserInterfaceIdiomPad ? 286.0f : 248.0f;
+    CGFloat x = 12.0f;
+    CGFloat y = safeInsets.top + 12.0f;
+    CGFloat contentX = 14.0f;
+    CGFloat contentWidth = panelWidth - contentX * 2.0f;
+    CGFloat rowY = 14.0f;
+    BOOL isCircle = _virtualButtonEditorShapeControl.selectedSegmentIndex == 1;
+
+    UILabel *scaleLabel = [_virtualButtonEditorView viewWithTag:9101];
+    UILabel *widthLabel = [_virtualButtonEditorView viewWithTag:9102];
+    UILabel *heightLabel = [_virtualButtonEditorView viewWithTag:9103];
+
+    _virtualButtonEditorTitleLabel.frame = CGRectMake(contentX, rowY, contentWidth - 194.0f, 20.0f);
+    _virtualButtonEditorCloseButton.frame = CGRectMake(panelWidth - 192.0f, 10.0f, 54.0f, 32.0f);
+    _virtualButtonEditorDeleteButton.frame = CGRectMake(panelWidth - 130.0f, 10.0f, 54.0f, 32.0f);
+    _virtualButtonEditorSaveButton.frame = CGRectMake(panelWidth - 68.0f, 10.0f, 54.0f, 32.0f);
+
+    rowY = CGRectGetMaxY(_virtualButtonEditorTitleLabel.frame) + 12.0f;
+    _virtualButtonEditorShapeControl.frame = CGRectMake(contentX, rowY, contentWidth, 30.0f);
+    rowY = CGRectGetMaxY(_virtualButtonEditorShapeControl.frame) + 12.0f;
+
+    scaleLabel.hidden = !isCircle;
+    _virtualButtonEditorScaleSlider.hidden = !isCircle;
+    _virtualButtonEditorScaleValueLabel.hidden = !isCircle;
+
+    widthLabel.hidden = isCircle;
+    _virtualButtonEditorWidthSlider.hidden = isCircle;
+    _virtualButtonEditorWidthValueLabel.hidden = isCircle;
+    heightLabel.hidden = isCircle;
+    _virtualButtonEditorHeightSlider.hidden = isCircle;
+    _virtualButtonEditorHeightValueLabel.hidden = isCircle;
+
+    if (isCircle) {
+        scaleLabel.frame = CGRectMake(contentX, rowY, 60.0f, 18.0f);
+        _virtualButtonEditorScaleValueLabel.frame = CGRectMake(panelWidth - 64.0f, rowY, 50.0f, 18.0f);
+        rowY = CGRectGetMaxY(scaleLabel.frame) + 4.0f;
+        _virtualButtonEditorScaleSlider.frame = CGRectMake(contentX, rowY, contentWidth, 24.0f);
+        rowY = CGRectGetMaxY(_virtualButtonEditorScaleSlider.frame) + 12.0f;
+    }
+    else {
+        widthLabel.frame = CGRectMake(contentX, rowY, 60.0f, 18.0f);
+        _virtualButtonEditorWidthValueLabel.frame = CGRectMake(panelWidth - 64.0f, rowY, 50.0f, 18.0f);
+        rowY = CGRectGetMaxY(widthLabel.frame) + 4.0f;
+        _virtualButtonEditorWidthSlider.frame = CGRectMake(contentX, rowY, contentWidth, 24.0f);
+        rowY = CGRectGetMaxY(_virtualButtonEditorWidthSlider.frame) + 10.0f;
+
+        heightLabel.frame = CGRectMake(contentX, rowY, 60.0f, 18.0f);
+        _virtualButtonEditorHeightValueLabel.frame = CGRectMake(panelWidth - 64.0f, rowY, 50.0f, 18.0f);
+        rowY = CGRectGetMaxY(heightLabel.frame) + 4.0f;
+        _virtualButtonEditorHeightSlider.frame = CGRectMake(contentX, rowY, contentWidth, 24.0f);
+        rowY = CGRectGetMaxY(_virtualButtonEditorHeightSlider.frame) + 12.0f;
+    }
+
+    _virtualButtonEditorView.frame = CGRectMake(MIN(MAX(x, 0.0f), MAX(CGRectGetWidth(bounds) - panelWidth - 12.0f, 0.0f)),
+                                                y,
+                                                panelWidth,
+                                                MAX(rowY, MAX(CGRectGetMaxY(_virtualButtonEditorSaveButton.frame), MAX(CGRectGetMaxY(_virtualButtonEditorDeleteButton.frame), CGRectGetMaxY(_virtualButtonEditorCloseButton.frame))) + 12.0f));
+}
+
+- (void)refreshVirtualButtonEditorForCurrentSelection {
+    NSDictionary *definition = [self selectedVirtualButtonDefinition];
+    if (![_streamView isTemporaryVirtualButtonsEditingEnabled] || definition == nil) {
+        _virtualButtonEditorView.hidden = YES;
+        return;
+    }
+
+    [self installVirtualButtonEditorIfNeeded];
+    _virtualButtonEditorTitleLabel.text = definition[@"title"] ?: @"虚拟按键";
+    _virtualButtonEditorShapeControl.selectedSegmentIndex = [definition[@"shape"] isEqualToString:@"circle"] ? 1 : 0;
+    _virtualButtonEditorScaleSlider.value = MAX(0.5f, MIN([definition[@"scale"] floatValue], 2.0f));
+    _virtualButtonEditorWidthSlider.value = MAX(0.5f, MIN([definition[@"widthScale"] floatValue], 2.0f));
+    _virtualButtonEditorHeightSlider.value = MAX(0.5f, MIN([definition[@"heightScale"] floatValue], 2.0f));
+    _virtualButtonEditorScaleValueLabel.text = [NSString stringWithFormat:@"%.2f", _virtualButtonEditorScaleSlider.value];
+    _virtualButtonEditorWidthValueLabel.text = [NSString stringWithFormat:@"%.2f", _virtualButtonEditorWidthSlider.value];
+    _virtualButtonEditorHeightValueLabel.text = [NSString stringWithFormat:@"%.2f", _virtualButtonEditorHeightSlider.value];
+    _virtualButtonEditorView.hidden = NO;
+    [self.view bringSubviewToFront:_virtualButtonEditorView];
+    [self layoutVirtualButtonEditorForCurrentBounds];
+}
+
+- (void)applyVirtualButtonEditorValuesToSelectedItem {
+    if (_selectedVirtualButtonIdentifier.length == 0) {
+        return;
+    }
+
+    NSUInteger index = [[self virtualButtonDefinitions] indexOfObjectPassingTest:^BOOL(NSDictionary *definition, NSUInteger idx, BOOL *stop) {
+        return [definition[@"id"] isEqualToString:self->_selectedVirtualButtonIdentifier];
+    }];
+    if (index == NSNotFound) {
+        return;
+    }
+
+    NSMutableDictionary *updatedDefinition = [[[self virtualButtonDefinitions] objectAtIndex:index] mutableCopy];
+    updatedDefinition[@"shape"] = _virtualButtonEditorShapeControl.selectedSegmentIndex == 1 ? @"circle" : @"roundedRect";
+    updatedDefinition[@"scale"] = @(_virtualButtonEditorScaleSlider.value);
+    updatedDefinition[@"widthScale"] = @(_virtualButtonEditorWidthSlider.value);
+    updatedDefinition[@"heightScale"] = @(_virtualButtonEditorHeightSlider.value);
+    [[self virtualButtonDefinitions] replaceObjectAtIndex:index withObject:updatedDefinition];
+    [self applyVirtualButtonDefinitionsToStreamView];
+    [self persistCurrentVirtualButtonScheme];
+}
+
+- (void)handleVirtualButtonSelectionDidChange:(NSNotification *)notification {
+    NSString *identifier = notification.userInfo[@"identifier"];
+    _selectedVirtualButtonIdentifier = ([identifier isKindOfClass:[NSString class]] && identifier.length > 0) ? [identifier copy] : nil;
+    [self refreshVirtualButtonEditorForCurrentSelection];
+}
+
+- (void)handleVirtualButtonEditorShapeChanged:(UISegmentedControl *)sender {
+    (void)sender;
+    [self applyVirtualButtonEditorValuesToSelectedItem];
+    [self refreshVirtualButtonEditorForCurrentSelection];
+}
+
+- (void)handleVirtualButtonEditorScaleChanged:(UISlider *)sender {
+    _virtualButtonEditorScaleValueLabel.text = [NSString stringWithFormat:@"%.2f", sender.value];
+    [self applyVirtualButtonEditorValuesToSelectedItem];
+}
+
+- (void)handleVirtualButtonEditorWidthChanged:(UISlider *)sender {
+    _virtualButtonEditorWidthValueLabel.text = [NSString stringWithFormat:@"%.2f", sender.value];
+    [self applyVirtualButtonEditorValuesToSelectedItem];
+}
+
+- (void)handleVirtualButtonEditorHeightChanged:(UISlider *)sender {
+    _virtualButtonEditorHeightValueLabel.text = [NSString stringWithFormat:@"%.2f", sender.value];
+    [self applyVirtualButtonEditorValuesToSelectedItem];
+}
+
+- (void)handleVirtualButtonEditorSaveTapped:(UIButton *)sender {
+    (void)sender;
+    [self applyVirtualButtonEditorValuesToSelectedItem];
+    [self showTemporaryTipText:@"虚拟按键已保存"];
+}
+
+- (void)handleVirtualButtonEditorCloseTapped:(UIButton *)sender {
+    (void)sender;
+    _virtualButtonEditorView.hidden = YES;
+}
+
+- (void)handleVirtualButtonEditorDeleteTapped:(UIButton *)sender {
+    (void)sender;
+    if (_selectedVirtualButtonIdentifier.length == 0) {
+        return;
+    }
+
+    NSIndexSet *indexes = [[self virtualButtonDefinitions] indexesOfObjectsPassingTest:^BOOL(NSDictionary *definition, NSUInteger idx, BOOL *stop) {
+        return [definition[@"id"] isEqualToString:self->_selectedVirtualButtonIdentifier];
+    }];
+    if (indexes.count == 0) {
+        return;
+    }
+
+    [[self virtualButtonDefinitions] removeObjectsAtIndexes:indexes];
+    _selectedVirtualButtonIdentifier = nil;
+    _virtualButtonEditorView.hidden = YES;
+    [self applyVirtualButtonDefinitionsToStreamView];
+    [self refreshVirtualButtonsPanelIfNeeded];
+    [self persistCurrentVirtualButtonScheme];
+    [self showTemporaryTipText:@"虚拟按键已删除"];
+}
+
+- (void)showVirtualButtonsPanel {
+    if (@available(iOS 13.0, *)) {
+        StreamVirtualButtonsPanelHostingViewController *controller = [[StreamVirtualButtonsPanelHostingViewController alloc] init];
+        controller.delegate = (id<StreamVirtualButtonsPanelHostingViewControllerDelegate>)self;
+        [controller configureWithTitle:@"虚拟按键"
+                                 items:[self virtualButtonPanelItems]
+                      isEditingEnabled:[_streamView isTemporaryVirtualButtonsEditingEnabled]
+                          buttonOpacity:[self currentVirtualButtonOpacity]];
+        controller.modalPresentationStyle = UIModalPresentationOverFullScreen;
+        _streamVirtualButtonsPanelHostingViewController = controller;
+        [self presentViewController:controller animated:YES completion:nil];
+    }
+}
+
+- (void)refreshVirtualButtonsPanelIfNeeded {
+    if (_streamVirtualButtonsPanelHostingViewController == nil) {
+        return;
+    }
+
+    [_streamVirtualButtonsPanelHostingViewController configureWithTitle:@"虚拟按键"
+                                                                 items:[self virtualButtonPanelItems]
+                                                      isEditingEnabled:[_streamView isTemporaryVirtualButtonsEditingEnabled]
+                                                          buttonOpacity:[self currentVirtualButtonOpacity]];
 }
 
 - (NSArray<NSDictionary *> *)shortcutDefinitions {
@@ -1510,6 +2018,16 @@ static const CGFloat kStreamFloatingMenuExpandedAlpha = 0.96f;
 
     if ([identifier isEqualToString:@"virtual_gamepad"] && self->_streamView != nil) {
         [self toggleTemporaryVirtualGamepad];
+        return;
+    }
+
+    if ([identifier isEqualToString:@"virtual_buttons"] && self->_streamView != nil) {
+        [self->_streamView setTemporaryVirtualButtonsVisible:![self->_streamView isTemporaryVirtualButtonsVisible]];
+        return;
+    }
+
+    if ([identifier isEqualToString:@"manage_virtual_buttons"]) {
+        [self showVirtualButtonsPanel];
         return;
     }
 
@@ -2035,6 +2553,179 @@ static const CGFloat kStreamFloatingMenuExpandedAlpha = 0.96f;
     [controller dismissViewControllerAnimated:YES completion:^{
         [self->_streamView showKeyInputBoard];
     }];
+}
+
+- (void)streamVirtualButtonsPanelHostingViewControllerDidCancel:(StreamVirtualButtonsPanelHostingViewController *)controller {
+    _streamVirtualButtonsPanelHostingViewController = nil;
+    [controller dismissViewControllerAnimated:YES completion:nil];
+}
+
+- (void)streamVirtualButtonsPanelHostingViewController:(StreamVirtualButtonsPanelHostingViewController *)controller didChangeEditingEnabled:(BOOL)enabled {
+    [_streamView setTemporaryVirtualButtonsEditingEnabled:enabled];
+    if (enabled) {
+        [_streamView setTemporaryVirtualButtonsVisible:YES];
+        _streamVirtualButtonsPanelHostingViewController = nil;
+        [controller dismissViewControllerAnimated:YES completion:nil];
+        [self showTemporaryTipText:@"点选虚拟按键可调整位置和大小"];
+    }
+    else {
+        _selectedVirtualButtonIdentifier = nil;
+        _virtualButtonEditorView.hidden = YES;
+    }
+    [self refreshVirtualButtonsPanelIfNeeded];
+    [self refreshVirtualButtonEditorForCurrentSelection];
+}
+
+- (void)streamVirtualButtonsPanelHostingViewController:(StreamVirtualButtonsPanelHostingViewController *)controller didDeleteItemWithIdentifier:(NSString *)identifier {
+    (void)controller;
+    NSIndexSet *indexes = [[self virtualButtonDefinitions] indexesOfObjectsPassingTest:^BOOL(NSDictionary *definition, NSUInteger idx, BOOL *stop) {
+        return [definition[@"id"] isEqualToString:identifier];
+    }];
+    if (indexes.count == 0) {
+        return;
+    }
+
+    [[self virtualButtonDefinitions] removeObjectsAtIndexes:indexes];
+    [self applyVirtualButtonDefinitionsToStreamView];
+    [self refreshVirtualButtonsPanelIfNeeded];
+    [self persistCurrentVirtualButtonScheme];
+}
+
+- (void)streamVirtualButtonsPanelHostingViewController:(StreamVirtualButtonsPanelHostingViewController *)controller didSubmitItemWithTitle:(NSString *)title keyLabels:(NSArray<NSString *> *)keyLabels keyCodes:(NSArray<NSNumber *> *)keyCodes {
+    (void)controller;
+    if (title.length == 0 || keyCodes.count == 0) {
+        return;
+    }
+
+    NSString *identifier = [NSString stringWithFormat:@"virtual_button_custom_%@", [[NSUUID UUID] UUIDString]];
+    NSString *subtitle = [keyLabels componentsJoinedByString:@" + "];
+    NSDictionary *definition = @{
+        @"id": identifier,
+        @"title": title,
+        @"subtitle": subtitle.length > 0 ? subtitle : title,
+        @"primary": keyCodes,
+        @"secondary": @[],
+        @"shape": @"roundedRect",
+        @"scale": @1.0,
+        @"widthScale": @1.0,
+        @"heightScale": @1.0,
+        @"xRatio": @0.5,
+        @"yRatio": @0.5
+    };
+    [[self virtualButtonDefinitions] addObject:definition];
+    [self applyVirtualButtonDefinitionsToStreamView];
+    [self refreshVirtualButtonsPanelIfNeeded];
+    [self persistCurrentVirtualButtonScheme];
+}
+
+- (void)streamVirtualButtonsPanelHostingViewController:(StreamVirtualButtonsPanelHostingViewController *)controller
+                         didSubmitMouseItemWithTitle:(NSString *)title
+                                mouseActionIdentifier:(NSString *)mouseActionIdentifier
+                                             subtitle:(NSString *)subtitle {
+    (void)controller;
+    if (title.length == 0 || mouseActionIdentifier.length == 0) {
+        return;
+    }
+
+    NSString *identifier = [NSString stringWithFormat:@"virtual_button_mouse_%@", [[NSUUID UUID] UUIDString]];
+    NSDictionary *definition = @{
+        @"id": identifier,
+        @"title": title,
+        @"subtitle": subtitle.length > 0 ? subtitle : title,
+        @"mouseAction": mouseActionIdentifier,
+        @"shape": @"circle",
+        @"scale": @1.0,
+        @"widthScale": @1.0,
+        @"heightScale": @1.0,
+        @"xRatio": @0.5,
+        @"yRatio": @0.5
+    };
+    [[self virtualButtonDefinitions] addObject:definition];
+    [self applyVirtualButtonDefinitionsToStreamView];
+    [self refreshVirtualButtonsPanelIfNeeded];
+    [self persistCurrentVirtualButtonScheme];
+}
+
+- (void)streamVirtualButtonsPanelHostingViewController:(StreamVirtualButtonsPanelHostingViewController *)controller
+                    didSubmitDirectionalItemWithTitle:(NSString *)title
+                               controlActionIdentifier:(NSString *)controlActionIdentifier
+                                              subtitle:(NSString *)subtitle {
+    (void)controller;
+    if (title.length == 0 || controlActionIdentifier.length == 0) {
+        return;
+    }
+
+    BOOL isJoystick = [controlActionIdentifier hasPrefix:@"joystick_"];
+    NSString *identifier = [NSString stringWithFormat:@"virtual_button_direction_%@", [[NSUUID UUID] UUIDString]];
+    NSDictionary *definition = @{
+        @"id": identifier,
+        @"title": title,
+        @"subtitle": subtitle.length > 0 ? subtitle : title,
+        @"controlAction": controlActionIdentifier,
+        @"shape": isJoystick ? @"circle" : @"roundedRect",
+        @"scale": @1.0,
+        @"widthScale": @1.0,
+        @"heightScale": @1.0,
+        @"xRatio": @0.5,
+        @"yRatio": @0.5
+    };
+    [[self virtualButtonDefinitions] addObject:definition];
+    [self applyVirtualButtonDefinitionsToStreamView];
+    [self refreshVirtualButtonsPanelIfNeeded];
+    [self persistCurrentVirtualButtonScheme];
+}
+
+- (void)streamVirtualButtonsPanelHostingViewController:(StreamVirtualButtonsPanelHostingViewController *)controller
+                         didUpdateItemWithIdentifier:(NSString *)identifier
+                                              shape:(NSString *)shape
+                                              scale:(double)scale
+                                         widthScale:(double)widthScale
+                                        heightScale:(double)heightScale {
+    (void)controller;
+    if (identifier.length == 0) {
+        return;
+    }
+
+    NSUInteger index = [[self virtualButtonDefinitions] indexOfObjectPassingTest:^BOOL(NSDictionary *definition, NSUInteger idx, BOOL *stop) {
+        return [definition[@"id"] isEqualToString:identifier];
+    }];
+    if (index == NSNotFound) {
+        return;
+    }
+
+    NSMutableDictionary *updatedDefinition = [[[self virtualButtonDefinitions] objectAtIndex:index] mutableCopy];
+    updatedDefinition[@"shape"] = [shape isEqualToString:@"circle"] ? @"circle" : @"roundedRect";
+    updatedDefinition[@"scale"] = @(MAX(0.5, MIN(scale, 2.0)));
+    updatedDefinition[@"widthScale"] = @(MAX(0.5, MIN(widthScale, 2.0)));
+    updatedDefinition[@"heightScale"] = @(MAX(0.5, MIN(heightScale, 2.0)));
+    [[self virtualButtonDefinitions] replaceObjectAtIndex:index withObject:updatedDefinition];
+    [self applyVirtualButtonDefinitionsToStreamView];
+    [self refreshVirtualButtonEditorForCurrentSelection];
+    [self persistCurrentVirtualButtonScheme];
+}
+
+- (void)streamVirtualButtonsPanelHostingViewController:(StreamVirtualButtonsPanelHostingViewController *)controller
+                                 didChangeButtonOpacity:(double)opacity {
+    (void)controller;
+    _currentSessionVirtualButtonOpacity = MAX(0.05f, MIN((CGFloat)opacity, 1.0f));
+    [self applyVirtualButtonDefinitionsToStreamView];
+    [self persistCurrentVirtualButtonScheme];
+}
+
+- (void)streamVirtualButtonsDidChange:(NSNotification *)notification {
+    NSArray<NSDictionary *> *descriptors = notification.userInfo[@"descriptors"];
+    if (![descriptors isKindOfClass:[NSArray class]]) {
+        return;
+    }
+
+    _virtualButtonDefinitions = [descriptors mutableCopy];
+    NSNumber *opacity = [descriptors.firstObject isKindOfClass:[NSDictionary class]] ? descriptors.firstObject[@"opacity"] : nil;
+    if ([opacity isKindOfClass:[NSNumber class]]) {
+        _currentSessionVirtualButtonOpacity = MAX(0.05f, MIN((CGFloat)opacity.doubleValue, 1.0f));
+    }
+    [self refreshVirtualButtonsPanelIfNeeded];
+    [self refreshVirtualButtonEditorForCurrentSelection];
+    [self persistCurrentVirtualButtonScheme];
 }
 
 @end

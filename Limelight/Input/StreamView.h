@@ -14,6 +14,8 @@
 #import "SensitivityBean.h"
 
 extern NSString * const StreamViewBoundsDidChangeNotification;
+extern NSString * const StreamViewVirtualButtonsDidChangeNotification;
+extern NSString * const StreamViewVirtualButtonSelectionDidChangeNotification;
 
 typedef NS_ENUM(NSInteger, StreamViewVideoAlignmentMode) {
     StreamViewVideoAlignmentModeCenter = 0,
@@ -40,6 +42,12 @@ typedef NS_ENUM(NSInteger, StreamViewVideoAlignmentMode) {
 - (void) showOnScreenControls;
 - (OnScreenControlsLevel) getCurrentOscState;
 - (void) setTemporaryVirtualGamepadVisible:(BOOL)visible;
+- (void) setTemporaryVirtualButtonDescriptors:(NSArray<NSDictionary<NSString *, id> *> *)descriptors;
+- (NSArray<NSDictionary<NSString *, id> *> *)currentTemporaryVirtualButtonDescriptors;
+- (void) setTemporaryVirtualButtonsVisible:(BOOL)visible;
+- (BOOL) isTemporaryVirtualButtonsVisible;
+- (void) setTemporaryVirtualButtonsEditingEnabled:(BOOL)enabled;
+- (BOOL) isTemporaryVirtualButtonsEditingEnabled;
 - (void) setTemporaryOnScreenControlsLevel:(OnScreenControlsLevel)level;
 - (void) setVideoAlignmentMode:(StreamViewVideoAlignmentMode)alignmentMode;
 - (StreamViewVideoAlignmentMode) videoAlignmentMode;

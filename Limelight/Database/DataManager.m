@@ -15,6 +15,18 @@
     AppDelegate *_appDelegate;
 }
 
+static NSString *VirtualButtonDefinitionsDefaultsKeyForSchemeSelectionAndOrientation(NSInteger schemeSelection, BOOL portrait) {
+    NSInteger clampedSelection = MAX(0, MIN(schemeSelection, 4));
+    return [NSString stringWithFormat:@"StreamPreferenceVirtualButtonDefinitionsScheme%ld_%@",
+            (long)clampedSelection,
+            portrait ? @"Portrait" : @"Landscape"];
+}
+
+static NSString *VirtualButtonOpacityDefaultsKeyForSchemeSelection(NSInteger schemeSelection) {
+    NSInteger clampedSelection = MAX(0, MIN(schemeSelection, 4));
+    return [NSString stringWithFormat:@"StreamPreferenceVirtualButtonOpacityScheme%ld", (long)clampedSelection];
+}
+
 - (id) init {
     self = [super init];
     
@@ -80,7 +92,8 @@
               videoAlignmentMargin:(CGFloat)videoAlignmentMargin
 performanceOverlayPositionSelection:(NSInteger)performanceOverlayPositionSelection
          performanceOverlayMargin:(CGFloat)performanceOverlayMargin
-               floatingMenuEnabled:(BOOL)floatingMenuEnabled{
+               floatingMenuEnabled:(BOOL)floatingMenuEnabled
+       virtualButtonSchemeSelection:(NSInteger)virtualButtonSchemeSelection{
     
     [_managedObjectContext performBlockAndWait:^{
         Settings* settingsToSave = [self retrieveSettings];
@@ -114,6 +127,7 @@ performanceOverlayPositionSelection:(NSInteger)performanceOverlayPositionSelecti
         [defaults setInteger:MAX(0, MIN(performanceOverlayPositionSelection, 5)) forKey:StreamPreferencePerformanceOverlayPositionSelectionKey];
         [defaults setDouble:MAX(0.0, MIN(performanceOverlayMargin, 150.0)) forKey:StreamPreferencePerformanceOverlayMarginKey];
         [defaults setBool:floatingMenuEnabled forKey:StreamPreferenceFloatingMenuEnabledKey];
+        [defaults setInteger:MAX(0, MIN(virtualButtonSchemeSelection, 4)) forKey:StreamPreferenceVirtualButtonSchemeSelectionKey];
         [defaults synchronize];
         [self saveData];
     }];
@@ -172,6 +186,38 @@ performanceOverlayPositionSelection:(NSInteger)performanceOverlayPositionSelecti
     }];
     
     return tempSettings;
+}
+
+- (NSArray<NSDictionary *> *)virtualButtonDefinitionsForSchemeSelection:(NSInteger)schemeSelection
+                                                               portrait:(BOOL)portrait {
+    NSInteger clampedSelection = MAX(0, MIN(schemeSelection, 4));
+    NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
+    NSArray *definitions = [defaults arrayForKey:VirtualButtonDefinitionsDefaultsKeyForSchemeSelectionAndOrientation(clampedSelection, portrait)];
+    if (![definitions isKindOfClass:[NSArray class]]) {
+        return nil;
+    }
+    return definitions;
+}
+
+- (CGFloat)virtualButtonOpacityForSchemeSelection:(NSInteger)schemeSelection {
+    NSInteger clampedSelection = MAX(0, MIN(schemeSelection, 4));
+    NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
+    id storedValue = [defaults objectForKey:VirtualButtonOpacityDefaultsKeyForSchemeSelection(clampedSelection)];
+    if (![storedValue isKindOfClass:[NSNumber class]]) {
+        return 0.52f;
+    }
+    return MAX(0.05f, MIN((CGFloat)[storedValue doubleValue], 1.0f));
+}
+
+- (void)saveVirtualButtonDefinitions:(NSArray<NSDictionary *> *)definitions
+                             opacity:(CGFloat)opacity
+                  forSchemeSelection:(NSInteger)schemeSelection
+                            portrait:(BOOL)portrait {
+    NSInteger clampedSelection = MAX(0, MIN(schemeSelection, 4));
+    NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
+    [defaults setObject:(definitions ?: @[]) forKey:VirtualButtonDefinitionsDefaultsKeyForSchemeSelectionAndOrientation(clampedSelection, portrait)];
+    [defaults setDouble:MAX(0.05f, MIN(opacity, 1.0f)) forKey:VirtualButtonOpacityDefaultsKeyForSchemeSelection(clampedSelection)];
+    [defaults synchronize];
 }
 
 - (Settings*) retrieveSettings {

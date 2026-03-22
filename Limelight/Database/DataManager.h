@@ -41,7 +41,8 @@
                 videoAlignmentMargin:(CGFloat)videoAlignmentMargin
 performanceOverlayPositionSelection:(NSInteger)performanceOverlayPositionSelection
          performanceOverlayMargin:(CGFloat)performanceOverlayMargin
-               floatingMenuEnabled:(BOOL)floatingMenuEnabled;
+               floatingMenuEnabled:(BOOL)floatingMenuEnabled
+       virtualButtonSchemeSelection:(NSInteger)virtualButtonSchemeSelection;
 
 - (NSArray*) getHosts;
 - (void) updateHost:(TemporaryHost*)host;
@@ -50,6 +51,13 @@ performanceOverlayPositionSelection:(NSInteger)performanceOverlayPositionSelecti
 - (void) removeApp:(TemporaryApp*)app;
 
 - (TemporarySettings*) getSettings;
+- (NSArray<NSDictionary *> *)virtualButtonDefinitionsForSchemeSelection:(NSInteger)schemeSelection
+                                                               portrait:(BOOL)portrait;
+- (CGFloat)virtualButtonOpacityForSchemeSelection:(NSInteger)schemeSelection;
+- (void)saveVirtualButtonDefinitions:(NSArray<NSDictionary *> *)definitions
+                             opacity:(CGFloat)opacity
+                  forSchemeSelection:(NSInteger)schemeSelection
+                            portrait:(BOOL)portrait;
 
 - (void) updateUniqueId:(NSString*)uniqueId;
 - (NSString*) getUniqueId;

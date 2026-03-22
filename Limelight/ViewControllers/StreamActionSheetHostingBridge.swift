@@ -57,6 +57,28 @@ final class StreamShortcutPanelItem: NSObject {
     func streamVirtualKeyboardPanelHostingViewControllerDidRequestSystemKeyboard(_ controller: StreamVirtualKeyboardPanelHostingViewController)
 }
 
+@objcMembers
+final class StreamVirtualButtonPanelItem: NSObject {
+    var identifier: String = ""
+    var title: String = ""
+    var subtitle: String = ""
+    var shape: String = "roundedRect"
+    var scale: NSNumber = 1.0
+    var widthScale: NSNumber = 1.0
+    var heightScale: NSNumber = 1.0
+}
+
+@objc protocol StreamVirtualButtonsPanelHostingViewControllerDelegate: NSObjectProtocol {
+    func streamVirtualButtonsPanelHostingViewControllerDidCancel(_ controller: StreamVirtualButtonsPanelHostingViewController)
+    func streamVirtualButtonsPanelHostingViewController(_ controller: StreamVirtualButtonsPanelHostingViewController, didChangeEditingEnabled enabled: Bool)
+    func streamVirtualButtonsPanelHostingViewController(_ controller: StreamVirtualButtonsPanelHostingViewController, didDeleteItemWithIdentifier identifier: String)
+    func streamVirtualButtonsPanelHostingViewController(_ controller: StreamVirtualButtonsPanelHostingViewController, didSubmitItemWithTitle title: String, keyLabels: [String], keyCodes: [NSNumber])
+    func streamVirtualButtonsPanelHostingViewController(_ controller: StreamVirtualButtonsPanelHostingViewController, didSubmitMouseItemWithTitle title: String, mouseActionIdentifier: String, subtitle: String)
+    func streamVirtualButtonsPanelHostingViewController(_ controller: StreamVirtualButtonsPanelHostingViewController, didSubmitDirectionalItemWithTitle title: String, controlActionIdentifier: String, subtitle: String)
+    func streamVirtualButtonsPanelHostingViewController(_ controller: StreamVirtualButtonsPanelHostingViewController, didUpdateItemWithIdentifier identifier: String, shape: String, scale: Double, widthScale: Double, heightScale: Double)
+    func streamVirtualButtonsPanelHostingViewController(_ controller: StreamVirtualButtonsPanelHostingViewController, didChangeButtonOpacity opacity: Double)
+}
+
 private final class StreamActionSheetViewModel: ObservableObject {
     @Published var title: String = ""
     @Published var items: [StreamActionSheetItem] = []
@@ -83,6 +105,44 @@ private final class StreamVirtualKeyboardPanelViewModel: ObservableObject {
     @Published var combinationModeEnabled: Bool = false
     @Published var fnModeEnabled: Bool = false
     @Published var selectedModifierKeyCodes: Set<Int> = []
+}
+
+private final class StreamVirtualButtonsPanelViewModel: ObservableObject {
+    @Published var title: String = ""
+    @Published var items: [StreamVirtualButtonPanelItem] = []
+    @Published var isAddingItem: Bool = false
+    @Published var isEditingEnabled: Bool = false
+    @Published var buttonOpacity: Double = 0.52
+    @Published var draftTitle: String = ""
+    @Published var fnModeEnabled: Bool = false
+    @Published var selectedKeyLabels: [String] = []
+    @Published var selectedKeyCodes: [NSNumber] = []
+    @Published var isShowingMousePicker: Bool = false
+    @Published var isShowingDirectionalPicker: Bool = false
+}
+
+private struct StreamVirtualMouseSelectableItem: Identifiable {
+    let id: String
+    let title: String
+    let subtitle: String
+    let assetName: String
+    let symbol: String
+}
+
+private struct StreamVirtualDirectionalSelectableItem: Identifiable {
+    let id: String
+    let title: String
+    let subtitle: String
+    let symbol: String
+}
+
+private struct StreamVirtualButtonSelectableKey: Identifiable, Hashable {
+    let id: String
+    let label: String
+    let keyCode: Int
+    let altLabel: String?
+    let altKeyCode: Int?
+    let widthUnits: CGFloat
 }
 
 private struct SegmentedOptionsControl: UIViewRepresentable {
@@ -670,6 +730,932 @@ private struct StreamShortcutCardView: View {
             )
         }
         .buttonStyle(PlainButtonStyle())
+    }
+}
+
+private struct StreamVirtualButtonsPanelView: View {
+    @ObservedObject var viewModel: StreamVirtualButtonsPanelViewModel
+    let isLandscape: Bool
+    let onToggleEditing: (Bool) -> Void
+    let onDelete: (String) -> Void
+    let onUpdate: (String, String, Double, Double, Double) -> Void
+    let onOpacityChange: (Double) -> Void
+    let onSubmit: (String, [String], [NSNumber]) -> Void
+    let onSubmitMouse: (String, String, String) -> Void
+    let onSubmitDirectional: (String, String, String) -> Void
+    let onCancel: () -> Void
+
+    private let horizontalPadding: CGFloat = 18
+    private let cardSpacing: CGFloat = 12
+    private let maxSelectedKeys = 5
+    var body: some View {
+        GeometryReader { geometry in
+            ZStack {
+                VStack(spacing: 0) {
+                    header
+                        .padding(.horizontal, 22)
+                        .padding(.top, 20)
+                        .padding(.bottom, 16)
+
+                    if viewModel.isAddingItem {
+                        addForm(in: geometry)
+                    } else {
+                        listContent(in: geometry)
+                    }
+                }
+                .frame(width: geometry.size.width, height: geometry.size.height, alignment: .top)
+
+                if viewModel.isShowingMousePicker {
+                    Color.black.opacity(0.36)
+                        .edgesIgnoringSafeArea(.all)
+                        .onTapGesture {
+                            viewModel.isShowingMousePicker = false
+                        }
+
+                    mouseButtonPickerOverlay(maxWidth: min(geometry.size.width - 40, 360))
+                }
+
+                if viewModel.isShowingDirectionalPicker {
+                    Color.black.opacity(0.36)
+                        .edgesIgnoringSafeArea(.all)
+                        .onTapGesture {
+                            viewModel.isShowingDirectionalPicker = false
+                        }
+
+                    directionalControlPickerOverlay(maxWidth: min(geometry.size.width - 40, 360))
+                }
+            }
+            .frame(width: geometry.size.width, height: geometry.size.height, alignment: .top)
+        }
+    }
+
+    private var header: some View {
+        HStack(spacing: 12) {
+            Text(viewModel.isAddingItem ? "添加虚拟按键" : viewModel.title)
+                .font(.system(size: 24, weight: .bold))
+                .foregroundColor(.white)
+                .lineLimit(1)
+
+            Spacer(minLength: 12)
+
+            if !viewModel.isAddingItem {
+                Button(action: {
+                    viewModel.isEditingEnabled.toggle()
+                    onToggleEditing(viewModel.isEditingEnabled)
+                }) {
+                    Text(viewModel.isEditingEnabled ? "完成编辑" : "编辑模式")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundColor(.white)
+                        .padding(.horizontal, 12)
+                        .frame(height: 32)
+                        .background(
+                            Capsule()
+                                .fill(viewModel.isEditingEnabled ? Color(red: 0.50, green: 0.45, blue: 0.94) : Color.white.opacity(0.08))
+                        )
+                        .overlay(
+                            Capsule()
+                                .stroke(Color.white.opacity(viewModel.isEditingEnabled ? 0.0 : 0.10), lineWidth: 1)
+                        )
+                }
+                .buttonStyle(PlainButtonStyle())
+
+                Button(action: beginAdding) {
+                    Image(systemName: "plus")
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundColor(.white)
+                        .frame(width: 40, height: 40)
+                        .background(Color.white.opacity(0.08))
+                        .clipShape(Circle())
+                }
+                .buttonStyle(PlainButtonStyle())
+            }
+
+            Button(action: onCancel) {
+                Image(systemName: "xmark")
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundColor(Color.white.opacity(0.82))
+                    .frame(width: 40, height: 40)
+                    .background(Color.white.opacity(0.08))
+                    .clipShape(Circle())
+            }
+            .buttonStyle(PlainButtonStyle())
+        }
+    }
+
+    private func listContent(in geometry: GeometryProxy) -> some View {
+        let columnCount = isLandscape ? 5 : 3
+        let contentWidth = max(geometry.size.width - horizontalPadding * 2, 0)
+        let cardWidth = max(floor((contentWidth - CGFloat(columnCount - 1) * cardSpacing) / CGFloat(columnCount)), 120)
+        let cardHeight = floor(cardWidth * 0.5)
+        let rows = chunkedItems(columnCount: columnCount)
+
+        return ScrollView(.vertical, showsIndicators: false) {
+            VStack(spacing: 14) {
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack {
+                        Text("虚拟按钮透明度")
+                            .font(.system(size: 13, weight: .medium))
+                            .foregroundColor(Color.white.opacity(0.78))
+
+                        Spacer(minLength: 8)
+
+                        Text(String(format: "%.0f%%", viewModel.buttonOpacity * 100.0))
+                            .font(.system(size: 12, weight: .semibold))
+                            .foregroundColor(Color.white.opacity(0.66))
+                    }
+
+                    Slider(value: Binding(get: {
+                        viewModel.buttonOpacity
+                    }, set: { newValue in
+                        viewModel.buttonOpacity = newValue
+                        onOpacityChange(newValue)
+                    }), in: 0.05...1.0, step: 0.05)
+                    .accentColor(Color(red: 0.50, green: 0.45, blue: 0.94))
+                }
+                .padding(.horizontal, 14)
+                .padding(.vertical, 12)
+                .background(
+                    RoundedRectangle(cornerRadius: 16, style: .continuous)
+                        .fill(Color.white.opacity(0.08))
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 16, style: .continuous)
+                        .stroke(Color.white.opacity(0.10), lineWidth: 1)
+                )
+
+                if viewModel.isEditingEnabled {
+                    HStack(spacing: 10) {
+                        Image(systemName: "hand.draw")
+                            .font(.system(size: 15, weight: .semibold))
+                            .foregroundColor(Color.white.opacity(0.84))
+
+                        Text("拖拽串流画面上的虚拟按键即可调整位置。")
+                            .font(.system(size: 13, weight: .medium))
+                            .foregroundColor(Color.white.opacity(0.72))
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 12)
+                    .background(
+                        RoundedRectangle(cornerRadius: 16, style: .continuous)
+                            .fill(Color.white.opacity(0.08))
+                    )
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 16, style: .continuous)
+                            .stroke(Color.white.opacity(0.10), lineWidth: 1)
+                    )
+                }
+
+                if viewModel.items.isEmpty {
+                    VStack(spacing: 12) {
+                        Image(systemName: "keyboard.badge.ellipsis")
+                            .font(.system(size: 26, weight: .semibold))
+                            .foregroundColor(Color.white.opacity(0.78))
+
+                        Text("还没有虚拟按键")
+                            .font(.system(size: 16, weight: .semibold))
+                            .foregroundColor(.white)
+
+                        Text("点击右上角加号，先添加一组自定义按键。")
+                            .font(.system(size: 13, weight: .medium))
+                            .foregroundColor(Color.white.opacity(0.68))
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.top, 40)
+                } else {
+                    ForEach(0..<rows.count, id: \.self) { rowIndex in
+                        HStack(spacing: cardSpacing) {
+                            ForEach(0..<rows[rowIndex].count, id: \.self) { itemIndex in
+                                let item = rows[rowIndex][itemIndex]
+                                StreamVirtualButtonCardView(item: item,
+                                                            width: cardWidth,
+                                                            height: cardHeight) {
+                                    onDelete(item.identifier)
+                                }
+                            }
+
+                            if rows[rowIndex].count < columnCount {
+                                ForEach(0..<(columnCount - rows[rowIndex].count), id: \.self) { _ in
+                                    Color.clear
+                                        .frame(width: cardWidth, height: cardHeight)
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            .padding(.horizontal, horizontalPadding)
+            .padding(.bottom, 20)
+        }
+    }
+
+    private func addForm(in geometry: GeometryProxy) -> some View {
+        return ScrollView(.vertical, showsIndicators: false) {
+            VStack(alignment: .leading, spacing: 16) {
+                VStack(alignment: .leading, spacing: 10) {
+                    Text("按键名称")
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundColor(Color.white.opacity(0.72))
+
+                    TextField("例如：Alt+Tab", text: Binding(get: {
+                        viewModel.draftTitle
+                    }, set: { newValue in
+                        viewModel.draftTitle = String(newValue.prefix(18))
+                    }))
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundColor(.white)
+                    .padding(.horizontal, 14)
+                    .frame(height: 44)
+                    .background(
+                        RoundedRectangle(cornerRadius: 14, style: .continuous)
+                            .fill(Color.white.opacity(0.08))
+                    )
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 14, style: .continuous)
+                            .stroke(Color.white.opacity(0.10), lineWidth: 1)
+                    )
+                }
+
+                VStack(alignment: .leading, spacing: 10) {
+                    Text("已选按键 \(viewModel.selectedKeyCodes.count)/\(maxSelectedKeys)")
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundColor(Color.white.opacity(0.72))
+
+                    if viewModel.selectedKeyLabels.isEmpty {
+                        Text("点击下方键帽添加组合键，最多支持 5 个。")
+                            .font(.system(size: 13, weight: .medium))
+                            .foregroundColor(Color.white.opacity(0.62))
+                            .padding(.vertical, 4)
+                    } else {
+                        selectedKeyWrap
+                    }
+                }
+
+                VStack(alignment: .leading, spacing: 10) {
+                    Text("选择按键")
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundColor(Color.white.opacity(0.72))
+
+                    HStack(spacing: 10) {
+                        modeChip(title: "Fn 模式",
+                                 isActive: viewModel.fnModeEnabled,
+                                 activeColor: Color(red: 0.33, green: 0.68, blue: 0.24)) {
+                            viewModel.fnModeEnabled.toggle()
+                        }
+
+                        Button(action: {
+                            viewModel.isShowingMousePicker = true
+                        }) {
+                            HStack(spacing: 6) {
+                                mousePickerIcon(for: selectableMouseItems[0], size: 13)
+                                Text("鼠标按钮")
+                                    .font(.system(size: 12, weight: .semibold))
+                            }
+                            .foregroundColor(.white)
+                            .padding(.horizontal, 12)
+                            .frame(height: 32)
+                            .background(
+                                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                    .fill(Color.white.opacity(0.08))
+                            )
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                    .stroke(Color.white.opacity(0.10), lineWidth: 1)
+                            )
+                        }
+                        .buttonStyle(PlainButtonStyle())
+
+                        Button(action: {
+                            viewModel.isShowingDirectionalPicker = true
+                        }) {
+                            HStack(spacing: 6) {
+                                Image(systemName: "circle.grid.cross")
+                                    .font(.system(size: 13, weight: .semibold))
+                                Text("摇杆 / DPad")
+                                    .font(.system(size: 12, weight: .semibold))
+                            }
+                            .foregroundColor(.white)
+                            .padding(.horizontal, 12)
+                            .frame(height: 32)
+                            .background(
+                                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                    .fill(Color.white.opacity(0.08))
+                            )
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                    .stroke(Color.white.opacity(0.10), lineWidth: 1)
+                            )
+                        }
+                        .buttonStyle(PlainButtonStyle())
+
+                        Spacer(minLength: 0)
+                    }
+
+                    selectableKeyboard(in: geometry)
+                }
+
+                HStack(spacing: 12) {
+                    Button(action: cancelAdding) {
+                        Text("取消")
+                            .font(.system(size: 15, weight: .semibold))
+                            .foregroundColor(.white)
+                            .frame(maxWidth: .infinity)
+                            .frame(height: 44)
+                            .background(
+                                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                                    .fill(Color.white.opacity(0.08))
+                            )
+                    }
+                    .buttonStyle(PlainButtonStyle())
+
+                    Button(action: submitDraft) {
+                        Text("保存")
+                            .font(.system(size: 15, weight: .semibold))
+                            .foregroundColor(.white)
+                            .frame(maxWidth: .infinity)
+                            .frame(height: 44)
+                            .background(
+                                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                                    .fill(canSubmitDraft ? Color(red: 0.50, green: 0.45, blue: 0.94) : Color.white.opacity(0.08))
+                            )
+                    }
+                    .buttonStyle(PlainButtonStyle())
+                    .disabled(!canSubmitDraft)
+                    .opacity(canSubmitDraft ? 1.0 : 0.7)
+                }
+            }
+            .padding(.horizontal, horizontalPadding)
+            .padding(.bottom, 20)
+        }
+    }
+
+    private func selectableKeyboard(in geometry: GeometryProxy) -> some View {
+        let contentWidth = max(geometry.size.width - horizontalPadding * 2, 0)
+        let rowSpacing: CGFloat = 8
+        let keySpacing: CGFloat = 8
+        let rowHeight: CGFloat = 38
+        let rows = selectableKeyRows
+
+        return VStack(spacing: rowSpacing) {
+            ForEach(0..<rows.count, id: \.self) { rowIndex in
+                let row = rows[rowIndex]
+                let totalUnits = max(row.reduce(CGFloat.zero) { $0 + $1.widthUnits }, 1)
+                let unitWidth = max((contentWidth - CGFloat(max(row.count - 1, 0)) * keySpacing) / totalUnits, 24)
+
+                HStack(spacing: keySpacing) {
+                    ForEach(row) { key in
+                        virtualKeyButton(key: key,
+                                         width: max(unitWidth * key.widthUnits, 28),
+                                         height: rowHeight)
+                    }
+                }
+            }
+        }
+    }
+
+    private var selectedKeyWrap: some View {
+        let rows = chunkedSelectedKeys(columnCount: isLandscape ? 5 : 3)
+        return VStack(alignment: .leading, spacing: 8) {
+            ForEach(0..<rows.count, id: \.self) { rowIndex in
+                HStack(spacing: 8) {
+                    ForEach(rows[rowIndex], id: \.self) { keyLabel in
+                        selectedKeyChip(label: keyLabel)
+                    }
+                }
+            }
+        }
+    }
+
+    private func selectedKeyChip(label: String) -> some View {
+        Button(action: {
+            removeSelectedKey(label: label)
+        }) {
+            HStack(spacing: 6) {
+                Text(label)
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundColor(.white)
+
+                Image(systemName: "xmark.circle.fill")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundColor(Color.white.opacity(0.76))
+            }
+            .padding(.horizontal, 10)
+            .frame(height: 30)
+            .background(
+                Capsule()
+                    .fill(Color.white.opacity(0.10))
+            )
+            .overlay(
+                Capsule()
+                    .stroke(Color.white.opacity(0.10), lineWidth: 1)
+            )
+        }
+        .buttonStyle(PlainButtonStyle())
+    }
+
+    private func modeChip(title: String,
+                          isActive: Bool,
+                          activeColor: Color,
+                          action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Text(title)
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundColor(.white)
+                .padding(.horizontal, 12)
+                .frame(height: 28)
+                .background(
+                    RoundedRectangle(cornerRadius: 10, style: .continuous)
+                        .fill(isActive ? activeColor : Color.white.opacity(0.10))
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 10, style: .continuous)
+                        .stroke(Color.white.opacity(isActive ? 0.0 : 0.10), lineWidth: 1)
+                )
+        }
+        .buttonStyle(PlainButtonStyle())
+    }
+
+    private func virtualKeyButton(key: StreamVirtualButtonSelectableKey, width: CGFloat, height: CGFloat) -> some View {
+        let displayLabel = activeLabel(for: key)
+        let isSelected = viewModel.selectedKeyLabels.contains(displayLabel)
+
+        return Button(action: {
+            appendSelectedKey(key)
+        }) {
+            Text(displayLabel)
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundColor(.white)
+                .frame(width: width, height: height)
+                .background(
+                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                        .fill(isSelected ? Color(red: 0.50, green: 0.45, blue: 0.94) : Color.white.opacity(0.08))
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                        .stroke(Color.white.opacity(isSelected ? 0.0 : 0.10), lineWidth: 1)
+                )
+        }
+        .buttonStyle(PlainButtonStyle())
+        .disabled(isSelected || viewModel.selectedKeyCodes.count >= maxSelectedKeys)
+    }
+
+    private var canSubmitDraft: Bool {
+        !viewModel.draftTitle.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && !viewModel.selectedKeyCodes.isEmpty
+    }
+
+    private func beginAdding() {
+        viewModel.isAddingItem = true
+        if viewModel.isEditingEnabled {
+            viewModel.isEditingEnabled = false
+            onToggleEditing(false)
+        }
+        viewModel.draftTitle = ""
+        viewModel.fnModeEnabled = false
+        viewModel.selectedKeyLabels = []
+        viewModel.selectedKeyCodes = []
+    }
+
+    private func cancelAdding() {
+        viewModel.isAddingItem = false
+        viewModel.draftTitle = ""
+        viewModel.fnModeEnabled = false
+        viewModel.selectedKeyLabels = []
+        viewModel.selectedKeyCodes = []
+        viewModel.isShowingMousePicker = false
+        viewModel.isShowingDirectionalPicker = false
+    }
+
+    private func appendSelectedKey(_ key: StreamVirtualButtonSelectableKey) {
+        let keyLabel = activeLabel(for: key)
+        let keyCode = activeKeyCode(for: key)
+
+        guard !viewModel.selectedKeyLabels.contains(keyLabel) else {
+            return
+        }
+        guard viewModel.selectedKeyCodes.count < maxSelectedKeys else {
+            return
+        }
+        viewModel.selectedKeyLabels.append(keyLabel)
+        viewModel.selectedKeyCodes.append(NSNumber(value: keyCode))
+    }
+
+    private func removeSelectedKey(label: String) {
+        guard let index = viewModel.selectedKeyLabels.firstIndex(of: label) else {
+            return
+        }
+        viewModel.selectedKeyLabels.remove(at: index)
+        if index < viewModel.selectedKeyCodes.count {
+            viewModel.selectedKeyCodes.remove(at: index)
+        }
+    }
+
+    private func submitDraft() {
+        guard canSubmitDraft else {
+            return
+        }
+        onSubmit(viewModel.draftTitle.trimmingCharacters(in: .whitespacesAndNewlines),
+                 viewModel.selectedKeyLabels,
+                 viewModel.selectedKeyCodes)
+        cancelAdding()
+    }
+
+    private func submitMouseDraft(item: StreamVirtualMouseSelectableItem) {
+        let typedTitle = viewModel.draftTitle.trimmingCharacters(in: .whitespacesAndNewlines)
+        let resolvedTitle = typedTitle.isEmpty ? item.title : typedTitle
+        onSubmitMouse(resolvedTitle, item.id, item.subtitle)
+        cancelAdding()
+    }
+
+    private func submitDirectionalDraft(item: StreamVirtualDirectionalSelectableItem) {
+        let typedTitle = viewModel.draftTitle.trimmingCharacters(in: .whitespacesAndNewlines)
+        let resolvedTitle = typedTitle.isEmpty ? item.title : typedTitle
+        onSubmitDirectional(resolvedTitle, item.id, item.subtitle)
+        cancelAdding()
+    }
+
+    private func activeLabel(for key: StreamVirtualButtonSelectableKey) -> String {
+        if viewModel.fnModeEnabled, let altLabel = key.altLabel {
+            return altLabel
+        }
+        return key.label
+    }
+
+    private func activeKeyCode(for key: StreamVirtualButtonSelectableKey) -> Int {
+        if viewModel.fnModeEnabled, let altKeyCode = key.altKeyCode {
+            return altKeyCode
+        }
+        return key.keyCode
+    }
+
+    private func chunkedItems(columnCount: Int) -> [[StreamVirtualButtonPanelItem]] {
+        guard columnCount > 0 else { return [] }
+        var result: [[StreamVirtualButtonPanelItem]] = []
+        var currentIndex = 0
+        while currentIndex < viewModel.items.count {
+            let endIndex = min(currentIndex + columnCount, viewModel.items.count)
+            result.append(Array(viewModel.items[currentIndex..<endIndex]))
+            currentIndex = endIndex
+        }
+        return result
+    }
+
+    private func chunkedSelectedKeys(columnCount: Int) -> [[String]] {
+        let values = viewModel.selectedKeyLabels
+        guard columnCount > 0 else { return [] }
+        var result: [[String]] = []
+        var currentIndex = 0
+        while currentIndex < values.count {
+            let endIndex = min(currentIndex + columnCount, values.count)
+            result.append(Array(values[currentIndex..<endIndex]))
+            currentIndex = endIndex
+        }
+        return result
+    }
+
+    private var selectableMouseItems: [StreamVirtualMouseSelectableItem] {
+        [
+            .init(id: "mouse_left", title: "鼠标左键", subtitle: "左键点击", assetName: "ic_mouse_left", symbol: "cursorarrow.click"),
+            .init(id: "mouse_left_lock", title: "鼠标左键锁定", subtitle: "点击锁定左键", assetName: "ic_mouse_left_p", symbol: "cursorarrow.click"),
+            .init(id: "mouse_right", title: "鼠标右键", subtitle: "右键点击", assetName: "ic_mouse_right", symbol: "cursorarrow.rays"),
+            .init(id: "mouse_right_lock", title: "鼠标右键锁定", subtitle: "点击锁定右键", assetName: "ic_mouse_right_p", symbol: "cursorarrow.rays"),
+            .init(id: "mouse_middle", title: "鼠标中键", subtitle: "中键点击", assetName: "ic_mouse_middle", symbol: "circle.grid.2x1"),
+            .init(id: "mouse_scroll_up", title: "上滚轮", subtitle: "向上滚动", assetName: "ic_mouse_scroll_up", symbol: "arrow.up.to.line"),
+            .init(id: "mouse_scroll_down", title: "下滚轮", subtitle: "向下滚动", assetName: "ic_mouse_scroll_down", symbol: "arrow.down.to.line")
+        ]
+    }
+
+    private var selectableDirectionalItems: [StreamVirtualDirectionalSelectableItem] {
+        [
+            .init(id: "joystick_wasd", title: "摇杆 WASD", subtitle: "摇杆样式，发送 W / A / S / D", symbol: "circle.circle"),
+            .init(id: "joystick_arrows", title: "摇杆上下左右", subtitle: "摇杆样式，发送方向键", symbol: "circle.circle.fill"),
+            .init(id: "dpad_wasd", title: "DPad-WASD", subtitle: "DPad 样式，发送 W / A / S / D", symbol: "plus.square"),
+            .init(id: "dpad_arrows", title: "DPad上下左右", subtitle: "DPad 样式，发送方向键", symbol: "plus.square.fill")
+        ]
+    }
+
+    @ViewBuilder
+    private func mousePickerIcon(for item: StreamVirtualMouseSelectableItem, size: CGFloat) -> some View {
+        if let image = UIImage(named: item.assetName) {
+            Image(uiImage: image)
+                .resizable()
+                .renderingMode(.original)
+                .scaledToFit()
+                .frame(width: size, height: size)
+        } else {
+            Image(systemName: item.symbol)
+                .font(.system(size: size * 0.72, weight: .semibold))
+                .foregroundColor(.white)
+        }
+    }
+
+    private func mouseButtonPickerOverlay(maxWidth: CGFloat) -> some View {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack {
+                Text("添加鼠标按钮")
+                    .font(.system(size: 18, weight: .bold))
+                    .foregroundColor(.white)
+
+                Spacer(minLength: 8)
+
+                Button(action: {
+                    viewModel.isShowingMousePicker = false
+                }) {
+                    Image(systemName: "xmark")
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundColor(Color.white.opacity(0.82))
+                        .frame(width: 30, height: 30)
+                        .background(Color.white.opacity(0.08))
+                        .clipShape(Circle())
+                }
+                .buttonStyle(PlainButtonStyle())
+            }
+
+            Text("选择一个鼠标按钮类型，保存后会作为单独的虚拟按钮添加到串流画面。")
+                .font(.system(size: 13, weight: .medium))
+                .foregroundColor(Color.white.opacity(0.68))
+
+            ScrollView(.vertical, showsIndicators: true) {
+                VStack(spacing: 10) {
+                    ForEach(selectableMouseItems) { item in
+                        Button(action: {
+                            submitMouseDraft(item: item)
+                        }) {
+                            HStack(spacing: 12) {
+                                mousePickerIcon(for: item, size: 18)
+                                    .frame(width: 36, height: 36)
+                                    .background(Color.white.opacity(0.08))
+                                    .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Text(item.title)
+                                        .font(.system(size: 14, weight: .semibold))
+                                        .foregroundColor(.white)
+                                    Text(item.subtitle)
+                                        .font(.system(size: 12, weight: .medium))
+                                        .foregroundColor(Color.white.opacity(0.66))
+                                }
+
+                                Spacer(minLength: 8)
+                            }
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 10)
+                            .background(
+                                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                                    .fill(Color.white.opacity(0.08))
+                            )
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                                    .stroke(Color.white.opacity(0.10), lineWidth: 1)
+                            )
+                        }
+                        .buttonStyle(PlainButtonStyle())
+                    }
+                }
+                .padding(.trailing, 2)
+            }
+            .frame(maxHeight: 280)
+        }
+        .padding(18)
+        .frame(maxWidth: maxWidth)
+        .background(
+            RoundedRectangle(cornerRadius: 22, style: .continuous)
+                .fill(Color(red: 0.16, green: 0.16, blue: 0.18).opacity(0.98))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 22, style: .continuous)
+                .stroke(Color.white.opacity(0.10), lineWidth: 1)
+        )
+        .shadow(color: Color.black.opacity(0.26), radius: 18, x: 0, y: 10)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
+    }
+
+    private func directionalControlPickerOverlay(maxWidth: CGFloat) -> some View {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack {
+                Text("添加摇杆 / DPad")
+                    .font(.system(size: 18, weight: .bold))
+                    .foregroundColor(.white)
+
+                Spacer(minLength: 8)
+
+                Button(action: {
+                    viewModel.isShowingDirectionalPicker = false
+                }) {
+                    Image(systemName: "xmark")
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundColor(Color.white.opacity(0.82))
+                        .frame(width: 30, height: 30)
+                        .background(Color.white.opacity(0.08))
+                        .clipShape(Circle())
+                }
+                .buttonStyle(PlainButtonStyle())
+            }
+
+            Text("选择一个新的方向控件样式，保存后会作为独立控件添加到串流画面。")
+                .font(.system(size: 13, weight: .medium))
+                .foregroundColor(Color.white.opacity(0.68))
+
+            ScrollView(.vertical, showsIndicators: true) {
+                VStack(spacing: 10) {
+                    ForEach(selectableDirectionalItems) { item in
+                        Button(action: {
+                            submitDirectionalDraft(item: item)
+                        }) {
+                            HStack(spacing: 12) {
+                                Image(systemName: item.symbol)
+                                    .font(.system(size: 18, weight: .semibold))
+                                    .foregroundColor(.white)
+                                    .frame(width: 36, height: 36)
+                                    .background(Color.white.opacity(0.08))
+                                    .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Text(item.title)
+                                        .font(.system(size: 14, weight: .semibold))
+                                        .foregroundColor(.white)
+                                    Text(item.subtitle)
+                                        .font(.system(size: 12, weight: .medium))
+                                        .foregroundColor(Color.white.opacity(0.66))
+                                }
+
+                                Spacer(minLength: 8)
+                            }
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 10)
+                            .background(
+                                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                                    .fill(Color.white.opacity(0.08))
+                            )
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                                    .stroke(Color.white.opacity(0.10), lineWidth: 1)
+                            )
+                        }
+                        .buttonStyle(PlainButtonStyle())
+                    }
+                }
+                .padding(.trailing, 2)
+            }
+            .frame(maxHeight: 280)
+        }
+        .padding(18)
+        .frame(maxWidth: maxWidth)
+        .background(
+            RoundedRectangle(cornerRadius: 22, style: .continuous)
+                .fill(Color(red: 0.16, green: 0.16, blue: 0.18).opacity(0.98))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 22, style: .continuous)
+                .stroke(Color.white.opacity(0.10), lineWidth: 1)
+        )
+        .shadow(color: Color.black.opacity(0.26), radius: 18, x: 0, y: 10)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
+    }
+
+    private var selectableKeyRows: [[StreamVirtualButtonSelectableKey]] {
+        [
+            [
+                .init(id: "esc", label: "Esc", keyCode: 0x1B, altLabel: nil, altKeyCode: nil, widthUnits: 1.0),
+                .init(id: "1", label: "1", keyCode: 0x31, altLabel: "F1", altKeyCode: 0x70, widthUnits: 1.0),
+                .init(id: "2", label: "2", keyCode: 0x32, altLabel: "F2", altKeyCode: 0x71, widthUnits: 1.0),
+                .init(id: "3", label: "3", keyCode: 0x33, altLabel: "F3", altKeyCode: 0x72, widthUnits: 1.0),
+                .init(id: "4", label: "4", keyCode: 0x34, altLabel: "F4", altKeyCode: 0x73, widthUnits: 1.0),
+                .init(id: "5", label: "5", keyCode: 0x35, altLabel: "F5", altKeyCode: 0x74, widthUnits: 1.0),
+                .init(id: "6", label: "6", keyCode: 0x36, altLabel: "F6", altKeyCode: 0x75, widthUnits: 1.0),
+                .init(id: "7", label: "7", keyCode: 0x37, altLabel: "F7", altKeyCode: 0x76, widthUnits: 1.0),
+                .init(id: "8", label: "8", keyCode: 0x38, altLabel: "F8", altKeyCode: 0x77, widthUnits: 1.0),
+                .init(id: "9", label: "9", keyCode: 0x39, altLabel: "F9", altKeyCode: 0x78, widthUnits: 1.0),
+                .init(id: "0", label: "0", keyCode: 0x30, altLabel: "F10", altKeyCode: 0x79, widthUnits: 1.0),
+                .init(id: "minus", label: "-", keyCode: 0xBD, altLabel: "F11", altKeyCode: 0x7A, widthUnits: 1.0),
+                .init(id: "equal", label: "=", keyCode: 0xBB, altLabel: "F12", altKeyCode: 0x7B, widthUnits: 1.0),
+                .init(id: "tick", label: "`", keyCode: 0xC0, altLabel: nil, altKeyCode: nil, widthUnits: 1.0),
+                .init(id: "backspace", label: "⌫", keyCode: 0x08, altLabel: nil, altKeyCode: nil, widthUnits: 1.6)
+            ],
+            [
+                .init(id: "tab", label: "Tab", keyCode: 0x09, altLabel: nil, altKeyCode: nil, widthUnits: 1.5),
+                .init(id: "q", label: "Q", keyCode: 0x51, altLabel: "0", altKeyCode: 0x60, widthUnits: 1.0),
+                .init(id: "w", label: "W", keyCode: 0x57, altLabel: "1", altKeyCode: 0x61, widthUnits: 1.0),
+                .init(id: "e", label: "E", keyCode: 0x45, altLabel: "2", altKeyCode: 0x62, widthUnits: 1.0),
+                .init(id: "r", label: "R", keyCode: 0x52, altLabel: "3", altKeyCode: 0x63, widthUnits: 1.0),
+                .init(id: "t", label: "T", keyCode: 0x54, altLabel: "4", altKeyCode: 0x64, widthUnits: 1.0),
+                .init(id: "y", label: "Y", keyCode: 0x59, altLabel: "5", altKeyCode: 0x65, widthUnits: 1.0),
+                .init(id: "u", label: "U", keyCode: 0x55, altLabel: "6", altKeyCode: 0x66, widthUnits: 1.0),
+                .init(id: "i", label: "I", keyCode: 0x49, altLabel: "Prt", altKeyCode: 0x2C, widthUnits: 1.0),
+                .init(id: "o", label: "O", keyCode: 0x4F, altLabel: "Scr", altKeyCode: 0x91, widthUnits: 1.0),
+                .init(id: "p", label: "P", keyCode: 0x50, altLabel: "Pause", altKeyCode: 0x13, widthUnits: 1.0),
+                .init(id: "openBracket", label: "[", keyCode: 0xDB, altLabel: nil, altKeyCode: nil, widthUnits: 1.0),
+                .init(id: "closeBracket", label: "]", keyCode: 0xDD, altLabel: nil, altKeyCode: nil, widthUnits: 1.0),
+                .init(id: "backslash", label: "\\", keyCode: 0xDC, altLabel: nil, altKeyCode: nil, widthUnits: 1.5)
+            ],
+            [
+                .init(id: "caps", label: "Caps", keyCode: 0x14, altLabel: nil, altKeyCode: nil, widthUnits: 1.75),
+                .init(id: "a", label: "A", keyCode: 0x41, altLabel: "7", altKeyCode: 0x67, widthUnits: 1.0),
+                .init(id: "s", label: "S", keyCode: 0x53, altLabel: "8", altKeyCode: 0x68, widthUnits: 1.0),
+                .init(id: "d", label: "D", keyCode: 0x44, altLabel: "9", altKeyCode: 0x69, widthUnits: 1.0),
+                .init(id: "f", label: "F", keyCode: 0x46, altLabel: nil, altKeyCode: nil, widthUnits: 1.0),
+                .init(id: "g", label: "G", keyCode: 0x47, altLabel: nil, altKeyCode: nil, widthUnits: 1.0),
+                .init(id: "h", label: "H", keyCode: 0x48, altLabel: nil, altKeyCode: nil, widthUnits: 1.0),
+                .init(id: "j", label: "J", keyCode: 0x4A, altLabel: "Ins", altKeyCode: 0x2D, widthUnits: 1.0),
+                .init(id: "k", label: "K", keyCode: 0x4B, altLabel: "Home", altKeyCode: 0x24, widthUnits: 1.0),
+                .init(id: "l", label: "L", keyCode: 0x4C, altLabel: "PgUp", altKeyCode: 0x21, widthUnits: 1.0),
+                .init(id: "semicolon", label: ";", keyCode: 0xBA, altLabel: nil, altKeyCode: nil, widthUnits: 1.0),
+                .init(id: "quote", label: "'", keyCode: 0xDE, altLabel: nil, altKeyCode: nil, widthUnits: 1.0),
+                .init(id: "enter", label: "Enter", keyCode: 0x0D, altLabel: nil, altKeyCode: nil, widthUnits: 2.0)
+            ],
+            [
+                .init(id: "leftShift", label: "Shift", keyCode: 0xA0, altLabel: nil, altKeyCode: nil, widthUnits: 1.75),
+                .init(id: "z", label: "Z", keyCode: 0x5A, altLabel: "/", altKeyCode: 0x6F, widthUnits: 1.0),
+                .init(id: "x", label: "X", keyCode: 0x58, altLabel: "*", altKeyCode: 0x6A, widthUnits: 1.0),
+                .init(id: "c", label: "C", keyCode: 0x43, altLabel: "+", altKeyCode: 0x6B, widthUnits: 1.0),
+                .init(id: "v", label: "V", keyCode: 0x56, altLabel: "-", altKeyCode: 0x6D, widthUnits: 1.0),
+                .init(id: "b", label: "B", keyCode: 0x42, altLabel: nil, altKeyCode: nil, widthUnits: 1.0),
+                .init(id: "n", label: "N", keyCode: 0x4E, altLabel: nil, altKeyCode: nil, widthUnits: 1.0),
+                .init(id: "m", label: "M", keyCode: 0x4D, altLabel: "Del", altKeyCode: 0x2E, widthUnits: 1.0),
+                .init(id: "comma", label: ",", keyCode: 0xBC, altLabel: "End", altKeyCode: 0x23, widthUnits: 1.0),
+                .init(id: "period", label: ".", keyCode: 0xBE, altLabel: "PgDn", altKeyCode: 0x22, widthUnits: 1.0),
+                .init(id: "slash", label: "/", keyCode: 0xBF, altLabel: nil, altKeyCode: nil, widthUnits: 1.0),
+                .init(id: "numLock", label: "NumLk", keyCode: 0x90, altLabel: "rShift", altKeyCode: 0xA1, widthUnits: 1.0),
+                .init(id: "up", label: "↑", keyCode: 0x26, altLabel: nil, altKeyCode: nil, widthUnits: 1.0),
+                .init(id: "delete", label: "Del", keyCode: 0x2E, altLabel: nil, altKeyCode: nil, widthUnits: 1.0)
+            ],
+            [
+                .init(id: "leftCtrl", label: "Ctrl", keyCode: 0xA2, altLabel: nil, altKeyCode: nil, widthUnits: 1.75),
+                .init(id: "leftWin", label: "Win", keyCode: 0x5B, altLabel: nil, altKeyCode: nil, widthUnits: 1.25),
+                .init(id: "leftAlt", label: "Alt", keyCode: 0xA4, altLabel: nil, altKeyCode: nil, widthUnits: 1.25),
+                .init(id: "space", label: "Space", keyCode: 0x20, altLabel: nil, altKeyCode: nil, widthUnits: 5.25),
+                .init(id: "rightAlt", label: "Alt", keyCode: 0xA5, altLabel: nil, altKeyCode: nil, widthUnits: 1.25),
+                .init(id: "rightWin", label: "rWin", keyCode: 0x5C, altLabel: nil, altKeyCode: nil, widthUnits: 1.0),
+                .init(id: "left", label: "←", keyCode: 0x25, altLabel: nil, altKeyCode: nil, widthUnits: 1.0),
+                .init(id: "down", label: "↓", keyCode: 0x28, altLabel: nil, altKeyCode: nil, widthUnits: 1.0),
+                .init(id: "right", label: "→", keyCode: 0x27, altLabel: nil, altKeyCode: nil, widthUnits: 1.0)
+            ]
+        ]
+    }
+}
+
+private struct StreamVirtualButtonCardView: View {
+    let item: StreamVirtualButtonPanelItem
+    let width: CGFloat
+    let height: CGFloat
+    let onDelete: () -> Void
+
+    init(item: StreamVirtualButtonPanelItem,
+         width: CGFloat,
+         height: CGFloat,
+         onDelete: @escaping () -> Void) {
+        self.item = item
+        self.width = width
+        self.height = height
+        self.onDelete = onDelete
+    }
+
+    var body: some View {
+        let actualHeight = floor(width * 0.42)
+
+        return VStack(alignment: .leading, spacing: 4) {
+            HStack(alignment: .top, spacing: 10) {
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(item.title)
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundColor(.white)
+                        .lineLimit(1)
+
+                    Text(item.subtitle)
+                        .font(.system(size: 10, weight: .medium))
+                        .foregroundColor(Color.white.opacity(0.68))
+                        .lineLimit(1)
+                }
+
+                Spacer(minLength: 8)
+
+                Button(action: onDelete) {
+                    Image(systemName: "trash")
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundColor(Color(red: 0.96, green: 0.46, blue: 0.46))
+                        .frame(width: 28, height: 28)
+                        .background(Color.white.opacity(0.08))
+                        .clipShape(Circle())
+                }
+                .buttonStyle(PlainButtonStyle())
+            }
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 8)
+        .frame(width: width, height: actualHeight, alignment: .top)
+        .background(
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .fill(
+                    LinearGradient(colors: [
+                        Color.white.opacity(0.11),
+                        Color.white.opacity(0.06)
+                    ], startPoint: .topLeading, endPoint: .bottomTrailing)
+                )
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .stroke(Color.white.opacity(0.10), lineWidth: 1)
+        )
+        .clipped()
     }
 }
 
@@ -1521,5 +2507,149 @@ final class StreamVirtualKeyboardPanelHostingViewController: UIViewController {
 
     @objc private func cancelTapped() {
         delegate?.streamVirtualKeyboardPanelHostingViewControllerDidCancel(self)
+    }
+}
+
+@objcMembers
+final class StreamVirtualButtonsPanelHostingViewController: UIViewController {
+    weak var delegate: StreamVirtualButtonsPanelHostingViewControllerDelegate?
+
+    private let viewModel = StreamVirtualButtonsPanelViewModel()
+    private let dimmingView = UIView()
+    private let panelContainerView = UIView()
+    private var hostingController: UIHostingController<StreamVirtualButtonsPanelView>?
+    private var isLandscapeLayout = false
+
+    override func viewDidLoad() {
+        super.viewDidLoad()
+        modalPresentationStyle = .overFullScreen
+        modalTransitionStyle = .crossDissolve
+        view.backgroundColor = .clear
+
+        buildViewHierarchy()
+        installHostingControllerIfNeeded()
+    }
+
+    override func viewDidLayoutSubviews() {
+        super.viewDidLayoutSubviews()
+
+        dimmingView.frame = view.bounds
+
+        let bounds = view.bounds
+        let bottomInset = view.safeAreaInsets.bottom
+        let newIsLandscapeLayout = bounds.width > bounds.height
+        if newIsLandscapeLayout != isLandscapeLayout {
+            isLandscapeLayout = newIsLandscapeLayout
+            refreshPanelRootView()
+        } else {
+            isLandscapeLayout = newIsLandscapeLayout
+        }
+
+        let panelWidth = bounds.width
+        let panelHeightRatio: CGFloat = traitCollection.userInterfaceIdiom == .pad ? 0.60 : 0.68
+        let panelHeight = bounds.height * panelHeightRatio
+        let panelContainerHeight = panelHeight + bottomInset
+        panelContainerView.frame = CGRect(x: 0,
+                                          y: bounds.height - panelContainerHeight,
+                                          width: panelWidth,
+                                          height: panelContainerHeight)
+    }
+
+    func configure(title: String, items: [StreamVirtualButtonPanelItem], isEditingEnabled: Bool, buttonOpacity: Double) {
+        viewModel.title = title
+        viewModel.items = items
+        viewModel.isEditingEnabled = isEditingEnabled
+        viewModel.buttonOpacity = buttonOpacity
+        refreshPanelRootView()
+    }
+
+    private func buildViewHierarchy() {
+        dimmingView.backgroundColor = UIColor.black.withAlphaComponent(0.42)
+        dimmingView.addGestureRecognizer(UITapGestureRecognizer(target: self, action: #selector(cancelTapped)))
+        view.addSubview(dimmingView)
+
+        panelContainerView.backgroundColor = UIColor(red: 0.15, green: 0.15, blue: 0.17, alpha: 0.94)
+        panelContainerView.layer.cornerRadius = 30
+        panelContainerView.layer.maskedCorners = [.layerMinXMinYCorner, .layerMaxXMinYCorner]
+        panelContainerView.layer.masksToBounds = true
+        panelContainerView.layer.borderWidth = 1
+        panelContainerView.layer.borderColor = UIColor.white.withAlphaComponent(0.10).cgColor
+        view.addSubview(panelContainerView)
+    }
+
+    private func installHostingControllerIfNeeded() {
+        let controller = EdgeIgnoringHostingController(rootView: makePanelRootView())
+        controller.view.translatesAutoresizingMaskIntoConstraints = false
+        controller.view.backgroundColor = .clear
+
+        addChild(controller)
+        panelContainerView.addSubview(controller.view)
+        NSLayoutConstraint.activate([
+            controller.view.leadingAnchor.constraint(equalTo: panelContainerView.leadingAnchor),
+            controller.view.trailingAnchor.constraint(equalTo: panelContainerView.trailingAnchor),
+            controller.view.topAnchor.constraint(equalTo: panelContainerView.topAnchor),
+            controller.view.bottomAnchor.constraint(equalTo: panelContainerView.bottomAnchor)
+        ])
+        controller.didMove(toParent: self)
+        hostingController = controller
+    }
+
+    private func refreshPanelRootView() {
+        hostingController?.rootView = makePanelRootView()
+    }
+
+    private func makePanelRootView() -> StreamVirtualButtonsPanelView {
+        StreamVirtualButtonsPanelView(viewModel: viewModel,
+                                      isLandscape: isLandscapeLayout,
+                                      onToggleEditing: { [weak self] enabled in
+                                          guard let self = self else { return }
+                                          self.delegate?.streamVirtualButtonsPanelHostingViewController(self, didChangeEditingEnabled: enabled)
+                                      },
+                                      onDelete: { [weak self] identifier in
+                                          guard let self = self else { return }
+                                          self.delegate?.streamVirtualButtonsPanelHostingViewController(self, didDeleteItemWithIdentifier: identifier)
+                                      },
+                                      onUpdate: { [weak self] identifier, shape, scale, widthScale, heightScale in
+                                          guard let self = self else { return }
+                                          self.delegate?.streamVirtualButtonsPanelHostingViewController(self,
+                                                                                                        didUpdateItemWithIdentifier: identifier,
+                                                                                                        shape: shape,
+                                                                                                        scale: scale,
+                                                                                                        widthScale: widthScale,
+                                                                                                        heightScale: heightScale)
+                                      },
+                                      onOpacityChange: { [weak self] opacity in
+                                          guard let self = self else { return }
+                                          self.delegate?.streamVirtualButtonsPanelHostingViewController(self, didChangeButtonOpacity: opacity)
+                                      },
+                                      onSubmit: { [weak self] title, keyLabels, keyCodes in
+                                          guard let self = self else { return }
+                                          self.delegate?.streamVirtualButtonsPanelHostingViewController(self,
+                                                                                                        didSubmitItemWithTitle: title,
+                                                                                                        keyLabels: keyLabels,
+                                                                                                        keyCodes: keyCodes)
+                                      },
+                                      onSubmitMouse: { [weak self] title, mouseActionIdentifier, subtitle in
+                                          guard let self = self else { return }
+                                          self.delegate?.streamVirtualButtonsPanelHostingViewController(self,
+                                                                                                        didSubmitMouseItemWithTitle: title,
+                                                                                                        mouseActionIdentifier: mouseActionIdentifier,
+                                                                                                        subtitle: subtitle)
+                                      },
+                                      onSubmitDirectional: { [weak self] title, controlActionIdentifier, subtitle in
+                                          guard let self = self else { return }
+                                          self.delegate?.streamVirtualButtonsPanelHostingViewController(self,
+                                                                                                        didSubmitDirectionalItemWithTitle: title,
+                                                                                                        controlActionIdentifier: controlActionIdentifier,
+                                                                                                        subtitle: subtitle)
+                                      },
+                                      onCancel: { [weak self] in
+                                          guard let self = self else { return }
+                                          self.delegate?.streamVirtualButtonsPanelHostingViewControllerDidCancel(self)
+                                      })
+    }
+
+    @objc private func cancelTapped() {
+        delegate?.streamVirtualButtonsPanelHostingViewControllerDidCancel(self)
     }
 }
