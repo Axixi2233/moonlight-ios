@@ -29,7 +29,6 @@ final class SettingsFormSnapshot: NSObject {
     var useFramePacing: Bool = false
 
     var absoluteTouchMode: Bool = false
-    var onscreenControls: Int = 1
     var optimizeGames: Bool = true
     var multiController: Bool = false
     var swapABXYButtons: Bool = false
@@ -51,11 +50,12 @@ final class SettingsFormSnapshot: NSObject {
     var performanceOverlayMargin: Int = 6
     var floatingMenuEnabled: Bool = false
     var virtualButtonSchemeSelection: Int = 0
+    var virtualGamepadSchemeSelection: Int = 0
+    var virtualGamepadOpacity: Int = 52
 }
 
 @objc protocol SettingsHostingViewControllerDelegate: NSObjectProtocol {
     func settingsHostingViewControllerDidRequestCustomResolution(_ controller: SettingsHostingViewController)
-    func settingsHostingViewControllerDidRequestOpenOnScreenControls(_ controller: SettingsHostingViewController)
     func settingsHostingViewController(_ controller: SettingsHostingViewController, didRequestOpenExternalURL urlString: String)
 }
 
@@ -87,7 +87,6 @@ private final class SettingsFormViewModel: ObservableObject {
     @Published var useFramePacing: Bool = false
 
     @Published var absoluteTouchMode: Bool = false
-    @Published var onscreenControls: Int = 1
     @Published var optimizeGames: Bool = true
     @Published var multiController: Bool = false
     @Published var swapABXYButtons: Bool = false
@@ -109,6 +108,8 @@ private final class SettingsFormViewModel: ObservableObject {
     @Published var performanceOverlayMargin: Double = 6
     @Published var floatingMenuEnabled: Bool = false
     @Published var virtualButtonSchemeSelection: Int = 0
+    @Published var virtualGamepadSchemeSelection: Int = 0
+    @Published var virtualGamepadOpacity: Double = 52
 
     func apply(snapshot: SettingsFormSnapshot) {
         bitrateValues = snapshot.bitrateValues.map { $0.intValue }
@@ -136,7 +137,6 @@ private final class SettingsFormViewModel: ObservableObject {
         useFramePacing = snapshot.useFramePacing
 
         absoluteTouchMode = snapshot.absoluteTouchMode
-        onscreenControls = snapshot.onscreenControls
         optimizeGames = snapshot.optimizeGames
         multiController = snapshot.multiController
         swapABXYButtons = snapshot.swapABXYButtons
@@ -158,6 +158,8 @@ private final class SettingsFormViewModel: ObservableObject {
         performanceOverlayMargin = Double(snapshot.performanceOverlayMargin)
         floatingMenuEnabled = snapshot.floatingMenuEnabled
         virtualButtonSchemeSelection = snapshot.virtualButtonSchemeSelection
+        virtualGamepadSchemeSelection = snapshot.virtualGamepadSchemeSelection
+        virtualGamepadOpacity = Double(snapshot.virtualGamepadOpacity)
     }
 
     func currentSnapshot() -> SettingsFormSnapshot {
@@ -181,7 +183,6 @@ private final class SettingsFormViewModel: ObservableObject {
         snapshot.enableHdr = enableHdr
         snapshot.useFramePacing = useFramePacing
         snapshot.absoluteTouchMode = absoluteTouchMode
-        snapshot.onscreenControls = onscreenControls
         snapshot.optimizeGames = optimizeGames
         snapshot.multiController = multiController
         snapshot.swapABXYButtons = swapABXYButtons
@@ -203,6 +204,8 @@ private final class SettingsFormViewModel: ObservableObject {
         snapshot.performanceOverlayMargin = Int(performanceOverlayMargin.rounded())
         snapshot.floatingMenuEnabled = floatingMenuEnabled
         snapshot.virtualButtonSchemeSelection = virtualButtonSchemeSelection
+        snapshot.virtualGamepadSchemeSelection = virtualGamepadSchemeSelection
+        snapshot.virtualGamepadOpacity = Int(virtualGamepadOpacity.rounded())
         return snapshot
     }
 
@@ -426,7 +429,6 @@ private struct ChoiceSectionRow: View {
 private struct SettingsRootView: View {
     @ObservedObject var model: SettingsFormViewModel
     let requestCustomResolution: () -> Void
-    let requestOnScreenControlsEditor: () -> Void
     let openExternalURL: (String) -> Void
 
     var body: some View {
@@ -493,23 +495,6 @@ private struct SettingsRootView: View {
 
                 Section(header: Text("输入设置")) {
                     segmentedSection(title: "触控模式", selection: touchModeSelection(), labels: model.touchModeTitles)
-                    
-                    choiceSection(
-                        title: "虚拟手柄",
-                        subtitle: model.onscreenControlsTitle,
-                        options: Array(model.onscreenControlTitles.enumerated()),
-                        selectedIndex: model.onscreenControls
-                    ) { index in
-                        model.onscreenControls = index
-                    } isDisabled: { _ in false }
-
-                    if model.onscreenControls == 4 {
-                        Button(action: {
-                            requestOnScreenControlsEditor()
-                        }) {
-                            Text("编辑自定义虚拟手柄布局")
-                        }
-                    }
 
                     Toggle("优化游戏设置", isOn: $model.optimizeGames).font(.headline)
                     Toggle("多控制器模式", isOn: $model.multiController).font(.headline)
@@ -533,6 +518,19 @@ private struct SettingsRootView: View {
                     ) { index in
                         model.virtualButtonSchemeSelection = index
                     } isDisabled: { _ in false }
+                    choiceSection(
+                        title: "虚拟手柄方案",
+                        subtitle: model.virtualGamepadSchemeTitle,
+                        options: Array(model.virtualGamepadSchemeTitles.enumerated()),
+                        selectedIndex: model.virtualGamepadSchemeSelection
+                    ) { index in
+                        model.virtualGamepadSchemeSelection = index
+                    } isDisabled: { _ in false }
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("虚拟手柄透明度 \(Int(model.virtualGamepadOpacity))%")
+                            .font(.headline)
+                        Slider(value: $model.virtualGamepadOpacity, in: 5...100, step: 1)
+                    }
                     choiceSection(
                         title: "性能信息位置",
                         subtitle: model.performanceOverlayPositionTitle,
@@ -703,17 +701,6 @@ private extension SettingsFormViewModel {
         codecValues.firstIndex(of: preferredCodecValue) ?? max(codecValues.count - 1, 0)
     }
 
-    var onscreenControlTitles: [String] {
-        ["关闭", "自动", "精简", "完整", "自定义"]
-    }
-
-    var onscreenControlsTitle: String {
-        guard onscreenControlTitles.indices.contains(onscreenControls) else {
-            return "自动"
-        }
-        return onscreenControlTitles[onscreenControls]
-    }
-
     var videoAlignmentTitles: [String] {
         ["居中", "顶部居中", "底部居中"]
     }
@@ -738,6 +725,17 @@ private extension SettingsFormViewModel {
             return "方案 1"
         }
         return virtualButtonSchemeTitles[virtualButtonSchemeSelection]
+    }
+
+    var virtualGamepadSchemeTitles: [String] {
+        ["方案 1", "方案 2", "方案 3", "方案 4", "方案 5"]
+    }
+
+    var virtualGamepadSchemeTitle: String {
+        guard virtualGamepadSchemeTitles.indices.contains(virtualGamepadSchemeSelection) else {
+            return "方案 1"
+        }
+        return virtualGamepadSchemeTitles[virtualGamepadSchemeSelection]
     }
 }
 
@@ -777,10 +775,6 @@ final class SettingsHostingViewController: UIViewController {
             requestCustomResolution: { [weak self] in
                 guard let self = self else { return }
                 self.delegate?.settingsHostingViewControllerDidRequestCustomResolution(self)
-            },
-            requestOnScreenControlsEditor: { [weak self] in
-                guard let self = self else { return }
-                self.delegate?.settingsHostingViewControllerDidRequestOpenOnScreenControls(self)
             },
             openExternalURL: { [weak self] urlString in
                 guard let self = self else { return }

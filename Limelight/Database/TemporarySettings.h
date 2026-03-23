@@ -14,6 +14,8 @@ FOUNDATION_EXTERN NSString * const StreamPreferencePerformanceOverlayPositionSel
 FOUNDATION_EXTERN NSString * const StreamPreferencePerformanceOverlayMarginKey;
 FOUNDATION_EXTERN NSString * const StreamPreferenceFloatingMenuEnabledKey;
 FOUNDATION_EXTERN NSString * const StreamPreferenceVirtualButtonSchemeSelectionKey;
+FOUNDATION_EXTERN NSString * const StreamPreferenceVirtualGamepadSchemeSelectionKey;
+FOUNDATION_EXTERN NSString * const StreamPreferenceVirtualGamepadOpacityKey;
 
 @interface TemporarySettings : NSObject
 
@@ -55,6 +57,8 @@ FOUNDATION_EXTERN NSString * const StreamPreferenceVirtualButtonSchemeSelectionK
 @property (nonatomic) CGFloat performanceOverlayMargin;
 @property (nonatomic) BOOL floatingMenuEnabled;
 @property (nonatomic) NSInteger virtualButtonSchemeSelection;
+@property (nonatomic) NSInteger virtualGamepadSchemeSelection;
+@property (nonatomic) CGFloat virtualGamepadOpacity;
 
 - (id) initFromSettings:(Settings*)settings;
 

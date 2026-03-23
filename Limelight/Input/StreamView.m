@@ -14,12 +14,13 @@
 #import "RelativeTouchHandler.h"
 #import "AbsoluteTouchHandler.h"
 #import "KeyboardInputField.h"
-#import "OSCProfilesManager.h"
 
 static const double X1_MOUSE_SPEED_DIVISOR = 2.5;
 NSString * const StreamViewBoundsDidChangeNotification = @"StreamViewBoundsDidChangeNotification";
 NSString * const StreamViewVirtualButtonsDidChangeNotification = @"StreamViewVirtualButtonsDidChangeNotification";
 NSString * const StreamViewVirtualButtonSelectionDidChangeNotification = @"StreamViewVirtualButtonSelectionDidChangeNotification";
+NSString * const StreamViewVirtualGamepadDidChangeNotification = @"StreamViewVirtualGamepadDidChangeNotification";
+NSString * const StreamViewVirtualGamepadSelectionDidChangeNotification = @"StreamViewVirtualGamepadSelectionDidChangeNotification";
 static NSString * const kVirtualButtonShapeCircle = @"circle";
 static NSString * const kVirtualButtonShapeRoundedRect = @"roundedRect";
 static NSString * const kVirtualControlJoystick = @"joystick";
@@ -49,10 +50,12 @@ typedef NS_OPTIONS(NSUInteger, StreamVirtualDirectionMask) {
 @property(nonatomic, assign) BOOL editingEnabled;
 @property(nonatomic, assign) BOOL selectedForEditing;
 @property(nonatomic, assign) CGFloat controlOpacity;
+@property(nonatomic, assign) BOOL selectionTapAllowed;
 @property(nonatomic, copy) dispatch_block_t selectionHandler;
-@property(nonatomic, copy) void (^directionMaskChangedHandler)(StreamVirtualDirectionMask previousMask, StreamVirtualDirectionMask currentMask);
+@property(nonatomic, copy) void (^directionMaskChangedHandler)(StreamVirtualDirectionMask previousMask, StreamVirtualDirectionMask currentMask, CGPoint normalizedVector);
 - (void)configureWithDescriptor:(NSDictionary<NSString *, id> *)descriptor;
 - (void)resetInteractionState;
+- (void)requireSelectionTapToFailForGestureRecognizer:(UIGestureRecognizer *)gestureRecognizer;
 @end
 
 @implementation StreamVirtualDirectionalControl {
@@ -105,6 +108,7 @@ typedef NS_OPTIONS(NSUInteger, StreamVirtualDirectionMask) {
 
         _controlAction = @"";
         _controlOpacity = 0.52f;
+        _selectionTapAllowed = YES;
         _currentMask = StreamVirtualDirectionMaskNone;
         _normalizedVector = CGPointZero;
     }
@@ -112,7 +116,19 @@ typedef NS_OPTIONS(NSUInteger, StreamVirtualDirectionMask) {
 }
 
 - (BOOL)isJoystick {
-    return [_controlAction hasPrefix:@"joystick_"];
+    return [_controlAction hasPrefix:@"joystick_"] || [self isGamepadJoystick];
+}
+
+- (BOOL)isGamepadJoystick {
+    return [_controlAction isEqualToString:@"gamepad_left_stick"] || [_controlAction isEqualToString:@"gamepad_right_stick"];
+}
+
+- (BOOL)isGamepadDPad {
+    return [_controlAction isEqualToString:@"gamepad_dpad"];
+}
+
+- (BOOL)isGamepadFaceButtons {
+    return [_controlAction isEqualToString:@"gamepad_face_buttons"];
 }
 
 - (BOOL)usesWASDMapping {
@@ -122,8 +138,13 @@ typedef NS_OPTIONS(NSUInteger, StreamVirtualDirectionMask) {
 - (void)setEditingEnabled:(BOOL)editingEnabled {
     _editingEnabled = editingEnabled;
     _interactionPanGestureRecognizer.enabled = NO;
-    _selectionTapGestureRecognizer.enabled = editingEnabled;
+    _selectionTapGestureRecognizer.enabled = editingEnabled && _selectionTapAllowed;
     [self updateVisualState];
+}
+
+- (void)setSelectionTapAllowed:(BOOL)selectionTapAllowed {
+    _selectionTapAllowed = selectionTapAllowed;
+    _selectionTapGestureRecognizer.enabled = _editingEnabled && _selectionTapAllowed;
 }
 
 - (void)setSelectedForEditing:(BOOL)selectedForEditing {
@@ -142,7 +163,16 @@ typedef NS_OPTIONS(NSUInteger, StreamVirtualDirectionMask) {
         self.controlAction = controlAction;
     }
 
-    NSArray<NSString *> *labels = [self usesWASDMapping] ? @[ @"W", @"S", @"A", @"D" ] : @[ @"↑", @"↓", @"←", @"→" ];
+    NSArray<NSString *> *labels = nil;
+    if ([self isGamepadJoystick]) {
+        labels = @[ @"", @"", @"", @"" ];
+    }
+    else if ([self isGamepadFaceButtons]) {
+        labels = @[ @"Y", @"A", @"X", @"B" ];
+    }
+    else {
+        labels = [self usesWASDMapping] ? @[ @"W", @"S", @"A", @"D" ] : @[ @"↑", @"↓", @"←", @"→" ];
+    }
     [_directionLabels enumerateObjectsUsingBlock:^(UILabel *label, NSUInteger idx, BOOL *stop) {
         label.text = idx < labels.count ? labels[idx] : @"";
     }];
@@ -170,10 +200,10 @@ typedef NS_OPTIONS(NSUInteger, StreamVirtualDirectionMask) {
     UILabel *rightLabel = _directionLabels.count > 3 ? _directionLabels[3] : nil;
 
     if ([self isJoystick]) {
-        CGFloat labelSize = floor(side * 0.24f);
+        CGFloat labelSize = floor(side * 0.20f);
         CGFloat inset = floor(side * 0.12f);
-        CGFloat knobSide = floor(side * 0.28f);
-        CGFloat centerDotSide = floor(side * 0.10f);
+        CGFloat knobSide = floor(side * 0.26f);
+        CGFloat centerDotSide = floor(side * 0.08f);
 
         upLabel.frame = CGRectMake(centerX - labelSize * 0.5f, inset, labelSize, labelSize);
         downLabel.frame = CGRectMake(centerX - labelSize * 0.5f, CGRectGetHeight(_baseView.bounds) - inset - labelSize, labelSize, labelSize);
@@ -186,13 +216,15 @@ typedef NS_OPTIONS(NSUInteger, StreamVirtualDirectionMask) {
 
         _knobView.bounds = CGRectMake(0, 0, knobSide, knobSide);
         _knobView.layer.cornerRadius = knobSide * 0.5f;
-        CGFloat travelRadius = MAX((side * 0.5f) - (knobSide * 0.5f) - (side * 0.12f), 0.0f);
+        CGFloat travelInset = [self isGamepadJoystick] ? (side * 0.025f) : (side * 0.12f);
+        CGFloat travelRadius = MAX((side * 0.5f) - (knobSide * 0.5f) - travelInset, 0.0f);
         _knobView.center = CGPointMake(centerX + _normalizedVector.x * travelRadius,
                                        centerY + _normalizedVector.y * travelRadius);
     }
     else {
-        CGFloat buttonSide = floor(side * 0.24f);
-        CGFloat inset = floor(side * 0.12f);
+        BOOL isGamepadCluster = [self isGamepadDPad] || [self isGamepadFaceButtons];
+        CGFloat buttonSide = floor(side * (isGamepadCluster ? 0.255f : 0.22f));
+        CGFloat inset = floor(side * (isGamepadCluster ? 0.125f : 0.16f));
 
         upLabel.frame = CGRectMake(centerX - buttonSide * 0.5f,
                                    inset,
@@ -224,6 +256,12 @@ typedef NS_OPTIONS(NSUInteger, StreamVirtualDirectionMask) {
 
 - (void)resetInteractionState {
     [self updateDirectionMask:StreamVirtualDirectionMaskNone normalizedVector:CGPointZero];
+}
+
+- (void)requireSelectionTapToFailForGestureRecognizer:(UIGestureRecognizer *)gestureRecognizer {
+    if (gestureRecognizer != nil) {
+        [_selectionTapGestureRecognizer requireGestureRecognizerToFail:gestureRecognizer];
+    }
 }
 
 - (void)handleSelectionTap:(UITapGestureRecognizer *)gestureRecognizer {
@@ -293,7 +331,7 @@ typedef NS_OPTIONS(NSUInteger, StreamVirtualDirectionMask) {
     CGFloat deltaX = location.x - centerX;
     CGFloat deltaY = location.y - centerY;
     CGFloat distance = hypot(deltaX, deltaY);
-    CGFloat deadZone = CGRectGetWidth(_baseView.bounds) * 0.14f;
+    CGFloat deadZone = CGRectGetWidth(_baseView.bounds) * ([self isGamepadFaceButtons] ? 0.12f : 0.14f);
 
     if (distance < deadZone) {
         return StreamVirtualDirectionMaskNone;
@@ -394,25 +432,30 @@ typedef NS_OPTIONS(NSUInteger, StreamVirtualDirectionMask) {
 
 - (void)updateDirectionMask:(StreamVirtualDirectionMask)newMask normalizedVector:(CGPoint)normalizedVector {
     StreamVirtualDirectionMask previousMask = _currentMask;
+    CGPoint previousVector = _normalizedVector;
     _currentMask = newMask;
     _normalizedVector = normalizedVector;
     [self updateVisualState];
     [self setNeedsLayout];
 
-    if (self.directionMaskChangedHandler != nil && previousMask != newMask) {
-        self.directionMaskChangedHandler(previousMask, newMask);
+    if (self.directionMaskChangedHandler != nil &&
+        (previousMask != newMask ||
+         fabs(previousVector.x - normalizedVector.x) > 0.001f ||
+         fabs(previousVector.y - normalizedVector.y) > 0.001f)) {
+        self.directionMaskChangedHandler(previousMask, newMask, normalizedVector);
     }
 }
 
 - (void)updateVisualState {
     BOOL joystick = [self isJoystick];
-    CGFloat borderWidth = self.editingEnabled ? (self.selectedForEditing ? 2.0f : 1.3f) : 1.0f;
+    CGFloat visualOpacity = MIN(MAX(self.controlOpacity, 0.05f), 1.0f);
+    CGFloat borderWidth = self.editingEnabled ? (self.selectedForEditing ? 2.0f : 1.3f) : ([self isGamepadJoystick] ? 1.1f : 1.0f);
     UIColor *editingBorderColor = self.editingEnabled ?
         (self.selectedForEditing ? [UIColor colorWithRed:0.60 green:0.55 blue:0.98 alpha:1.0] : [[UIColor colorWithRed:0.50 green:0.45 blue:0.94 alpha:1.0] colorWithAlphaComponent:0.86]) :
-        [[UIColor whiteColor] colorWithAlphaComponent:0.14];
+        [[UIColor whiteColor] colorWithAlphaComponent:([self isGamepadJoystick] ? (0.10f + 0.16f * visualOpacity) : (0.08f + 0.12f * visualOpacity))];
     UIColor *fillColor = self.editingEnabled ?
         (self.selectedForEditing ? [UIColor colorWithRed:0.19 green:0.19 blue:0.25 alpha:0.90] : [[UIColor blackColor] colorWithAlphaComponent:self.controlOpacity]) :
-        [[UIColor blackColor] colorWithAlphaComponent:self.controlOpacity];
+        ([self isGamepadJoystick] ? [[UIColor blackColor] colorWithAlphaComponent:(0.10f + 0.58f * visualOpacity)] : [[UIColor blackColor] colorWithAlphaComponent:(0.08f + 0.56f * visualOpacity)]);
 
     _baseView.backgroundColor = fillColor;
     _baseView.layer.borderWidth = borderWidth;
@@ -420,9 +463,10 @@ typedef NS_OPTIONS(NSUInteger, StreamVirtualDirectionMask) {
     _baseView.layer.cornerRadius = CGRectGetWidth(self.bounds) * 0.5f;
 
     UIColor *joystickActiveFill = [UIColor clearColor];
-    UIColor *dpadActiveFill = [[UIColor whiteColor] colorWithAlphaComponent:0.10f];
+    UIColor *dpadActiveFill = [[UIColor whiteColor] colorWithAlphaComponent:(0.06f + 0.10f * visualOpacity)];
+    UIColor *faceActiveFill = [[UIColor whiteColor] colorWithAlphaComponent:(0.08f + 0.12f * visualOpacity)];
     UIColor *inactiveFill = [UIColor clearColor];
-    UIColor *textColor = joystick ? [UIColor colorWithWhite:1.0 alpha:0.88] : [UIColor colorWithWhite:1.0 alpha:0.88];
+    UIColor *textColor = [UIColor colorWithWhite:1.0 alpha:(0.28f + 0.60f * visualOpacity)];
 
     UILabel *upLabel = _directionLabels.count > 0 ? _directionLabels[0] : nil;
     UILabel *downLabel = _directionLabels.count > 1 ? _directionLabels[1] : nil;
@@ -438,12 +482,15 @@ typedef NS_OPTIONS(NSUInteger, StreamVirtualDirectionMask) {
     for (NSDictionary *state in states) {
         UILabel *label = state[@"label"];
         BOOL active = [state[@"active"] boolValue];
-        label.textColor = active ? [UIColor whiteColor] : textColor;
-        label.backgroundColor = active ? (joystick ? joystickActiveFill : dpadActiveFill) : inactiveFill;
+        BOOL hideLabelForGamepadJoystick = joystick && [self isGamepadJoystick];
+        label.hidden = hideLabelForGamepadJoystick;
+        label.textColor = active ? [[UIColor whiteColor] colorWithAlphaComponent:(0.42f + 0.58f * visualOpacity)] : textColor;
+        UIColor *activeFill = [self isGamepadFaceButtons] ? faceActiveFill : (joystick ? joystickActiveFill : dpadActiveFill);
+        label.backgroundColor = active ? activeFill : inactiveFill;
         label.layer.cornerRadius = CGRectGetWidth(label.bounds) * 0.5f;
         label.layer.masksToBounds = YES;
         label.layer.borderWidth = joystick ? 0.0f : 0.8f;
-        label.layer.borderColor = [[UIColor whiteColor] colorWithAlphaComponent:(active ? 0.92f : 0.72f)].CGColor;
+        label.layer.borderColor = [[UIColor whiteColor] colorWithAlphaComponent:(active ? (0.36f + 0.58f * visualOpacity) : (0.18f + 0.42f * visualOpacity))].CGColor;
         label.layer.shadowColor = [UIColor blackColor].CGColor;
         label.layer.shadowOpacity = 0.0f;
         label.layer.shadowRadius = 0.0f;
@@ -452,18 +499,16 @@ typedef NS_OPTIONS(NSUInteger, StreamVirtualDirectionMask) {
     }
 
     _centerDotView.hidden = !joystick;
-    _centerDotView.backgroundColor = [[UIColor whiteColor] colorWithAlphaComponent:0.34];
+    _centerDotView.backgroundColor = [self isGamepadJoystick] ? [UIColor colorWithWhite:1.0 alpha:(0.04f + 0.14f * visualOpacity)] : [[UIColor whiteColor] colorWithAlphaComponent:(0.10f + 0.24f * visualOpacity)];
     _knobView.hidden = !joystick;
-    _knobView.backgroundColor = [[UIColor whiteColor] colorWithAlphaComponent:0.18];
-    _knobView.layer.borderWidth = 0.8f;
-    _knobView.layer.borderColor = [[UIColor whiteColor] colorWithAlphaComponent:0.22].CGColor;
+    _knobView.backgroundColor = [self isGamepadJoystick] ? [UIColor colorWithWhite:0.56 alpha:(0.18f + 0.68f * visualOpacity)] : [[UIColor whiteColor] colorWithAlphaComponent:(0.08f + 0.16f * visualOpacity)];
+    _knobView.layer.borderWidth = [self isGamepadJoystick] ? 0.8f : 0.8f;
+    _knobView.layer.borderColor = [self isGamepadJoystick] ? [UIColor colorWithWhite:0.55 alpha:(0.12f + 0.32f * visualOpacity)].CGColor : [[UIColor whiteColor] colorWithAlphaComponent:(0.08f + 0.18f * visualOpacity)].CGColor;
 }
 
 @end
 
 @implementation StreamView {
-    OnScreenControls* onScreenControls;
-
     KeyboardInputField* keyInputField;
     BOOL isInputingText;
     NSMutableSet* keysDown;
@@ -499,7 +544,6 @@ typedef NS_OPTIONS(NSUInteger, StreamVirtualDirectionMask) {
     StreamViewVideoAlignmentMode videoAlignmentMode;
     CGFloat videoAlignmentMargin;
     BOOL viewOnlyModeEnabled;
-    OnScreenControlsLevel requestedOnScreenControlsLevel;
     UIView *virtualButtonsContainerView;
     NSArray<UIView *> *virtualButtons;
     NSArray<NSDictionary<NSString *, id> *> *virtualButtonDescriptors;
@@ -507,42 +551,12 @@ typedef NS_OPTIONS(NSUInteger, StreamVirtualDirectionMask) {
     BOOL temporaryVirtualButtonsEditingEnabled;
     NSString *selectedVirtualButtonIdentifier;
     NSMutableSet<NSString *> *lockedMouseActionIdentifiers;
-}
-
-- (BOOL)shouldUseFullOnScreenControlsForCurrentOrientation {
-    return self.bounds.size.height > self.bounds.size.width;
-}
-
-- (OnScreenControlsLevel)effectiveOnScreenControlsLevelForRequestedLevel:(OnScreenControlsLevel)level {
-    if (level != OnScreenControlsCustom) {
-        return level;
-    }
-
-    OSCProfile *selectedProfile = [[OSCProfilesManager sharedManager] getSelectedProfile];
-    if (selectedProfile == nil || [self shouldUseFullOnScreenControlsForCurrentOrientation]) {
-        return OnScreenControlsLevelFull;
-    }
-
-    return OnScreenControlsCustom;
-}
-
-- (void)applyRequestedOnScreenControlsLevel {
-#if !TARGET_OS_TV
-    if (onScreenControls == nil) {
-        return;
-    }
-
-    if (requestedOnScreenControlsLevel == OnScreenControlsLevelAuto && controllerSupport != nil) {
-        [controllerSupport initAutoOnScreenControlMode:onScreenControls];
-        return;
-    }
-
-    OnScreenControlsLevel effectiveLevel = [self effectiveOnScreenControlsLevelForRequestedLevel:requestedOnScreenControlsLevel];
-    if ([onScreenControls getLevel] != effectiveLevel) {
-        [onScreenControls setLevel:effectiveLevel];
-    }
-    [onScreenControls show];
-#endif
+    UIView *virtualGamepadContainerView;
+    NSArray<UIView *> *virtualGamepadControls;
+    NSArray<NSDictionary<NSString *, id> *> *virtualGamepadDescriptors;
+    BOOL temporaryVirtualGamepadVisible;
+    BOOL temporaryVirtualGamepadEditingEnabled;
+    NSString *selectedVirtualGamepadIdentifier;
 }
 
 - (void) setupStreamView:(ControllerSupport*)controllerSupport
@@ -578,12 +592,7 @@ typedef NS_OPTIONS(NSUInteger, StreamVirtualDirectionMask) {
     // iOS uses RelativeTouchHandler or AbsoluteTouchHandler depending on user preference
     [self applyTemporaryTouchModeWithAbsoluteTouchMode:settings.absoluteTouchMode
                                       multiTouchScreen:settings.multiTouchScreen];
-    
-    onScreenControls = [[OnScreenControls alloc] initWithView:self controllerSup:controllerSupport streamConfig:streamConfig];
-    requestedOnScreenControlsLevel = (OnScreenControlsLevel)[settings.onscreenControls integerValue];
-    Log(LOG_I, @"Setting requested on-screen controls level: %d", (int)requestedOnScreenControlsLevel);
-    [self applyRequestedOnScreenControlsLevel];
-    
+
     // It would be nice to just use GCMouse on iOS 14+ and the older API on iOS 13
     // but unfortunately that isn't possible today. GCMouse doesn't recognize many
     // mice correctly, but UIKit does. We will register for both and ignore UIKit
@@ -639,10 +648,6 @@ typedef NS_OPTIONS(NSUInteger, StreamVirtualDirectionMask) {
     else {
         touchHandler = [[RelativeTouchHandler alloc] initWithView:self settings:settings];
     }
-
-    if (onScreenControls != nil) {
-        [self applyRequestedOnScreenControlsLevel];
-    }
 #endif
 }
 
@@ -675,10 +680,10 @@ typedef NS_OPTIONS(NSUInteger, StreamVirtualDirectionMask) {
 - (void)layoutSubviews {
     [super layoutSubviews];
 
+    [self layoutVirtualGamepadOverlay];
     [self layoutVirtualButtonsOverlay];
 
     if (!CGSizeEqualToSize(lastPostedBoundsSize, self.bounds.size)) {
-        [self applyRequestedOnScreenControlsLevel];
         lastPostedBoundsSize = self.bounds.size;
         [[NSNotificationCenter defaultCenter] postNotificationName:StreamViewBoundsDidChangeNotification object:self];
     }
@@ -716,19 +721,11 @@ typedef NS_OPTIONS(NSUInteger, StreamVirtualDirectionMask) {
     }
 }
 
-- (void) showOnScreenControls {
+- (void)updateOscControllerEnabledState {
 #if !TARGET_OS_TV
-    [onScreenControls show];
+    BOOL shouldEnableOsc = temporaryVirtualGamepadVisible;
+    [controllerSupport setOscEnabledForCurrentSession:shouldEnableOsc];
 #endif
-}
-
-- (OnScreenControlsLevel) getCurrentOscState {
-    if (onScreenControls == nil) {
-        return OnScreenControlsLevelOff;
-    }
-    else {
-        return [onScreenControls getLevel];
-    }
 }
 
 - (NSArray<NSDictionary<NSString *, id> *> *)builtInVirtualButtonDescriptors {
@@ -748,6 +745,599 @@ typedef NS_OPTIONS(NSUInteger, StreamVirtualDirectionMask) {
     }
 
     return @[];
+}
+
+- (NSArray<NSDictionary<NSString *, id> *> *)activeVirtualGamepadDescriptors {
+    return virtualGamepadDescriptors ?: @[];
+}
+
+- (BOOL)isDirectionalVirtualGamepadDescriptor:(NSDictionary<NSString *, id> *)descriptor {
+    NSString *controlAction = descriptor[@"controlAction"];
+    return [controlAction isKindOfClass:[NSString class]] && [controlAction hasPrefix:@"gamepad_"];
+}
+
+- (BOOL)isCircularVirtualGamepadDescriptor:(NSDictionary<NSString *, id> *)descriptor {
+    NSString *shape = descriptor[@"shape"];
+    return [shape isEqualToString:kVirtualButtonShapeCircle];
+}
+
+- (CGSize)virtualGamepadSizeForDescriptor:(NSDictionary<NSString *, id> *)descriptor {
+    BOOL isPad = UIDevice.currentDevice.userInterfaceIdiom == UIUserInterfaceIdiomPad;
+    CGFloat baseCircleSide = isPad ? 68.0f : 56.0f;
+    CGFloat baseRoundedWidth = isPad ? 98.0f : 84.0f;
+    CGFloat baseRoundedHeight = isPad ? 48.0f : 40.0f;
+    CGFloat baseDirectionalSide = isPad ? 142.0f : 116.0f;
+
+    if ([self isDirectionalVirtualGamepadDescriptor:descriptor]) {
+        NSNumber *scaleNumber = descriptor[@"scale"];
+        CGFloat scale = MIN(MAX(scaleNumber != nil ? scaleNumber.doubleValue : 1.0, 0.50), 2.00);
+        CGFloat side = baseDirectionalSide * scale;
+        return CGSizeMake(side, side);
+    }
+
+    if ([self isCircularVirtualGamepadDescriptor:descriptor]) {
+        NSNumber *scaleNumber = descriptor[@"scale"];
+        CGFloat scale = MIN(MAX(scaleNumber != nil ? scaleNumber.doubleValue : 1.0, 0.50), 2.00);
+        CGFloat side = baseCircleSide * scale;
+        return CGSizeMake(side, side);
+    }
+
+    NSNumber *widthScaleNumber = descriptor[@"widthScale"];
+    NSNumber *heightScaleNumber = descriptor[@"heightScale"];
+    CGFloat widthScale = MIN(MAX(widthScaleNumber != nil ? widthScaleNumber.doubleValue : 1.0, 0.50), 2.00);
+    CGFloat heightScale = MIN(MAX(heightScaleNumber != nil ? heightScaleNumber.doubleValue : 1.0, 0.50), 2.00);
+    return CGSizeMake(baseRoundedWidth * widthScale, baseRoundedHeight * heightScale);
+}
+
+- (int)gamepadButtonFlagsForDirectionMask:(StreamVirtualDirectionMask)mask {
+    int flags = 0;
+    if ((mask & StreamVirtualDirectionMaskUp) != 0) {
+        flags |= UP_FLAG;
+    }
+    if ((mask & StreamVirtualDirectionMaskDown) != 0) {
+        flags |= DOWN_FLAG;
+    }
+    if ((mask & StreamVirtualDirectionMaskLeft) != 0) {
+        flags |= LEFT_FLAG;
+    }
+    if ((mask & StreamVirtualDirectionMaskRight) != 0) {
+        flags |= RIGHT_FLAG;
+    }
+    return flags;
+}
+
+- (int)gamepadFaceButtonFlagsForDirectionMask:(StreamVirtualDirectionMask)mask {
+    int flags = 0;
+    if ((mask & StreamVirtualDirectionMaskUp) != 0) {
+        flags |= Y_FLAG;
+    }
+    if ((mask & StreamVirtualDirectionMaskDown) != 0) {
+        flags |= A_FLAG;
+    }
+    if ((mask & StreamVirtualDirectionMaskLeft) != 0) {
+        flags |= X_FLAG;
+    }
+    if ((mask & StreamVirtualDirectionMaskRight) != 0) {
+        flags |= B_FLAG;
+    }
+    return flags;
+}
+
+- (int)gamepadButtonFlagsForRole:(NSString *)role {
+    if (![role isKindOfClass:[NSString class]]) {
+        return 0;
+    }
+    if ([role isEqualToString:@"a"]) return A_FLAG;
+    if ([role isEqualToString:@"b"]) return B_FLAG;
+    if ([role isEqualToString:@"x"]) return X_FLAG;
+    if ([role isEqualToString:@"y"]) return Y_FLAG;
+    if ([role isEqualToString:@"select"]) return BACK_FLAG;
+    if ([role isEqualToString:@"start"]) return PLAY_FLAG;
+    if ([role isEqualToString:@"l1"]) return LB_FLAG;
+    if ([role isEqualToString:@"r1"]) return RB_FLAG;
+    if ([role isEqualToString:@"l3"]) return LS_CLK_FLAG;
+    if ([role isEqualToString:@"r3"]) return RS_CLK_FLAG;
+    return 0;
+}
+
+- (void)ensureVirtualGamepadOverlayIfNeeded {
+    if (virtualGamepadContainerView != nil) {
+        return;
+    }
+
+    virtualGamepadContainerView = [[UIView alloc] initWithFrame:CGRectZero];
+    virtualGamepadContainerView.backgroundColor = [UIColor clearColor];
+    virtualGamepadContainerView.hidden = YES;
+    [self addSubview:virtualGamepadContainerView];
+}
+
+- (void)applyAppearanceForVirtualGamepadButton:(UIButton *)button descriptor:(NSDictionary<NSString *, id> *)descriptor size:(CGSize)size {
+    BOOL isCircle = [self isCircularVirtualGamepadDescriptor:descriptor];
+    NSString *role = descriptor[@"role"];
+    NSString *title = descriptor[@"title"] ?: @"";
+    BOOL isSelected = selectedVirtualGamepadIdentifier != nil && [selectedVirtualGamepadIdentifier isEqualToString:descriptor[@"id"]];
+    NSNumber *opacityNumber = descriptor[@"opacity"];
+    CGFloat buttonOpacity = MIN(MAX(opacityNumber != nil ? opacityNumber.doubleValue : 0.52, 0.05), 1.0);
+    button.bounds = CGRectMake(0, 0, size.width, size.height);
+    button.layer.cornerRadius = isCircle ? size.width * 0.5f : MIN(size.height * 0.34f, 18.0f);
+    button.layer.borderWidth = temporaryVirtualGamepadEditingEnabled ? (isSelected ? 2.0f : 1.3f) : 1.1f;
+    button.layer.borderColor = (temporaryVirtualGamepadEditingEnabled ?
+                                (isSelected ? [UIColor colorWithRed:0.60 green:0.55 blue:0.98 alpha:1.0].CGColor : [[UIColor colorWithWhite:1.0 alpha:0.28] CGColor]) :
+                                [[UIColor whiteColor] colorWithAlphaComponent:(0.08f + 0.20f * buttonOpacity)].CGColor);
+    button.backgroundColor = temporaryVirtualGamepadEditingEnabled ?
+        (isSelected ? [UIColor colorWithRed:0.18 green:0.18 blue:0.24 alpha:0.92] : [[UIColor blackColor] colorWithAlphaComponent:buttonOpacity]) :
+        [[UIColor blackColor] colorWithAlphaComponent:(0.10f + 0.58f * buttonOpacity)];
+    [button setTitle:title forState:UIControlStateNormal];
+    [button setTitleColor:[[UIColor whiteColor] colorWithAlphaComponent:(0.28f + 0.72f * buttonOpacity)] forState:UIControlStateNormal];
+    button.titleLabel.font = [UIFont systemFontOfSize:(isCircle ? 15.0f : 13.0f) weight:UIFontWeightSemibold];
+    button.titleLabel.adjustsFontSizeToFitWidth = YES;
+    button.titleLabel.minimumScaleFactor = 0.60f;
+    button.contentEdgeInsets = isCircle ? UIEdgeInsetsZero : UIEdgeInsetsMake(8.0f, 12.0f, 8.0f, 12.0f);
+    button.imageView.alpha = 0.28f + 0.72f * buttonOpacity;
+    button.titleLabel.alpha = 0.28f + 0.72f * buttonOpacity;
+
+    if ([role hasPrefix:@"l2"] || [role hasPrefix:@"r2"]) {
+        button.titleLabel.font = [UIFont systemFontOfSize:13.0f weight:UIFontWeightBold];
+    }
+}
+
+- (void)selectVirtualGamepadWithIdentifier:(NSString *)identifier descriptor:(NSDictionary<NSString *, id> *)descriptor {
+    selectedVirtualGamepadIdentifier = [identifier copy];
+    [self rebuildVirtualGamepadOverlay];
+    [[NSNotificationCenter defaultCenter] postNotificationName:StreamViewVirtualGamepadSelectionDidChangeNotification
+                                                        object:self
+                                                      userInfo:@{
+                                                        @"identifier": selectedVirtualGamepadIdentifier ?: @"",
+                                                        @"descriptor": descriptor ?: @{}
+                                                      }];
+}
+
+- (void)resetTemporaryVirtualGamepadState {
+#if !TARGET_OS_TV
+    Controller *oscController = [controllerSupport getOscController];
+    if (oscController == nil) {
+        return;
+    }
+
+    [controllerSupport updateButtonFlags:oscController flags:0];
+    [controllerSupport updateTriggers:oscController left:0 right:0];
+    [controllerSupport updateLeftStick:oscController x:0 y:0];
+    [controllerSupport updateRightStick:oscController x:0 y:0];
+    [controllerSupport updateFinished:oscController];
+#endif
+}
+
+- (void)applyVirtualGamepadDirectionalDescriptor:(NSDictionary<NSString *, id> *)descriptor
+                                    previousMask:(StreamVirtualDirectionMask)previousMask
+                                     currentMask:(StreamVirtualDirectionMask)currentMask
+                                normalizedVector:(CGPoint)normalizedVector {
+#if !TARGET_OS_TV
+    (void)previousMask;
+    Controller *oscController = [controllerSupport getOscController];
+    if (oscController == nil) {
+        return;
+    }
+
+    NSString *controlAction = descriptor[@"controlAction"];
+    if ([controlAction isEqualToString:@"gamepad_dpad"]) {
+        int directionFlags = [self gamepadButtonFlagsForDirectionMask:currentMask];
+        int preservedFlags = oscController.lastButtonFlags & ~(UP_FLAG | DOWN_FLAG | LEFT_FLAG | RIGHT_FLAG);
+        [controllerSupport updateButtonFlags:oscController flags:(preservedFlags | directionFlags)];
+        [controllerSupport updateFinished:oscController];
+        return;
+    }
+    if ([controlAction isEqualToString:@"gamepad_face_buttons"]) {
+        int faceFlags = [self gamepadFaceButtonFlagsForDirectionMask:currentMask];
+        int preservedFlags = oscController.lastButtonFlags & ~(A_FLAG | B_FLAG | X_FLAG | Y_FLAG);
+        [controllerSupport updateButtonFlags:oscController flags:(preservedFlags | faceFlags)];
+        [controllerSupport updateFinished:oscController];
+        return;
+    }
+
+    short stickX = (short)lrintf(0x7FFE * normalizedVector.x);
+    short stickY = (short)lrintf(0x7FFE * -normalizedVector.y);
+    if (currentMask == StreamVirtualDirectionMaskNone) {
+        stickX = 0;
+        stickY = 0;
+    }
+
+    if ([controlAction isEqualToString:@"gamepad_left_stick"]) {
+        [controllerSupport updateLeftStick:oscController x:stickX y:stickY];
+    }
+    else if ([controlAction isEqualToString:@"gamepad_right_stick"]) {
+        [controllerSupport updateRightStick:oscController x:stickX y:stickY];
+    }
+    [controllerSupport updateFinished:oscController];
+#endif
+}
+
+- (void)rebuildVirtualGamepadOverlay {
+    if (virtualGamepadContainerView == nil) {
+        return;
+    }
+
+    for (UIView *control in virtualGamepadControls) {
+        [control removeFromSuperview];
+    }
+
+    NSMutableArray<UIView *> *controls = [NSMutableArray array];
+    [[self activeVirtualGamepadDescriptors] enumerateObjectsUsingBlock:^(NSDictionary<NSString *,id> *descriptor, NSUInteger idx, BOOL *stop) {
+        UIView *controlView = nil;
+        if ([self isDirectionalVirtualGamepadDescriptor:descriptor]) {
+            StreamVirtualDirectionalControl *directionalControl = [[StreamVirtualDirectionalControl alloc] initWithFrame:CGRectZero];
+            directionalControl.translatesAutoresizingMaskIntoConstraints = YES;
+            directionalControl.autoresizingMask = UIViewAutoresizingNone;
+            directionalControl.controlOpacity = MIN(MAX([descriptor[@"opacity"] doubleValue], 0.05), 1.0);
+            __weak typeof(self) weakSelf = self;
+            directionalControl.selectionHandler = ^{
+                __strong typeof(weakSelf) strongSelf = weakSelf;
+                if (strongSelf == nil || !strongSelf->temporaryVirtualGamepadEditingEnabled) { return; }
+                [strongSelf selectVirtualGamepadWithIdentifier:descriptor[@"id"] descriptor:descriptor];
+            };
+            directionalControl.directionMaskChangedHandler = ^(StreamVirtualDirectionMask previousMask, StreamVirtualDirectionMask currentMask, CGPoint normalizedVector) {
+                __strong typeof(weakSelf) strongSelf = weakSelf;
+                if (strongSelf == nil) { return; }
+                [strongSelf applyVirtualGamepadDirectionalDescriptor:descriptor
+                                                        previousMask:previousMask
+                                                         currentMask:currentMask
+                                                    normalizedVector:normalizedVector];
+            };
+            [directionalControl configureWithDescriptor:descriptor];
+            controlView = directionalControl;
+        }
+        else {
+            UIButton *button = [UIButton buttonWithType:UIButtonTypeCustom];
+            button.translatesAutoresizingMaskIntoConstraints = YES;
+            button.autoresizingMask = UIViewAutoresizingNone;
+            [button addTarget:self action:@selector(virtualGamepadButtonTapped:) forControlEvents:UIControlEventTouchUpInside];
+            if (!temporaryVirtualGamepadEditingEnabled) {
+                [button addTarget:self action:@selector(virtualGamepadButtonPressDown:) forControlEvents:UIControlEventTouchDown];
+                [button addTarget:self action:@selector(virtualGamepadButtonPressRelease:) forControlEvents:UIControlEventTouchUpInside];
+                [button addTarget:self action:@selector(virtualGamepadButtonPressRelease:) forControlEvents:UIControlEventTouchUpOutside];
+                [button addTarget:self action:@selector(virtualGamepadButtonPressRelease:) forControlEvents:UIControlEventTouchCancel];
+                [button addTarget:self action:@selector(virtualGamepadButtonPressDown:) forControlEvents:UIControlEventTouchDragEnter];
+                [button addTarget:self action:@selector(virtualGamepadButtonPressRelease:) forControlEvents:UIControlEventTouchDragExit];
+            }
+            objc_setAssociatedObject(button, "virtualGamepadRole", descriptor[@"role"], OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+            [self applyAppearanceForVirtualGamepadButton:button descriptor:descriptor size:[self virtualGamepadSizeForDescriptor:descriptor]];
+            controlView = button;
+        }
+
+        UILongPressGestureRecognizer *dragGestureRecognizer = [[UILongPressGestureRecognizer alloc] initWithTarget:self action:@selector(handleVirtualGamepadLongPressDrag:)];
+        dragGestureRecognizer.minimumPressDuration = 0.20;
+        dragGestureRecognizer.allowableMovement = CGFLOAT_MAX;
+        dragGestureRecognizer.cancelsTouchesInView = YES;
+        dragGestureRecognizer.enabled = temporaryVirtualGamepadEditingEnabled;
+        [controlView addGestureRecognizer:dragGestureRecognizer];
+        objc_setAssociatedObject(controlView, "virtualGamepadDescriptor", descriptor, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+        objc_setAssociatedObject(controlView, "virtualGamepadIdentifier", descriptor[@"id"], OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+        [virtualGamepadContainerView addSubview:controlView];
+        [controls addObject:controlView];
+    }];
+
+    virtualGamepadControls = [controls copy];
+    virtualGamepadContainerView.hidden = !temporaryVirtualGamepadVisible || virtualGamepadControls.count == 0;
+    [self layoutVirtualGamepadOverlay];
+}
+
+- (void)layoutVirtualGamepadOverlay {
+    if (virtualGamepadContainerView == nil) {
+        return;
+    }
+
+    virtualGamepadContainerView.frame = self.bounds;
+    CGFloat safeTop = 0.0f;
+    CGFloat safeBottom = 0.0f;
+    CGFloat safeLeft = 0.0f;
+    CGFloat safeRight = 0.0f;
+    if (@available(iOS 11.0, *)) {
+        safeTop = self.safeAreaInsets.top;
+        safeBottom = self.safeAreaInsets.bottom;
+        safeLeft = self.safeAreaInsets.left;
+        safeRight = self.safeAreaInsets.right;
+    }
+
+    BOOL portrait = CGRectGetHeight(self.bounds) >= CGRectGetWidth(self.bounds);
+    CGFloat availableWidth = CGRectGetWidth(self.bounds) - safeLeft - safeRight;
+    CGFloat availableHeight = CGRectGetHeight(self.bounds) - safeTop - safeBottom;
+
+    CGPoint (^defaultGamepadCenter)(NSDictionary<NSString *, id> *, CGSize, CGFloat, CGFloat, CGFloat, CGFloat) =
+    ^CGPoint(NSDictionary<NSString *, id> *descriptor, CGSize size, CGFloat minCenterX, CGFloat maxCenterX, CGFloat minCenterY, CGFloat maxCenterY) {
+        NSString *identifier = descriptor[@"id"];
+        if (![identifier isKindOfClass:[NSString class]]) {
+            return CGPointMake(CGRectGetMidX(self.bounds), CGRectGetMidY(self.bounds));
+        }
+
+        CGFloat leftPrimaryX = minCenterX + MIN(MAX(availableWidth * (portrait ? 0.14f : 0.10f), 12.0f), MAX(maxCenterX - minCenterX, 0.0f));
+        CGFloat rightPrimaryX = maxCenterX - MIN(MAX(availableWidth * (portrait ? 0.14f : 0.10f), 12.0f), MAX(maxCenterX - minCenterX, 0.0f));
+        CGFloat leftSecondaryX = minCenterX + MIN(MAX(availableWidth * (portrait ? 0.17f : 0.13f), 16.0f), MAX(maxCenterX - minCenterX, 0.0f));
+        CGFloat rightSecondaryX = maxCenterX - MIN(MAX(availableWidth * (portrait ? 0.17f : 0.13f), 16.0f), MAX(maxCenterX - minCenterX, 0.0f));
+        CGFloat topTriggerY = minCenterY;
+        CGFloat shoulderGap = MAX(portrait ? 58.0f : 48.0f, size.height + (portrait ? 16.0f : 12.0f));
+        CGFloat topShoulderY = MIN(minCenterY + shoulderGap, maxCenterY);
+        CGFloat topCenterY = minCenterY + MIN(MAX(availableHeight * (portrait ? 0.20f : 0.16f), 28.0f), MAX(maxCenterY - minCenterY, 0.0f));
+        CGFloat dpadY = minCenterY + MIN(MAX(availableHeight * (portrait ? 0.50f : 0.42f), 24.0f), MAX(maxCenterY - minCenterY, 0.0f));
+        CGFloat stickY = maxCenterY - MIN(MAX(availableHeight * (portrait ? 0.06f : 0.08f), 12.0f), MAX(maxCenterY - minCenterY, 0.0f));
+        CGFloat l3r3VerticalGap = portrait ? 56.0f : 48.0f;
+        CGFloat faceClusterCenterX = rightSecondaryX;
+        CGFloat faceClusterCenterY = minCenterY + MIN(MAX(availableHeight * (portrait ? 0.52f : 0.40f), 24.0f), MAX(maxCenterY - minCenterY, 0.0f));
+        CGFloat selectStartOffset = MIN(MAX(availableWidth * 0.08f, 18.0f), 46.0f);
+        CGFloat selectCenterX = CGRectGetMidX(self.bounds) - selectStartOffset;
+        CGFloat startCenterX = CGRectGetMidX(self.bounds) + selectStartOffset;
+        CGFloat l3r3Y = MIN(MAX(topCenterY + l3r3VerticalGap, minCenterY), maxCenterY);
+        if ([identifier isEqualToString:@"gamepad_left_stick"]) {
+            return CGPointMake(leftPrimaryX, stickY);
+        }
+        if ([identifier isEqualToString:@"gamepad_dpad"]) {
+            return CGPointMake(leftSecondaryX, dpadY);
+        }
+        if ([identifier isEqualToString:@"gamepad_right_stick"]) {
+            return CGPointMake(rightPrimaryX, stickY);
+        }
+        if ([identifier isEqualToString:@"gamepad_l3"]) {
+            return CGPointMake(MIN(MAX(selectCenterX, minCenterX), maxCenterX), l3r3Y);
+        }
+        if ([identifier isEqualToString:@"gamepad_r3"]) {
+            return CGPointMake(MIN(MAX(startCenterX, minCenterX), maxCenterX), l3r3Y);
+        }
+        if ([identifier isEqualToString:@"gamepad_face_buttons"]) {
+            return CGPointMake(faceClusterCenterX, faceClusterCenterY);
+        }
+        if ([identifier isEqualToString:@"gamepad_l1"]) {
+            return CGPointMake(leftSecondaryX, topShoulderY);
+        }
+        if ([identifier isEqualToString:@"gamepad_r1"]) {
+            return CGPointMake(rightSecondaryX, topShoulderY);
+        }
+        if ([identifier isEqualToString:@"gamepad_l2"]) {
+            return CGPointMake(leftSecondaryX, topTriggerY);
+        }
+        if ([identifier isEqualToString:@"gamepad_r2"]) {
+            return CGPointMake(rightSecondaryX, topTriggerY);
+        }
+        if ([identifier isEqualToString:@"gamepad_select"]) {
+            return CGPointMake(selectCenterX, topCenterY);
+        }
+        if ([identifier isEqualToString:@"gamepad_start"]) {
+            return CGPointMake(startCenterX, topCenterY);
+        }
+
+        return CGPointMake(CGRectGetMidX(self.bounds), CGRectGetMidY(self.bounds));
+    };
+
+    [virtualGamepadControls enumerateObjectsUsingBlock:^(UIView *control, NSUInteger idx, BOOL *stop) {
+        NSDictionary<NSString *, id> *descriptor = idx < self->virtualGamepadDescriptors.count ? self->virtualGamepadDescriptors[idx] : nil;
+        if (descriptor == nil) {
+            return;
+        }
+        CGSize size = [self virtualGamepadSizeForDescriptor:descriptor];
+        CGFloat minCenterX = safeLeft + 12.0f + size.width * 0.5f;
+        CGFloat maxCenterX = CGRectGetWidth(self.bounds) - safeRight - 12.0f - size.width * 0.5f;
+        CGFloat minCenterY = safeTop + 12.0f + size.height * 0.5f;
+        CGFloat maxCenterY = CGRectGetHeight(self.bounds) - safeBottom - 20.0f - size.height * 0.5f;
+        CGFloat widthRange = MAX(maxCenterX - minCenterX, 0.0f);
+        CGFloat heightRange = MAX(maxCenterY - minCenterY, 0.0f);
+        CGFloat xRatio = MIN(MAX([descriptor[@"xRatio"] doubleValue], 0.0), 1.0);
+        CGFloat yRatio = MIN(MAX([descriptor[@"yRatio"] doubleValue], 0.0), 1.0);
+        CGPoint defaultCenter = defaultGamepadCenter(descriptor, size, minCenterX, maxCenterX, minCenterY, maxCenterY);
+        CGFloat centerX = defaultCenter.x;
+        CGFloat centerY = defaultCenter.y;
+        if (descriptor[@"xRatio"] != nil && descriptor[@"yRatio"] != nil) {
+            centerX = widthRange > 0.0f ? (minCenterX + widthRange * xRatio) : CGRectGetMidX(self.bounds);
+            centerY = heightRange > 0.0f ? (minCenterY + heightRange * yRatio) : CGRectGetMidY(self.bounds);
+        }
+        CGFloat clampedCenterX = MIN(MAX(centerX, minCenterX), maxCenterX);
+        CGFloat clampedCenterY = MIN(MAX(centerY, minCenterY), maxCenterY);
+        control.frame = CGRectMake(clampedCenterX - size.width * 0.5f,
+                                   clampedCenterY - size.height * 0.5f,
+                                   size.width,
+                                   size.height);
+
+        if ([control isKindOfClass:[UIButton class]]) {
+            [self applyAppearanceForVirtualGamepadButton:(UIButton *)control descriptor:descriptor size:size];
+        }
+        else if ([control isKindOfClass:[StreamVirtualDirectionalControl class]]) {
+            StreamVirtualDirectionalControl *directionalControl = (StreamVirtualDirectionalControl *)control;
+            directionalControl.editingEnabled = self->temporaryVirtualGamepadEditingEnabled;
+            directionalControl.selectedForEditing = selectedVirtualGamepadIdentifier != nil && [selectedVirtualGamepadIdentifier isEqualToString:descriptor[@"id"]];
+            directionalControl.controlOpacity = MIN(MAX([descriptor[@"opacity"] doubleValue], 0.05), 1.0);
+            [directionalControl configureWithDescriptor:descriptor];
+        }
+    }];
+
+    [self bringSubviewToFront:virtualGamepadContainerView];
+}
+
+- (void)virtualGamepadButtonPressDown:(UIButton *)sender {
+#if !TARGET_OS_TV
+    NSDictionary<NSString *, id> *descriptor = objc_getAssociatedObject(sender, "virtualGamepadDescriptor");
+    if (temporaryVirtualGamepadEditingEnabled) {
+        return;
+    }
+    NSString *role = descriptor[@"role"];
+    Controller *oscController = [controllerSupport getOscController];
+    if (oscController == nil) {
+        return;
+    }
+
+    if ([role isEqualToString:@"l2"]) {
+        [controllerSupport updateLeftTrigger:oscController left:0xFF];
+    }
+    else if ([role isEqualToString:@"r2"]) {
+        [controllerSupport updateRightTrigger:oscController right:0xFF];
+    }
+    else {
+        int flag = [self gamepadButtonFlagsForRole:role];
+        if (flag == 0) {
+            return;
+        }
+        [controllerSupport setButtonFlag:oscController flags:flag];
+    }
+    [controllerSupport updateFinished:oscController];
+    sender.transform = CGAffineTransformMakeScale(0.94f, 0.94f);
+    sender.backgroundColor = [[UIColor whiteColor] colorWithAlphaComponent:0.22f];
+#endif
+}
+
+- (void)handleVirtualGamepadSelectionTapGesture:(UITapGestureRecognizer *)gestureRecognizer {
+#if !TARGET_OS_TV
+    if (!temporaryVirtualGamepadEditingEnabled) {
+        return;
+    }
+    UIView *view = gestureRecognizer.view;
+    NSDictionary<NSString *, id> *descriptor = objc_getAssociatedObject(view, "virtualGamepadDescriptor");
+    [self selectVirtualGamepadWithIdentifier:descriptor[@"id"] descriptor:descriptor];
+#endif
+}
+
+- (void)virtualGamepadButtonTapped:(UIButton *)sender {
+#if !TARGET_OS_TV
+    if (!temporaryVirtualGamepadEditingEnabled) {
+        return;
+    }
+
+    NSString *identifier = objc_getAssociatedObject(sender, "virtualGamepadIdentifier");
+    NSDictionary<NSString *, id> *descriptor = objc_getAssociatedObject(sender, "virtualGamepadDescriptor");
+    [self selectVirtualGamepadWithIdentifier:identifier descriptor:descriptor];
+#endif
+}
+
+- (void)virtualGamepadButtonPressRelease:(UIButton *)sender {
+#if !TARGET_OS_TV
+    if (temporaryVirtualGamepadEditingEnabled) {
+        return;
+    }
+    NSDictionary<NSString *, id> *descriptor = objc_getAssociatedObject(sender, "virtualGamepadDescriptor");
+    NSString *role = descriptor[@"role"];
+    Controller *oscController = [controllerSupport getOscController];
+    if (oscController == nil) {
+        return;
+    }
+
+    if ([role isEqualToString:@"l2"]) {
+        [controllerSupport updateLeftTrigger:oscController left:0];
+    }
+    else if ([role isEqualToString:@"r2"]) {
+        [controllerSupport updateRightTrigger:oscController right:0];
+    }
+    else {
+        int flag = [self gamepadButtonFlagsForRole:role];
+        if (flag == 0) {
+            return;
+        }
+        [controllerSupport clearButtonFlag:oscController flags:flag];
+    }
+    [controllerSupport updateFinished:oscController];
+    sender.transform = CGAffineTransformIdentity;
+    sender.backgroundColor = [[UIColor blackColor] colorWithAlphaComponent:0.36f];
+#endif
+}
+
+- (void)handleVirtualGamepadLongPressDrag:(UILongPressGestureRecognizer *)gestureRecognizer {
+#if !TARGET_OS_TV
+    if (!temporaryVirtualGamepadEditingEnabled) {
+        return;
+    }
+
+    UIView *control = gestureRecognizer.view;
+    if (![control isKindOfClass:[UIView class]]) {
+        return;
+    }
+
+    CGPoint location = [gestureRecognizer locationInView:virtualGamepadContainerView];
+    if (gestureRecognizer.state == UIGestureRecognizerStateBegan) {
+        CGPoint touchOffset = CGPointMake(control.center.x - location.x, control.center.y - location.y);
+        objc_setAssociatedObject(gestureRecognizer, "virtualGamepadDragTouchOffset", [NSValue valueWithCGPoint:touchOffset], OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+        objc_setAssociatedObject(gestureRecognizer, "virtualGamepadDragDidMove", @(NO), OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+        return;
+    }
+
+    NSValue *touchOffsetValue = objc_getAssociatedObject(gestureRecognizer, "virtualGamepadDragTouchOffset");
+    if (touchOffsetValue == nil) {
+        return;
+    }
+
+    CGPoint touchOffset = [touchOffsetValue CGPointValue];
+    BOOL didMove = [objc_getAssociatedObject(gestureRecognizer, "virtualGamepadDragDidMove") boolValue];
+
+    if (gestureRecognizer.state == UIGestureRecognizerStateChanged || gestureRecognizer.state == UIGestureRecognizerStateEnded) {
+        CGFloat controlWidth = CGRectGetWidth(control.bounds);
+        CGFloat controlHeight = CGRectGetHeight(control.bounds);
+        CGFloat safeTop = 0.0f;
+        CGFloat safeBottom = 0.0f;
+        CGFloat safeLeft = 0.0f;
+        CGFloat safeRight = 0.0f;
+        if (@available(iOS 11.0, *)) {
+            safeTop = self.safeAreaInsets.top;
+            safeBottom = self.safeAreaInsets.bottom;
+            safeLeft = self.safeAreaInsets.left;
+            safeRight = self.safeAreaInsets.right;
+        }
+
+        CGFloat minCenterX = safeLeft + 12.0f + controlWidth * 0.5f;
+        CGFloat maxCenterX = CGRectGetWidth(self.bounds) - safeRight - 12.0f - controlWidth * 0.5f;
+        CGFloat minCenterY = safeTop + 12.0f + controlHeight * 0.5f;
+        CGFloat maxCenterY = CGRectGetHeight(self.bounds) - safeBottom - 20.0f - controlHeight * 0.5f;
+
+        CGPoint center = CGPointMake(location.x + touchOffset.x, location.y + touchOffset.y);
+        center.x = MIN(MAX(center.x, minCenterX), maxCenterX);
+        center.y = MIN(MAX(center.y, minCenterY), maxCenterY);
+        control.center = center;
+        if (!didMove && hypot(location.x - (center.x - touchOffset.x), location.y - (center.y - touchOffset.y)) >= 0.0f) {
+            didMove = YES;
+            objc_setAssociatedObject(gestureRecognizer, "virtualGamepadDragDidMove", @(YES), OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+        }
+
+        NSUInteger index = [virtualGamepadControls indexOfObject:control];
+        if (index != NSNotFound) {
+            [self updateVirtualGamepadDescriptorAtIndex:index center:center controlSize:CGSizeMake(controlWidth, controlHeight) notify:(gestureRecognizer.state == UIGestureRecognizerStateEnded)];
+        }
+    }
+
+    if (gestureRecognizer.state == UIGestureRecognizerStateEnded || gestureRecognizer.state == UIGestureRecognizerStateCancelled || gestureRecognizer.state == UIGestureRecognizerStateFailed) {
+        objc_setAssociatedObject(gestureRecognizer, "virtualGamepadDragTouchOffset", nil, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+        objc_setAssociatedObject(gestureRecognizer, "virtualGamepadDragDidMove", nil, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    }
+#endif
+}
+
+- (void)updateVirtualGamepadDescriptorAtIndex:(NSUInteger)index center:(CGPoint)center controlSize:(CGSize)controlSize notify:(BOOL)notify {
+    if (index >= virtualGamepadDescriptors.count) {
+        return;
+    }
+
+    CGFloat safeTop = 0.0f;
+    CGFloat safeBottom = 0.0f;
+    CGFloat safeLeft = 0.0f;
+    CGFloat safeRight = 0.0f;
+    if (@available(iOS 11.0, *)) {
+        safeTop = self.safeAreaInsets.top;
+        safeBottom = self.safeAreaInsets.bottom;
+        safeLeft = self.safeAreaInsets.left;
+        safeRight = self.safeAreaInsets.right;
+    }
+
+    CGFloat minCenterX = safeLeft + 12.0f + controlSize.width * 0.5f;
+    CGFloat maxCenterX = CGRectGetWidth(self.bounds) - safeRight - 12.0f - controlSize.width * 0.5f;
+    CGFloat minCenterY = safeTop + 12.0f + controlSize.height * 0.5f;
+    CGFloat maxCenterY = CGRectGetHeight(self.bounds) - safeBottom - 20.0f - controlSize.height * 0.5f;
+    CGFloat widthRange = MAX(maxCenterX - minCenterX, 1.0f);
+    CGFloat heightRange = MAX(maxCenterY - minCenterY, 1.0f);
+    CGFloat xRatio = MIN(MAX((center.x - minCenterX) / widthRange, 0.0f), 1.0f);
+    CGFloat yRatio = MIN(MAX((center.y - minCenterY) / heightRange, 0.0f), 1.0f);
+
+    NSMutableArray *updatedDescriptors = [virtualGamepadDescriptors mutableCopy];
+    NSMutableDictionary *updatedDescriptor = [virtualGamepadDescriptors[index] mutableCopy];
+    updatedDescriptor[@"xRatio"] = @(xRatio);
+    updatedDescriptor[@"yRatio"] = @(yRatio);
+    updatedDescriptors[index] = updatedDescriptor;
+    virtualGamepadDescriptors = [updatedDescriptors copy];
+
+    if (notify) {
+        [[NSNotificationCenter defaultCenter] postNotificationName:StreamViewVirtualGamepadDidChangeNotification
+                                                            object:self
+                                                          userInfo:@{ @"descriptors": virtualGamepadDescriptors ?: @[] }];
+    }
 }
 
 - (BOOL)isDirectionalVirtualButtonDescriptor:(NSDictionary<NSString *, id> *)descriptor {
@@ -782,16 +1372,18 @@ typedef NS_OPTIONS(NSUInteger, StreamVirtualDirectionMask) {
 
         if ([self isDirectionalVirtualButtonDescriptor:descriptor]) {
             StreamVirtualDirectionalControl *directionalControl = [[StreamVirtualDirectionalControl alloc] initWithFrame:CGRectZero];
-            directionalControl.translatesAutoresizingMaskIntoConstraints = NO;
+            directionalControl.translatesAutoresizingMaskIntoConstraints = YES;
+            directionalControl.autoresizingMask = UIViewAutoresizingNone;
             __weak typeof(self) weakSelf = self;
             directionalControl.selectionHandler = ^{
                 __strong typeof(weakSelf) strongSelf = weakSelf;
                 if (strongSelf == nil) { return; }
                 [strongSelf selectVirtualButtonWithIdentifier:descriptor[@"id"] descriptor:descriptor];
             };
-            directionalControl.directionMaskChangedHandler = ^(StreamVirtualDirectionMask previousMask, StreamVirtualDirectionMask currentMask) {
+            directionalControl.directionMaskChangedHandler = ^(StreamVirtualDirectionMask previousMask, StreamVirtualDirectionMask currentMask, CGPoint normalizedVector) {
                 __strong typeof(weakSelf) strongSelf = weakSelf;
                 if (strongSelf == nil) { return; }
+                (void)normalizedVector;
                 [strongSelf applyDirectionalControlAction:descriptor[@"controlAction"] previousMask:previousMask currentMask:currentMask];
             };
             [directionalControl configureWithDescriptor:descriptor];
@@ -799,7 +1391,8 @@ typedef NS_OPTIONS(NSUInteger, StreamVirtualDirectionMask) {
         }
         else {
             UIButton *button = [UIButton buttonWithType:UIButtonTypeCustom];
-            button.translatesAutoresizingMaskIntoConstraints = NO;
+            button.translatesAutoresizingMaskIntoConstraints = YES;
+            button.autoresizingMask = UIViewAutoresizingNone;
             button.backgroundColor = [[UIColor blackColor] colorWithAlphaComponent:0.52];
             button.layer.borderWidth = temporaryVirtualButtonsEditingEnabled ? 1.3f : 1.0f;
             button.clipsToBounds = YES;
@@ -1138,7 +1731,12 @@ typedef NS_OPTIONS(NSUInteger, StreamVirtualDirectionMask) {
             [self updateVirtualButtonDescriptorAtIndex:idx center:CGPointMake(centerX, centerY) buttonSize:CGSizeMake(buttonWidth, buttonHeight) notify:NO];
         }
 
-        button.bounds = CGRectMake(0, 0, buttonWidth, buttonHeight);
+        CGFloat clampedCenterX = MIN(MAX(centerX, minCenterX), maxCenterX);
+        CGFloat clampedCenterY = MIN(MAX(centerY, minCenterY), maxCenterY);
+        button.frame = CGRectMake(clampedCenterX - buttonWidth * 0.5f,
+                                  clampedCenterY - buttonHeight * 0.5f,
+                                  buttonWidth,
+                                  buttonHeight);
         if ([button isKindOfClass:[UIButton class]]) {
             [self applyAppearanceForVirtualButton:(UIButton *)button descriptor:descriptor ?: @{} size:buttonSize];
             objc_setAssociatedObject(button, "virtualMouseAction", descriptor[@"mouseAction"], OBJC_ASSOCIATION_RETAIN_NONATOMIC);
@@ -1150,8 +1748,6 @@ typedef NS_OPTIONS(NSUInteger, StreamVirtualDirectionMask) {
             directionalControl.controlOpacity = MIN(MAX([descriptor[@"opacity"] doubleValue], 0.05), 1.0);
             [directionalControl configureWithDescriptor:descriptor ?: @{}];
         }
-        button.center = CGPointMake(MIN(MAX(centerX, minCenterX), maxCenterX),
-                                    MIN(MAX(centerY, minCenterY), maxCenterY));
         button.alpha = temporaryVirtualButtonsEditingEnabled ? 0.98f : 1.0f;
     }];
 
@@ -1448,33 +2044,60 @@ typedef NS_OPTIONS(NSUInteger, StreamVirtualDirectionMask) {
     return [virtualButtonDescriptors copy] ?: @[];
 }
 
-- (void)setTemporaryVirtualGamepadVisible:(BOOL)visible {
+- (void)setTemporaryVirtualGamepadDescriptors:(NSArray<NSDictionary<NSString *,id> *> *)descriptors {
 #if !TARGET_OS_TV
-    if (onScreenControls == nil) {
-        return;
-    }
-
-    [controllerSupport setOscEnabledForCurrentSession:visible];
-    requestedOnScreenControlsLevel = OnScreenControlsLevelOff;
-    if (visible) {
-        OSCProfile *selectedProfile = [[OSCProfilesManager sharedManager] getSelectedProfile];
-        requestedOnScreenControlsLevel = (selectedProfile != nil) ? OnScreenControlsCustom : OnScreenControlsLevelFull;
-    }
-
-    [self applyRequestedOnScreenControlsLevel];
+    virtualGamepadDescriptors = [descriptors copy] ?: @[];
+    [self ensureVirtualGamepadOverlayIfNeeded];
+    [self rebuildVirtualGamepadOverlay];
 #endif
 }
 
-- (void)setTemporaryOnScreenControlsLevel:(OnScreenControlsLevel)level {
+- (void)setTemporaryVirtualGamepadVisible:(BOOL)visible {
 #if !TARGET_OS_TV
-    if (onScreenControls == nil) {
-        return;
+    [self ensureVirtualGamepadOverlayIfNeeded];
+    temporaryVirtualGamepadVisible = visible;
+    if (!visible) {
+        [self resetTemporaryVirtualGamepadState];
     }
-
-    [controllerSupport setOscEnabledForCurrentSession:(level != OnScreenControlsLevelOff)];
-    requestedOnScreenControlsLevel = level;
-    [self applyRequestedOnScreenControlsLevel];
+    [self updateOscControllerEnabledState];
+    virtualGamepadContainerView.hidden = !visible || virtualGamepadControls.count == 0;
+    if (visible) {
+        [self layoutVirtualGamepadOverlay];
+        [self bringSubviewToFront:virtualGamepadContainerView];
+    }
 #endif
+}
+
+- (BOOL)isTemporaryVirtualGamepadVisible {
+    return temporaryVirtualGamepadVisible;
+}
+
+- (void)setTemporaryVirtualGamepadEditingEnabled:(BOOL)enabled {
+#if !TARGET_OS_TV
+    temporaryVirtualGamepadEditingEnabled = enabled;
+    [self ensureVirtualGamepadOverlayIfNeeded];
+    if (enabled) {
+        temporaryVirtualGamepadVisible = YES;
+    }
+    else {
+        selectedVirtualGamepadIdentifier = nil;
+        [[NSNotificationCenter defaultCenter] postNotificationName:StreamViewVirtualGamepadSelectionDidChangeNotification
+                                                            object:self
+                                                          userInfo:@{
+                                                            @"identifier": @"",
+                                                            @"descriptor": @{}
+                                                          }];
+    }
+    [self rebuildVirtualGamepadOverlay];
+#endif
+}
+
+- (BOOL)isTemporaryVirtualGamepadEditingEnabled {
+    return temporaryVirtualGamepadEditingEnabled;
+}
+
+- (NSArray<NSDictionary<NSString *,id> *> *)currentTemporaryVirtualGamepadDescriptors {
+    return [virtualGamepadDescriptors copy] ?: @[];
 }
 
 - (void)setVideoAlignmentMode:(StreamViewVideoAlignmentMode)alignmentMode {
@@ -1755,17 +2378,15 @@ typedef NS_OPTIONS(NSUInteger, StreamVirtualDirectionMask) {
     }
 #endif
     
-    if (![onScreenControls handleTouchDownEvent:touches]) {
-        // We still inform the touch handler even if we're going trigger the
-        // keyboard activation gesture. This is important to ensure the touch
-        // handler has a consistent view of touch events to correctly suppress
-        // activation of one or two finger gestures when a three finger gesture
-        // is triggered.
-        [touchHandler touchesBegan:touches withEvent:event];
-        
-        if ([[event allTouches] count] == 5) {
-            [self showKeyInputBoard];
-        }
+    // We still inform the touch handler even if we're going trigger the
+    // keyboard activation gesture. This is important to ensure the touch
+    // handler has a consistent view of touch events to correctly suppress
+    // activation of one or two finger gestures when a three finger gesture
+    // is triggered.
+    [touchHandler touchesBegan:touches withEvent:event];
+    
+    if ([[event allTouches] count] == 5) {
+        [self showKeyInputBoard];
     }
 }
 
@@ -2185,9 +2806,7 @@ typedef NS_OPTIONS(NSUInteger, StreamVirtualDirectionMask) {
     
     hasUserInteracted = YES;
     
-    if (![onScreenControls handleTouchMovedEvent:touches]) {
-        [touchHandler touchesMoved:touches withEvent:event];
-    }
+    [touchHandler touchesMoved:touches withEvent:event];
 }
 
 - (void)pressesBegan:(NSSet<UIPress *> *)presses withEvent:(UIPressesEvent *)event {
@@ -2262,9 +2881,7 @@ typedef NS_OPTIONS(NSUInteger, StreamVirtualDirectionMask) {
     }
 #endif
     
-    if (![onScreenControls handleTouchUpEvent:touches]) {
-        [touchHandler touchesEnded:touches withEvent:event];
-    }
+    [touchHandler touchesEnded:touches withEvent:event];
 }
 
 - (void)touchesCancelled:(NSSet *)touches withEvent:(UIEvent *)event {

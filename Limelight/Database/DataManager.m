@@ -27,6 +27,18 @@ static NSString *VirtualButtonOpacityDefaultsKeyForSchemeSelection(NSInteger sch
     return [NSString stringWithFormat:@"StreamPreferenceVirtualButtonOpacityScheme%ld", (long)clampedSelection];
 }
 
+static NSString *VirtualGamepadDefinitionsDefaultsKeyForSchemeSelectionAndOrientation(NSInteger schemeSelection, BOOL portrait) {
+    NSInteger clampedSelection = MAX(0, MIN(schemeSelection, 4));
+    return [NSString stringWithFormat:@"StreamPreferenceVirtualGamepadDefinitionsScheme%ld_%@",
+            (long)clampedSelection,
+            portrait ? @"Portrait" : @"Landscape"];
+}
+
+static NSString *VirtualGamepadOpacityDefaultsKeyForSchemeSelection(NSInteger schemeSelection) {
+    NSInteger clampedSelection = MAX(0, MIN(schemeSelection, 4));
+    return [NSString stringWithFormat:@"StreamPreferenceVirtualGamepadOpacityScheme%ld", (long)clampedSelection];
+}
+
 - (id) init {
     self = [super init];
     
@@ -93,7 +105,9 @@ static NSString *VirtualButtonOpacityDefaultsKeyForSchemeSelection(NSInteger sch
 performanceOverlayPositionSelection:(NSInteger)performanceOverlayPositionSelection
          performanceOverlayMargin:(CGFloat)performanceOverlayMargin
                floatingMenuEnabled:(BOOL)floatingMenuEnabled
-       virtualButtonSchemeSelection:(NSInteger)virtualButtonSchemeSelection{
+       virtualButtonSchemeSelection:(NSInteger)virtualButtonSchemeSelection
+     virtualGamepadSchemeSelection:(NSInteger)virtualGamepadSchemeSelection
+             virtualGamepadOpacity:(CGFloat)virtualGamepadOpacity{
     
     [_managedObjectContext performBlockAndWait:^{
         Settings* settingsToSave = [self retrieveSettings];
@@ -128,6 +142,8 @@ performanceOverlayPositionSelection:(NSInteger)performanceOverlayPositionSelecti
         [defaults setDouble:MAX(0.0, MIN(performanceOverlayMargin, 150.0)) forKey:StreamPreferencePerformanceOverlayMarginKey];
         [defaults setBool:floatingMenuEnabled forKey:StreamPreferenceFloatingMenuEnabledKey];
         [defaults setInteger:MAX(0, MIN(virtualButtonSchemeSelection, 4)) forKey:StreamPreferenceVirtualButtonSchemeSelectionKey];
+        [defaults setInteger:MAX(0, MIN(virtualGamepadSchemeSelection, 4)) forKey:StreamPreferenceVirtualGamepadSchemeSelectionKey];
+        [defaults setDouble:MAX(0.05f, MIN(virtualGamepadOpacity, 1.0f)) forKey:StreamPreferenceVirtualGamepadOpacityKey];
         [defaults synchronize];
         [self saveData];
     }];
@@ -217,6 +233,46 @@ performanceOverlayPositionSelection:(NSInteger)performanceOverlayPositionSelecti
     NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
     [defaults setObject:(definitions ?: @[]) forKey:VirtualButtonDefinitionsDefaultsKeyForSchemeSelectionAndOrientation(clampedSelection, portrait)];
     [defaults setDouble:MAX(0.05f, MIN(opacity, 1.0f)) forKey:VirtualButtonOpacityDefaultsKeyForSchemeSelection(clampedSelection)];
+    [defaults synchronize];
+}
+
+- (NSArray<NSDictionary *> *)virtualGamepadDefinitionsForSchemeSelection:(NSInteger)schemeSelection
+                                                                portrait:(BOOL)portrait {
+    NSInteger clampedSelection = MAX(0, MIN(schemeSelection, 4));
+    NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
+    NSArray *definitions = [defaults arrayForKey:VirtualGamepadDefinitionsDefaultsKeyForSchemeSelectionAndOrientation(clampedSelection, portrait)];
+    if (![definitions isKindOfClass:[NSArray class]]) {
+        return nil;
+    }
+    return definitions;
+}
+
+- (CGFloat)virtualGamepadOpacityForSchemeSelection:(NSInteger)schemeSelection {
+    NSInteger clampedSelection = MAX(0, MIN(schemeSelection, 4));
+    NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
+    id storedValue = [defaults objectForKey:VirtualGamepadOpacityDefaultsKeyForSchemeSelection(clampedSelection)];
+    if (![storedValue isKindOfClass:[NSNumber class]]) {
+        return MAX(0.05f, MIN((CGFloat)[defaults doubleForKey:StreamPreferenceVirtualGamepadOpacityKey], 1.0f));
+    }
+    return MAX(0.05f, MIN((CGFloat)[storedValue doubleValue], 1.0f));
+}
+
+- (void)saveVirtualGamepadOpacity:(CGFloat)opacity
+                forSchemeSelection:(NSInteger)schemeSelection {
+    NSInteger clampedSelection = MAX(0, MIN(schemeSelection, 4));
+    NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
+    [defaults setDouble:MAX(0.05f, MIN(opacity, 1.0f)) forKey:VirtualGamepadOpacityDefaultsKeyForSchemeSelection(clampedSelection)];
+    [defaults synchronize];
+}
+
+- (void)saveVirtualGamepadDefinitions:(NSArray<NSDictionary *> *)definitions
+                              opacity:(CGFloat)opacity
+                   forSchemeSelection:(NSInteger)schemeSelection
+                             portrait:(BOOL)portrait {
+    NSInteger clampedSelection = MAX(0, MIN(schemeSelection, 4));
+    NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
+    [defaults setObject:(definitions ?: @[]) forKey:VirtualGamepadDefinitionsDefaultsKeyForSchemeSelectionAndOrientation(clampedSelection, portrait)];
+    [defaults setDouble:MAX(0.05f, MIN(opacity, 1.0f)) forKey:VirtualGamepadOpacityDefaultsKeyForSchemeSelection(clampedSelection)];
     [defaults synchronize];
 }
 

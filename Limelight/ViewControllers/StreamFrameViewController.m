@@ -74,7 +74,6 @@ static const CGFloat kStreamFloatingMenuExpandedAlpha = 0.96f;
     CGFloat _viewOnlyRestoreZoomScale;
     CGPoint _viewOnlyRestoreContentOffset;
     BOOL _viewOnlyHadScrollViewBeforeEntering;
-    OnScreenControlsLevel _viewOnlyRestoreOscLevel;
     BOOL _suppressTerminationAlertForManualExit;
     UIControl *_floatingMenuButton;
     UIImageView *_floatingMenuIconView;
@@ -87,6 +86,7 @@ static const CGFloat kStreamFloatingMenuExpandedAlpha = 0.96f;
     CGPoint _floatingMenuTouchOffset;
     BOOL _floatingMenuDragMoved;
     NSMutableArray<NSDictionary *> *_virtualButtonDefinitions;
+    NSMutableArray<NSDictionary *> *_virtualGamepadDefinitions;
     UIView *_virtualButtonEditorView;
     UILabel *_virtualButtonEditorTitleLabel;
     UISegmentedControl *_virtualButtonEditorShapeControl;
@@ -100,9 +100,13 @@ static const CGFloat kStreamFloatingMenuExpandedAlpha = 0.96f;
     UIButton *_virtualButtonEditorDeleteButton;
     UIButton *_virtualButtonEditorSaveButton;
     NSString *_selectedVirtualButtonIdentifier;
+    NSString *_selectedVirtualGamepadIdentifier;
     CGFloat _currentSessionVirtualButtonOpacity;
+    CGFloat _currentSessionVirtualGamepadOpacity;
     NSInteger _currentSessionVirtualButtonSchemeSelection;
+    NSInteger _currentSessionVirtualGamepadSchemeSelection;
     BOOL _currentSessionVirtualButtonLayoutPortrait;
+    BOOL _currentSessionVirtualGamepadLayoutPortrait;
     
 #if !TARGET_OS_TV
     UIScreenEdgePanGestureRecognizer *_exitSwipeRecognizer;
@@ -659,8 +663,11 @@ static const CGFloat kStreamFloatingMenuExpandedAlpha = 0.96f;
     
     _settings = [[[DataManager alloc] init] getSettings];
     _currentSessionVirtualButtonSchemeSelection = _settings.virtualButtonSchemeSelection;
+    _currentSessionVirtualGamepadSchemeSelection = _settings.virtualGamepadSchemeSelection;
     _currentSessionVirtualButtonLayoutPortrait = [self isVirtualButtonLayoutPortraitForSize:self.view.bounds.size];
+    _currentSessionVirtualGamepadLayoutPortrait = _currentSessionVirtualButtonLayoutPortrait;
     [self loadVirtualButtonDefinitionsFromCurrentScheme];
+    [self loadVirtualGamepadDefinitionsFromCurrentScheme];
     _currentSessionTouchModeSelection = !_settings.absoluteTouchMode ? 0 : (_settings.multiTouchScreen ? 2 : 1);
     _currentSessionVideoAlignmentSelection = MAX(0, MIN(_settings.videoAlignmentSelection, 2));
     _currentSessionVideoAlignmentMargin = MAX(0.0f, MIN(_settings.videoAlignmentMargin, 150.0f));
@@ -703,6 +710,7 @@ static const CGFloat kStreamFloatingMenuExpandedAlpha = 0.96f;
     [_streamView setVideoAlignmentMode:_currentSessionVideoAlignmentSelection];
     [_streamView setVideoAlignmentMargin:_currentSessionVideoAlignmentMargin];
     [self applyVirtualButtonDefinitionsToStreamView];
+    [self applyVirtualGamepadDefinitionsToStreamView];
     
 #if TARGET_OS_TV
     if (!_menuTapGestureRecognizer || !_menuDoubleTapGestureRecognizer || !_playPauseTapGestureRecognizer) {
@@ -737,7 +745,7 @@ static const CGFloat kStreamFloatingMenuExpandedAlpha = 0.96f;
 #if TARGET_OS_TV
     [_tipLabel setText:@"Tip: Tap the Play/Pause button on the Apple TV Remote to disconnect from your PC"];
 #else
-    [_tipLabel setText:@"Tip: Swipe from the left edge to disconnect from your PC"];
+    [_tipLabel setText:@"提示：从左侧边缘向内滑动即可打开游戏菜单。"];
 #endif
     
     _tipLabel.textColor = [UIColor whiteColor];
@@ -786,6 +794,14 @@ static const CGFloat kStreamFloatingMenuExpandedAlpha = 0.96f;
     [[NSNotificationCenter defaultCenter] addObserver:self
                                              selector:@selector(handleVirtualButtonSelectionDidChange:)
                                                  name:StreamViewVirtualButtonSelectionDidChangeNotification
+                                               object:_streamView];
+    [[NSNotificationCenter defaultCenter] addObserver:self
+                                             selector:@selector(streamVirtualGamepadDidChange:)
+                                                 name:StreamViewVirtualGamepadDidChangeNotification
+                                               object:_streamView];
+    [[NSNotificationCenter defaultCenter] addObserver:self
+                                             selector:@selector(handleVirtualGamepadSelectionDidChange:)
+                                                 name:StreamViewVirtualGamepadSelectionDidChangeNotification
                                                object:_streamView];
     
 #if 0
@@ -997,10 +1013,14 @@ static const CGFloat kStreamFloatingMenuExpandedAlpha = 0.96f;
     [super viewWillTransitionToSize:size withTransitionCoordinator:coordinator];
 
     BOOL nextPortrait = [self isVirtualButtonLayoutPortraitForSize:size];
-    BOOL orientationChanged = nextPortrait != _currentSessionVirtualButtonLayoutPortrait;
+    BOOL virtualButtonOrientationChanged = nextPortrait != _currentSessionVirtualButtonLayoutPortrait;
+    BOOL virtualGamepadOrientationChanged = nextPortrait != _currentSessionVirtualGamepadLayoutPortrait;
 
-    if (orientationChanged) {
+    if (virtualButtonOrientationChanged) {
         [self persistCurrentVirtualButtonScheme];
+    }
+    if (virtualGamepadOrientationChanged) {
+        [self persistCurrentVirtualGamepadScheme];
     }
 
     [coordinator animateAlongsideTransition:^(id<UIViewControllerTransitionCoordinatorContext> context) {
@@ -1008,10 +1028,15 @@ static const CGFloat kStreamFloatingMenuExpandedAlpha = 0.96f;
         [self layoutStreamingSubviewsForCurrentBounds];
     } completion:^(id<UIViewControllerTransitionCoordinatorContext> context) {
         (void)context;
-        if (orientationChanged) {
+        if (virtualButtonOrientationChanged) {
             [self switchVirtualButtonLayoutToPortrait:nextPortrait preserveCurrentLayoutAsFallback:YES];
             [self applyVirtualButtonDefinitionsToStreamView];
             [self refreshVirtualButtonsPanelIfNeeded];
+            [self refreshVirtualButtonEditorForCurrentSelection];
+        }
+        if (virtualGamepadOrientationChanged) {
+            [self switchVirtualGamepadLayoutToPortrait:nextPortrait preserveCurrentLayoutAsFallback:YES];
+            [self applyVirtualGamepadDefinitionsToStreamView];
             [self refreshVirtualButtonEditorForCurrentSelection];
         }
         [self layoutStreamingSubviewsForCurrentBounds];
@@ -1124,6 +1149,12 @@ static const CGFloat kStreamFloatingMenuExpandedAlpha = 0.96f;
         virtualGamepadItem.symbolName = @"gamecontroller";
         [items addObject:virtualGamepadItem];
 
+        StreamActionSheetItem *manageVirtualGamepadItem = [[StreamActionSheetItem alloc] init];
+        manageVirtualGamepadItem.identifier = @"manage_virtual_gamepad";
+        manageVirtualGamepadItem.title = @"编辑虚拟手柄";
+        manageVirtualGamepadItem.subtitle = @"调整位置和大小";
+        manageVirtualGamepadItem.symbolName = @"gamecontroller.fill";
+
         StreamActionSheetItem *virtualButtonsItem = [[StreamActionSheetItem alloc] init];
         virtualButtonsItem.identifier = @"virtual_buttons";
         virtualButtonsItem.title = @"虚拟按键";
@@ -1136,7 +1167,6 @@ static const CGFloat kStreamFloatingMenuExpandedAlpha = 0.96f;
         manageVirtualButtonsItem.title = @"编辑虚拟按键";
         manageVirtualButtonsItem.subtitle = @"添加或删除当前串流会话的虚拟按键";
         manageVirtualButtonsItem.symbolName = @"square.and.pencil";
-        [items addObject:manageVirtualButtonsItem];
 
         StreamActionSheetItem *shortcutItem = [[StreamActionSheetItem alloc] init];
         shortcutItem.identifier = @"shortcuts";
@@ -1158,6 +1188,8 @@ static const CGFloat kStreamFloatingMenuExpandedAlpha = 0.96f;
         viewOnlyItem.subtitle = @"禁用控制，仅允许缩放和平移画面";
         viewOnlyItem.symbolName = @"eye";
         [items addObject:viewOnlyItem];
+        [items addObject:manageVirtualGamepadItem];
+        [items addObject:manageVirtualButtonsItem];
 
         StreamActionSheetHostingViewController *controller = [[StreamActionSheetHostingViewController alloc] init];
         controller.delegate = (id<StreamActionSheetHostingViewControllerDelegate>)self;
@@ -1378,7 +1410,7 @@ static const CGFloat kStreamFloatingMenuExpandedAlpha = 0.96f;
 }
 
 - (BOOL)isTemporaryVirtualGamepadVisible {
-    return [_streamView getCurrentOscState] != OnScreenControlsLevelOff;
+    return [_streamView isTemporaryVirtualGamepadVisible];
 }
 
 - (void)toggleTemporaryVirtualGamepad {
@@ -1402,9 +1434,7 @@ static const CGFloat kStreamFloatingMenuExpandedAlpha = 0.96f;
         _viewOnlyHadScrollViewBeforeEntering = (_scrollView != nil && _scrollView.superview == self.view);
         _viewOnlyRestoreZoomScale = (_scrollView != nil) ? _scrollView.zoomScale : 1.0f;
         _viewOnlyRestoreContentOffset = (_scrollView != nil) ? _scrollView.contentOffset : CGPointZero;
-        _viewOnlyRestoreOscLevel = [_streamView getCurrentOscState];
         [_streamView setViewOnlyModeEnabled:YES];
-        [_streamView setTemporaryOnScreenControlsLevel:OnScreenControlsLevelOff];
         [self updateStreamingTouchModeLayout];
         if (_scrollView != nil) {
             [_scrollView setZoomScale:MAX(_viewOnlyRestoreZoomScale, 1.0f) animated:NO];
@@ -1417,7 +1447,6 @@ static const CGFloat kStreamFloatingMenuExpandedAlpha = 0.96f;
     _viewOnlyModeEnabled = NO;
     [_streamView setViewOnlyModeEnabled:NO];
     [self updateStreamingTouchModeLayout];
-    [_streamView setTemporaryOnScreenControlsLevel:_viewOnlyRestoreOscLevel];
 
     if (_scrollView != nil) {
         if (_viewOnlyHadScrollViewBeforeEntering) {
@@ -1446,8 +1475,50 @@ static const CGFloat kStreamFloatingMenuExpandedAlpha = 0.96f;
     ];
 }
 
+- (NSArray<NSDictionary *> *)defaultVirtualGamepadDefinitionsForPortrait:(BOOL)portrait {
+    if (portrait) {
+        return @[
+            @{@"id": @"gamepad_left_stick", @"title": @"LS", @"controlAction": @"gamepad_left_stick", @"shape": @"circle", @"scale": @0.96, @"xRatio": @0.24, @"yRatio": @0.80},
+            @{@"id": @"gamepad_dpad", @"title": @"DPad", @"controlAction": @"gamepad_dpad", @"shape": @"circle", @"scale": @0.90, @"xRatio": @0.24, @"yRatio": @0.60},
+            @{@"id": @"gamepad_right_stick", @"title": @"RS", @"controlAction": @"gamepad_right_stick", @"shape": @"circle", @"scale": @0.96, @"xRatio": @0.76, @"yRatio": @0.80},
+            @{@"id": @"gamepad_l3", @"title": @"L3", @"role": @"l3", @"shape": @"circle", @"scale": @0.74, @"xRatio": @0.44, @"yRatio": @0.36},
+            @{@"id": @"gamepad_r3", @"title": @"R3", @"role": @"r3", @"shape": @"circle", @"scale": @0.74, @"xRatio": @0.56, @"yRatio": @0.36},
+            @{@"id": @"gamepad_face_buttons", @"title": @"ABXY", @"controlAction": @"gamepad_face_buttons", @"shape": @"circle", @"scale": @0.90, @"xRatio": @0.78, @"yRatio": @0.54},
+            @{@"id": @"gamepad_l1", @"title": @"L1", @"role": @"l1", @"shape": @"roundedRect", @"widthScale": @0.92, @"heightScale": @0.92, @"xRatio": @0.22, @"yRatio": @0.18},
+            @{@"id": @"gamepad_r1", @"title": @"R1", @"role": @"r1", @"shape": @"roundedRect", @"widthScale": @0.92, @"heightScale": @0.92, @"xRatio": @0.78, @"yRatio": @0.18},
+            @{@"id": @"gamepad_l2", @"title": @"L2", @"role": @"l2", @"shape": @"roundedRect", @"widthScale": @0.92, @"heightScale": @0.92, @"xRatio": @0.22, @"yRatio": @0.10},
+            @{@"id": @"gamepad_r2", @"title": @"R2", @"role": @"r2", @"shape": @"roundedRect", @"widthScale": @0.92, @"heightScale": @0.92, @"xRatio": @0.78, @"yRatio": @0.10},
+            @{@"id": @"gamepad_select", @"title": @"Select", @"role": @"select", @"shape": @"roundedRect", @"widthScale": @0.84, @"heightScale": @0.88, @"xRatio": @0.44, @"yRatio": @0.26},
+            @{@"id": @"gamepad_start", @"title": @"Start", @"role": @"start", @"shape": @"roundedRect", @"widthScale": @0.84, @"heightScale": @0.88, @"xRatio": @0.56, @"yRatio": @0.26}
+        ];
+    }
+
+    return @[
+        @{@"id": @"gamepad_left_stick", @"title": @"LS", @"controlAction": @"gamepad_left_stick", @"shape": @"circle", @"scale": @0.96, @"xRatio": @0.20, @"yRatio": @0.76},
+        @{@"id": @"gamepad_dpad", @"title": @"DPad", @"controlAction": @"gamepad_dpad", @"shape": @"circle", @"scale": @0.88, @"xRatio": @0.18, @"yRatio": @0.48},
+        @{@"id": @"gamepad_right_stick", @"title": @"RS", @"controlAction": @"gamepad_right_stick", @"shape": @"circle", @"scale": @0.96, @"xRatio": @0.80, @"yRatio": @0.76},
+        @{@"id": @"gamepad_l3", @"title": @"L3", @"role": @"l3", @"shape": @"circle", @"scale": @0.72, @"xRatio": @0.47, @"yRatio": @0.28},
+        @{@"id": @"gamepad_r3", @"title": @"R3", @"role": @"r3", @"shape": @"circle", @"scale": @0.72, @"xRatio": @0.53, @"yRatio": @0.28},
+        @{@"id": @"gamepad_face_buttons", @"title": @"ABXY", @"controlAction": @"gamepad_face_buttons", @"shape": @"circle", @"scale": @0.88, @"xRatio": @0.82, @"yRatio": @0.40},
+        @{@"id": @"gamepad_l1", @"title": @"L1", @"role": @"l1", @"shape": @"roundedRect", @"widthScale": @0.92, @"heightScale": @0.92, @"xRatio": @0.20, @"yRatio": @0.15},
+        @{@"id": @"gamepad_r1", @"title": @"R1", @"role": @"r1", @"shape": @"roundedRect", @"widthScale": @0.92, @"heightScale": @0.92, @"xRatio": @0.80, @"yRatio": @0.15},
+        @{@"id": @"gamepad_l2", @"title": @"L2", @"role": @"l2", @"shape": @"roundedRect", @"widthScale": @0.92, @"heightScale": @0.92, @"xRatio": @0.20, @"yRatio": @0.06},
+        @{@"id": @"gamepad_r2", @"title": @"R2", @"role": @"r2", @"shape": @"roundedRect", @"widthScale": @0.92, @"heightScale": @0.92, @"xRatio": @0.80, @"yRatio": @0.06},
+        @{@"id": @"gamepad_select", @"title": @"Select", @"role": @"select", @"shape": @"roundedRect", @"widthScale": @0.82, @"heightScale": @0.88, @"xRatio": @0.47, @"yRatio": @0.18},
+        @{@"id": @"gamepad_start", @"title": @"Start", @"role": @"start", @"shape": @"roundedRect", @"widthScale": @0.82, @"heightScale": @0.88, @"xRatio": @0.53, @"yRatio": @0.18}
+    ];
+}
+
+- (void)loadDefaultVirtualGamepadDefinitionsForCurrentOrientation {
+    _virtualGamepadDefinitions = [[self defaultVirtualGamepadDefinitionsForPortrait:_currentSessionVirtualGamepadLayoutPortrait] mutableCopy];
+}
+
 - (NSInteger)currentVirtualButtonSchemeSelection {
     return MAX(0, MIN(_currentSessionVirtualButtonSchemeSelection, 4));
+}
+
+- (NSInteger)currentVirtualGamepadSchemeSelection {
+    return MAX(0, MIN(_currentSessionVirtualGamepadSchemeSelection, 4));
 }
 
 - (BOOL)isVirtualButtonLayoutPortraitForSize:(CGSize)size {
@@ -1496,6 +1567,51 @@ static const CGFloat kStreamFloatingMenuExpandedAlpha = 0.96f;
     [self switchVirtualButtonLayoutToPortrait:_currentSessionVirtualButtonLayoutPortrait preserveCurrentLayoutAsFallback:NO];
 }
 
+- (void)switchVirtualGamepadLayoutToPortrait:(BOOL)portrait preserveCurrentLayoutAsFallback:(BOOL)preserveCurrentLayoutAsFallback {
+    NSArray<NSDictionary *> *fallbackDefinitions = preserveCurrentLayoutAsFallback ? [[self virtualGamepadDefinitions] copy] : nil;
+    CGFloat fallbackOpacity = [self currentVirtualGamepadOpacity];
+    DataManager *dataManager = [[DataManager alloc] init];
+    NSInteger schemeSelection = [self currentVirtualGamepadSchemeSelection];
+    NSArray<NSDictionary *> *savedDefinitions = [dataManager virtualGamepadDefinitionsForSchemeSelection:schemeSelection
+                                                                                               portrait:portrait];
+
+    _currentSessionVirtualGamepadLayoutPortrait = portrait;
+    if (savedDefinitions != nil && savedDefinitions.count > 0) {
+        _virtualGamepadDefinitions = [savedDefinitions mutableCopy];
+    }
+    else if (fallbackDefinitions.count > 0) {
+        _virtualGamepadDefinitions = [fallbackDefinitions mutableCopy];
+    }
+    else {
+        _virtualGamepadDefinitions = [[self defaultVirtualGamepadDefinitionsForPortrait:portrait] mutableCopy];
+    }
+
+    _currentSessionVirtualGamepadOpacity = [dataManager virtualGamepadOpacityForSchemeSelection:schemeSelection];
+    if (_currentSessionVirtualGamepadOpacity <= 0.0f) {
+        _currentSessionVirtualGamepadOpacity = fallbackOpacity;
+    }
+}
+
+- (void)persistCurrentVirtualGamepadScheme {
+    DataManager *dataManager = [[DataManager alloc] init];
+    [dataManager saveVirtualGamepadDefinitions:[self virtualGamepadDefinitions]
+                                       opacity:[self currentVirtualGamepadOpacity]
+                            forSchemeSelection:[self currentVirtualGamepadSchemeSelection]
+                                      portrait:_currentSessionVirtualGamepadLayoutPortrait];
+}
+
+- (void)loadVirtualGamepadDefinitionsFromCurrentScheme {
+    [self switchVirtualGamepadLayoutToPortrait:_currentSessionVirtualGamepadLayoutPortrait preserveCurrentLayoutAsFallback:NO];
+}
+
+- (NSMutableArray<NSDictionary *> *)virtualGamepadDefinitions {
+    if (_virtualGamepadDefinitions == nil) {
+        [self loadDefaultVirtualGamepadDefinitionsForCurrentOrientation];
+    }
+
+    return _virtualGamepadDefinitions;
+}
+
 - (NSMutableArray<NSDictionary *> *)virtualButtonDefinitions {
     if (_virtualButtonDefinitions == nil) {
         [self loadVirtualButtonDefinitionsFromCurrentScheme];
@@ -1528,6 +1644,13 @@ static const CGFloat kStreamFloatingMenuExpandedAlpha = 0.96f;
     return _currentSessionVirtualButtonOpacity;
 }
 
+- (CGFloat)currentVirtualGamepadOpacity {
+    if (_currentSessionVirtualGamepadOpacity <= 0.0f) {
+        _currentSessionVirtualGamepadOpacity = 0.52f;
+    }
+    return _currentSessionVirtualGamepadOpacity;
+}
+
 - (void)applyVirtualButtonDefinitionsToStreamView {
     if (_streamView == nil) {
         return;
@@ -1544,6 +1667,22 @@ static const CGFloat kStreamFloatingMenuExpandedAlpha = 0.96f;
     [_streamView setTemporaryVirtualButtonDescriptors:descriptors];
 }
 
+- (void)applyVirtualGamepadDefinitionsToStreamView {
+    if (_streamView == nil) {
+        return;
+    }
+
+    CGFloat opacity = [self currentVirtualGamepadOpacity];
+    NSMutableArray<NSDictionary *> *descriptors = [NSMutableArray arrayWithCapacity:[self virtualGamepadDefinitions].count];
+    for (NSDictionary *definition in [self virtualGamepadDefinitions]) {
+        NSMutableDictionary *updatedDefinition = [definition mutableCopy];
+        updatedDefinition[@"opacity"] = @(opacity);
+        [descriptors addObject:updatedDefinition];
+    }
+
+    [_streamView setTemporaryVirtualGamepadDescriptors:descriptors];
+}
+
 - (NSDictionary *)selectedVirtualButtonDefinition {
     if (_selectedVirtualButtonIdentifier.length == 0) {
         return nil;
@@ -1557,6 +1696,21 @@ static const CGFloat kStreamFloatingMenuExpandedAlpha = 0.96f;
     }
 
     return [[self virtualButtonDefinitions] objectAtIndex:index];
+}
+
+- (NSDictionary *)selectedVirtualGamepadDefinition {
+    if (_selectedVirtualGamepadIdentifier.length == 0) {
+        return nil;
+    }
+
+    NSUInteger index = [[self virtualGamepadDefinitions] indexOfObjectPassingTest:^BOOL(NSDictionary *definition, NSUInteger idx, BOOL *stop) {
+        return [definition[@"id"] isEqualToString:self->_selectedVirtualGamepadIdentifier];
+    }];
+    if (index == NSNotFound) {
+        return nil;
+    }
+
+    return [[self virtualGamepadDefinitions] objectAtIndex:index];
 }
 
 - (void)installVirtualButtonEditorIfNeeded {
@@ -1688,19 +1842,26 @@ static const CGFloat kStreamFloatingMenuExpandedAlpha = 0.96f;
     CGFloat contentWidth = panelWidth - contentX * 2.0f;
     CGFloat rowY = 14.0f;
     BOOL isCircle = _virtualButtonEditorShapeControl.selectedSegmentIndex == 1;
+    BOOL hideDeleteButton = _virtualButtonEditorDeleteButton.hidden;
+    BOOL hideShapeControl = _virtualButtonEditorShapeControl.hidden;
 
     UILabel *scaleLabel = [_virtualButtonEditorView viewWithTag:9101];
     UILabel *widthLabel = [_virtualButtonEditorView viewWithTag:9102];
     UILabel *heightLabel = [_virtualButtonEditorView viewWithTag:9103];
 
-    _virtualButtonEditorTitleLabel.frame = CGRectMake(contentX, rowY, contentWidth - 194.0f, 20.0f);
-    _virtualButtonEditorCloseButton.frame = CGRectMake(panelWidth - 192.0f, 10.0f, 54.0f, 32.0f);
-    _virtualButtonEditorDeleteButton.frame = CGRectMake(panelWidth - 130.0f, 10.0f, 54.0f, 32.0f);
+    _virtualButtonEditorTitleLabel.frame = CGRectMake(contentX, rowY, contentWidth - (hideDeleteButton ? 132.0f : 194.0f), 20.0f);
+    _virtualButtonEditorCloseButton.frame = CGRectMake(panelWidth - (hideDeleteButton ? 130.0f : 192.0f), 10.0f, 54.0f, 32.0f);
+    _virtualButtonEditorDeleteButton.frame = hideDeleteButton ? CGRectZero : CGRectMake(panelWidth - 130.0f, 10.0f, 54.0f, 32.0f);
     _virtualButtonEditorSaveButton.frame = CGRectMake(panelWidth - 68.0f, 10.0f, 54.0f, 32.0f);
 
     rowY = CGRectGetMaxY(_virtualButtonEditorTitleLabel.frame) + 12.0f;
-    _virtualButtonEditorShapeControl.frame = CGRectMake(contentX, rowY, contentWidth, 30.0f);
-    rowY = CGRectGetMaxY(_virtualButtonEditorShapeControl.frame) + 12.0f;
+    if (hideShapeControl) {
+        _virtualButtonEditorShapeControl.frame = CGRectZero;
+    }
+    else {
+        _virtualButtonEditorShapeControl.frame = CGRectMake(contentX, rowY, contentWidth, 30.0f);
+        rowY = CGRectGetMaxY(_virtualButtonEditorShapeControl.frame) + 12.0f;
+    }
 
     scaleLabel.hidden = !isCircle;
     _virtualButtonEditorScaleSlider.hidden = !isCircle;
@@ -1737,18 +1898,30 @@ static const CGFloat kStreamFloatingMenuExpandedAlpha = 0.96f;
     _virtualButtonEditorView.frame = CGRectMake(MIN(MAX(x, 0.0f), MAX(CGRectGetWidth(bounds) - panelWidth - 12.0f, 0.0f)),
                                                 y,
                                                 panelWidth,
-                                                MAX(rowY, MAX(CGRectGetMaxY(_virtualButtonEditorSaveButton.frame), MAX(CGRectGetMaxY(_virtualButtonEditorDeleteButton.frame), CGRectGetMaxY(_virtualButtonEditorCloseButton.frame))) + 12.0f));
+                                                MAX(rowY, MAX(CGRectGetMaxY(_virtualButtonEditorSaveButton.frame), MAX(hideDeleteButton ? 0.0f : CGRectGetMaxY(_virtualButtonEditorDeleteButton.frame), CGRectGetMaxY(_virtualButtonEditorCloseButton.frame))) + 12.0f));
 }
 
 - (void)refreshVirtualButtonEditorForCurrentSelection {
-    NSDictionary *definition = [self selectedVirtualButtonDefinition];
-    if (![_streamView isTemporaryVirtualButtonsEditingEnabled] || definition == nil) {
+    BOOL editingVirtualButtons = [_streamView isTemporaryVirtualButtonsEditingEnabled];
+    BOOL editingVirtualGamepad = [_streamView isTemporaryVirtualGamepadEditingEnabled];
+    NSDictionary *definition = editingVirtualButtons ? [self selectedVirtualButtonDefinition] : (editingVirtualGamepad ? [self selectedVirtualGamepadDefinition] : nil);
+    if ((!editingVirtualButtons && !editingVirtualGamepad) || definition == nil) {
         _virtualButtonEditorView.hidden = YES;
         return;
     }
 
     [self installVirtualButtonEditorIfNeeded];
-    _virtualButtonEditorTitleLabel.text = definition[@"title"] ?: @"虚拟按键";
+    _virtualButtonEditorDeleteButton.hidden = editingVirtualGamepad;
+    NSString *controlAction = definition[@"controlAction"];
+    BOOL shapeLocked = [controlAction isKindOfClass:[NSString class]] &&
+        ([controlAction hasPrefix:@"joystick_"] ||
+         [controlAction hasPrefix:@"dpad_"] ||
+         [controlAction isEqualToString:@"gamepad_left_stick"] ||
+         [controlAction isEqualToString:@"gamepad_right_stick"] ||
+         [controlAction isEqualToString:@"gamepad_dpad"] ||
+         [controlAction isEqualToString:@"gamepad_face_buttons"]);
+    _virtualButtonEditorShapeControl.hidden = shapeLocked;
+    _virtualButtonEditorTitleLabel.text = definition[@"title"] ?: (editingVirtualGamepad ? @"虚拟手柄" : @"虚拟按键");
     _virtualButtonEditorShapeControl.selectedSegmentIndex = [definition[@"shape"] isEqualToString:@"circle"] ? 1 : 0;
     _virtualButtonEditorScaleSlider.value = MAX(0.5f, MIN([definition[@"scale"] floatValue], 2.0f));
     _virtualButtonEditorWidthSlider.value = MAX(0.5f, MIN([definition[@"widthScale"] floatValue], 2.0f));
@@ -1762,30 +1935,64 @@ static const CGFloat kStreamFloatingMenuExpandedAlpha = 0.96f;
 }
 
 - (void)applyVirtualButtonEditorValuesToSelectedItem {
-    if (_selectedVirtualButtonIdentifier.length == 0) {
+    BOOL editingVirtualButtons = [_streamView isTemporaryVirtualButtonsEditingEnabled];
+    BOOL editingVirtualGamepad = [_streamView isTemporaryVirtualGamepadEditingEnabled];
+    if (!editingVirtualButtons && !editingVirtualGamepad) {
         return;
     }
 
-    NSUInteger index = [[self virtualButtonDefinitions] indexOfObjectPassingTest:^BOOL(NSDictionary *definition, NSUInteger idx, BOOL *stop) {
-        return [definition[@"id"] isEqualToString:self->_selectedVirtualButtonIdentifier];
+    NSString *selectedIdentifier = editingVirtualButtons ? _selectedVirtualButtonIdentifier : _selectedVirtualGamepadIdentifier;
+    if (selectedIdentifier.length == 0) {
+        return;
+    }
+
+    NSMutableArray<NSDictionary *> *definitions = editingVirtualButtons ? [self virtualButtonDefinitions] : [self virtualGamepadDefinitions];
+    NSUInteger index = [definitions indexOfObjectPassingTest:^BOOL(NSDictionary *definition, NSUInteger idx, BOOL *stop) {
+        return [definition[@"id"] isEqualToString:selectedIdentifier];
     }];
     if (index == NSNotFound) {
         return;
     }
 
-    NSMutableDictionary *updatedDefinition = [[[self virtualButtonDefinitions] objectAtIndex:index] mutableCopy];
-    updatedDefinition[@"shape"] = _virtualButtonEditorShapeControl.selectedSegmentIndex == 1 ? @"circle" : @"roundedRect";
+    NSMutableDictionary *updatedDefinition = [[definitions objectAtIndex:index] mutableCopy];
+    NSString *controlAction = updatedDefinition[@"controlAction"];
+    BOOL shapeLocked = [controlAction isKindOfClass:[NSString class]] &&
+        ([controlAction hasPrefix:@"joystick_"] ||
+         [controlAction hasPrefix:@"dpad_"] ||
+         [controlAction isEqualToString:@"gamepad_left_stick"] ||
+         [controlAction isEqualToString:@"gamepad_right_stick"] ||
+         [controlAction isEqualToString:@"gamepad_dpad"] ||
+         [controlAction isEqualToString:@"gamepad_face_buttons"]);
+    updatedDefinition[@"shape"] = shapeLocked ? @"circle" : (_virtualButtonEditorShapeControl.selectedSegmentIndex == 1 ? @"circle" : @"roundedRect");
     updatedDefinition[@"scale"] = @(_virtualButtonEditorScaleSlider.value);
     updatedDefinition[@"widthScale"] = @(_virtualButtonEditorWidthSlider.value);
     updatedDefinition[@"heightScale"] = @(_virtualButtonEditorHeightSlider.value);
-    [[self virtualButtonDefinitions] replaceObjectAtIndex:index withObject:updatedDefinition];
-    [self applyVirtualButtonDefinitionsToStreamView];
-    [self persistCurrentVirtualButtonScheme];
+    [definitions replaceObjectAtIndex:index withObject:updatedDefinition];
+    if (editingVirtualButtons) {
+        [self applyVirtualButtonDefinitionsToStreamView];
+        [self persistCurrentVirtualButtonScheme];
+    }
+    else {
+        [self applyVirtualGamepadDefinitionsToStreamView];
+        [self persistCurrentVirtualGamepadScheme];
+    }
 }
 
 - (void)handleVirtualButtonSelectionDidChange:(NSNotification *)notification {
     NSString *identifier = notification.userInfo[@"identifier"];
     _selectedVirtualButtonIdentifier = ([identifier isKindOfClass:[NSString class]] && identifier.length > 0) ? [identifier copy] : nil;
+    if (_selectedVirtualButtonIdentifier.length > 0) {
+        _selectedVirtualGamepadIdentifier = nil;
+    }
+    [self refreshVirtualButtonEditorForCurrentSelection];
+}
+
+- (void)handleVirtualGamepadSelectionDidChange:(NSNotification *)notification {
+    NSString *identifier = notification.userInfo[@"identifier"];
+    _selectedVirtualGamepadIdentifier = ([identifier isKindOfClass:[NSString class]] && identifier.length > 0) ? [identifier copy] : nil;
+    if (_selectedVirtualGamepadIdentifier.length > 0) {
+        _selectedVirtualButtonIdentifier = nil;
+    }
     [self refreshVirtualButtonEditorForCurrentSelection];
 }
 
@@ -1812,8 +2019,9 @@ static const CGFloat kStreamFloatingMenuExpandedAlpha = 0.96f;
 
 - (void)handleVirtualButtonEditorSaveTapped:(UIButton *)sender {
     (void)sender;
+    BOOL editingVirtualGamepad = [_streamView isTemporaryVirtualGamepadEditingEnabled];
     [self applyVirtualButtonEditorValuesToSelectedItem];
-    [self showTemporaryTipText:@"虚拟按键已保存"];
+    [self showTemporaryTipText:(editingVirtualGamepad ? @"虚拟手柄已保存" : @"虚拟按键已保存")];
 }
 
 - (void)handleVirtualButtonEditorCloseTapped:(UIButton *)sender {
@@ -1823,24 +2031,39 @@ static const CGFloat kStreamFloatingMenuExpandedAlpha = 0.96f;
 
 - (void)handleVirtualButtonEditorDeleteTapped:(UIButton *)sender {
     (void)sender;
-    if (_selectedVirtualButtonIdentifier.length == 0) {
+    BOOL editingVirtualButtons = [_streamView isTemporaryVirtualButtonsEditingEnabled];
+    BOOL editingVirtualGamepad = [_streamView isTemporaryVirtualGamepadEditingEnabled];
+    if (editingVirtualGamepad) {
+        return;
+    }
+    NSString *selectedIdentifier = editingVirtualButtons ? _selectedVirtualButtonIdentifier : _selectedVirtualGamepadIdentifier;
+    if (selectedIdentifier.length == 0) {
         return;
     }
 
-    NSIndexSet *indexes = [[self virtualButtonDefinitions] indexesOfObjectsPassingTest:^BOOL(NSDictionary *definition, NSUInteger idx, BOOL *stop) {
-        return [definition[@"id"] isEqualToString:self->_selectedVirtualButtonIdentifier];
+    NSMutableArray<NSDictionary *> *definitions = editingVirtualButtons ? [self virtualButtonDefinitions] : [self virtualGamepadDefinitions];
+    NSIndexSet *indexes = [definitions indexesOfObjectsPassingTest:^BOOL(NSDictionary *definition, NSUInteger idx, BOOL *stop) {
+        return [definition[@"id"] isEqualToString:selectedIdentifier];
     }];
     if (indexes.count == 0) {
         return;
     }
 
-    [[self virtualButtonDefinitions] removeObjectsAtIndexes:indexes];
+    [definitions removeObjectsAtIndexes:indexes];
     _selectedVirtualButtonIdentifier = nil;
+    _selectedVirtualGamepadIdentifier = nil;
     _virtualButtonEditorView.hidden = YES;
-    [self applyVirtualButtonDefinitionsToStreamView];
-    [self refreshVirtualButtonsPanelIfNeeded];
-    [self persistCurrentVirtualButtonScheme];
-    [self showTemporaryTipText:@"虚拟按键已删除"];
+    if (editingVirtualButtons) {
+        [self applyVirtualButtonDefinitionsToStreamView];
+        [self refreshVirtualButtonsPanelIfNeeded];
+        [self persistCurrentVirtualButtonScheme];
+        [self showTemporaryTipText:@"虚拟按键已删除"];
+    }
+    else {
+        [self applyVirtualGamepadDefinitionsToStreamView];
+        [self persistCurrentVirtualGamepadScheme];
+        [self showTemporaryTipText:@"虚拟手柄控件已删除"];
+    }
 }
 
 - (void)showVirtualButtonsPanel {
@@ -2021,6 +2244,19 @@ static const CGFloat kStreamFloatingMenuExpandedAlpha = 0.96f;
         return;
     }
 
+    if ([identifier isEqualToString:@"manage_virtual_gamepad"] && self->_streamView != nil) {
+        [self->_streamView setTemporaryVirtualGamepadEditingEnabled:![self->_streamView isTemporaryVirtualGamepadEditingEnabled]];
+        if ([self->_streamView isTemporaryVirtualGamepadEditingEnabled]) {
+            [self->_streamView setTemporaryVirtualGamepadVisible:YES];
+            [self showTemporaryTipText:@"点选虚拟手柄控件可调整位置和大小"];
+        }
+        else {
+            self->_selectedVirtualGamepadIdentifier = nil;
+            self->_virtualButtonEditorView.hidden = YES;
+        }
+        return;
+    }
+
     if ([identifier isEqualToString:@"virtual_buttons"] && self->_streamView != nil) {
         [self->_streamView setTemporaryVirtualButtonsVisible:![self->_streamView isTemporaryVirtualButtonsVisible]];
         return;
@@ -2061,8 +2297,6 @@ static const CGFloat kStreamFloatingMenuExpandedAlpha = 0.96f;
         // the first frame of video.
         self->_stageLabel.hidden = YES;
         self->_tipLabel.hidden = YES;
-        
-        [self->_streamView showOnScreenControls];
         
         [self->_controllerSupport connectionEstablished];
         
@@ -2379,12 +2613,11 @@ static const CGFloat kStreamFloatingMenuExpandedAlpha = 0.96f;
 
 - (BOOL)prefersHomeIndicatorAutoHidden {
     if ([_controllerSupport getConnectedGamepadCount] > 0 &&
-        [_streamView getCurrentOscState] == OnScreenControlsLevelOff &&
         _userIsInteracting == NO) {
         // Autohide the home bar when a gamepad is connected
-        // and the on-screen controls are disabled. We can't
-        // do this all the time because any touch on the display
-        // will cause the home indicator to reappear, and our
+        // while the user is not interacting. We can't do this
+        // all the time because any touch on the display will
+        // cause the home indicator to reappear, and our
         // preferredScreenEdgesDeferringSystemGestures will also
         // be suppressed (leading to possible errant exits of the
         // stream).
@@ -2726,6 +2959,17 @@ static const CGFloat kStreamFloatingMenuExpandedAlpha = 0.96f;
     [self refreshVirtualButtonsPanelIfNeeded];
     [self refreshVirtualButtonEditorForCurrentSelection];
     [self persistCurrentVirtualButtonScheme];
+}
+
+- (void)streamVirtualGamepadDidChange:(NSNotification *)notification {
+    NSArray<NSDictionary *> *descriptors = notification.userInfo[@"descriptors"];
+    if (![descriptors isKindOfClass:[NSArray class]]) {
+        return;
+    }
+
+    _virtualGamepadDefinitions = [descriptors mutableCopy];
+    [self refreshVirtualButtonEditorForCurrentSelection];
+    [self persistCurrentVirtualGamepadScheme];
 }
 
 @end

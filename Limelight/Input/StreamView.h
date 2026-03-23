@@ -7,7 +7,6 @@
 //
 
 #import "ControllerSupport.h"
-#import "OnScreenControls.h"
 #import "Moonlight-Swift.h"
 #import "StreamConfiguration.h"
 #import "TouchScreenManager.h"
@@ -16,6 +15,8 @@
 extern NSString * const StreamViewBoundsDidChangeNotification;
 extern NSString * const StreamViewVirtualButtonsDidChangeNotification;
 extern NSString * const StreamViewVirtualButtonSelectionDidChangeNotification;
+extern NSString * const StreamViewVirtualGamepadDidChangeNotification;
+extern NSString * const StreamViewVirtualGamepadSelectionDidChangeNotification;
 
 typedef NS_ENUM(NSInteger, StreamViewVideoAlignmentMode) {
     StreamViewVideoAlignmentModeCenter = 0,
@@ -39,16 +40,18 @@ typedef NS_ENUM(NSInteger, StreamViewVideoAlignmentMode) {
 - (void) setupStreamView:(ControllerSupport*)controllerSupport
      interactionDelegate:(id<UserInteractionDelegate>)interactionDelegate
                   config:(StreamConfiguration*)streamConfig;
-- (void) showOnScreenControls;
-- (OnScreenControlsLevel) getCurrentOscState;
 - (void) setTemporaryVirtualGamepadVisible:(BOOL)visible;
+- (BOOL) isTemporaryVirtualGamepadVisible;
+- (void) setTemporaryVirtualGamepadDescriptors:(NSArray<NSDictionary<NSString *, id> *> *)descriptors;
+- (NSArray<NSDictionary<NSString *, id> *> *)currentTemporaryVirtualGamepadDescriptors;
+- (void) setTemporaryVirtualGamepadEditingEnabled:(BOOL)enabled;
+- (BOOL) isTemporaryVirtualGamepadEditingEnabled;
 - (void) setTemporaryVirtualButtonDescriptors:(NSArray<NSDictionary<NSString *, id> *> *)descriptors;
 - (NSArray<NSDictionary<NSString *, id> *> *)currentTemporaryVirtualButtonDescriptors;
 - (void) setTemporaryVirtualButtonsVisible:(BOOL)visible;
 - (BOOL) isTemporaryVirtualButtonsVisible;
 - (void) setTemporaryVirtualButtonsEditingEnabled:(BOOL)enabled;
 - (BOOL) isTemporaryVirtualButtonsEditingEnabled;
-- (void) setTemporaryOnScreenControlsLevel:(OnScreenControlsLevel)level;
 - (void) setVideoAlignmentMode:(StreamViewVideoAlignmentMode)alignmentMode;
 - (StreamViewVideoAlignmentMode) videoAlignmentMode;
 - (void) setVideoAlignmentMargin:(CGFloat)alignmentMargin;

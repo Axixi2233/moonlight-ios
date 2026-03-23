@@ -314,7 +314,7 @@ static NSMutableSet* hostList;
             if (host.pairState == PairStateUnpaired) {
                 return @"在线，未配对";
             }
-            return @"在线，可串流";
+            return @"在线";
 
         case StateOffline:
             return @"离线";
@@ -504,10 +504,10 @@ static NSMutableSet* hostList;
     // Needs to be synchronous to ensure the alert is shown before any potential
     // failure callback could be invoked.
     dispatch_sync(dispatch_get_main_queue(), ^{
-        self->_pairAlert = [UIAlertController alertControllerWithTitle:@"Pairing"
-                                                               message:[NSString stringWithFormat:@"Enter the following PIN on the host machine: %@\n\nIf your host PC is running Sunshine, navigate to the Sunshine web UI to enter the PIN.", PIN]
+        self->_pairAlert = [UIAlertController alertControllerWithTitle:@"配对中"
+                                                               message:[NSString stringWithFormat:@"在主机上输入以下 PIN 码：%@\n\n如果您的主机 PC 运行的是 Sunshine，请导航至 Sunshine Web UI 输入 PIN 码。", PIN]
                                                         preferredStyle:UIAlertControllerStyleAlert];
-        [self->_pairAlert addAction:[UIAlertAction actionWithTitle:@"Cancel" style:UIAlertActionStyleDestructive handler:^(UIAlertAction* action) {
+        [self->_pairAlert addAction:[UIAlertAction actionWithTitle:@"确认" style:UIAlertActionStyleDestructive handler:^(UIAlertAction* action) {
             self->_pairAlert = nil;
             [self->_discMan startDiscovery];
             [self hideLoadingFrame: ^{
@@ -519,11 +519,11 @@ static NSMutableSet* hostList;
 }
 
 - (void)displayPairingFailureDialog:(NSString *)message {
-    UIAlertController* failedDialog = [UIAlertController alertControllerWithTitle:@"Pairing Failed"
+    UIAlertController* failedDialog = [UIAlertController alertControllerWithTitle:@"配对失败"
                                                                           message:message
                                                                    preferredStyle:UIAlertControllerStyleAlert];
     [Utils addHelpOptionToDialog:failedDialog];
-    [failedDialog addAction:[UIAlertAction actionWithTitle:@"OK" style:UIAlertActionStyleDefault handler:nil]];
+    [failedDialog addAction:[UIAlertAction actionWithTitle:@"确认" style:UIAlertActionStyleDefault handler:nil]];
     
     [_discMan startDiscovery];
     
@@ -765,11 +765,11 @@ static NSMutableSet* hostList;
 }
 
 - (void)displayDnsFailedDialog {
-    UIAlertController* alert = [UIAlertController alertControllerWithTitle:@"Network Error"
-                                                                   message:@"Failed to resolve host."
+    UIAlertController* alert = [UIAlertController alertControllerWithTitle:@"网络错误"
+                                                                   message:@"主机名解析失败。"
                                                             preferredStyle:UIAlertControllerStyleAlert];
     [Utils addHelpOptionToDialog:alert];
-    [alert addAction:[UIAlertAction actionWithTitle:@"OK" style:UIAlertActionStyleDefault handler:nil]];
+    [alert addAction:[UIAlertAction actionWithTitle:@"确认" style:UIAlertActionStyleDefault handler:nil]];
     [[self activeViewController] presentViewController:alert animated:YES completion:nil];
 }
 
@@ -838,11 +838,11 @@ static NSMutableSet* hostList;
                         return;
                     }
                     
-                    UIAlertController* applistAlert = [UIAlertController alertControllerWithTitle:@"Connection Failed"
+                    UIAlertController* applistAlert = [UIAlertController alertControllerWithTitle:@"连接失败"
                                                                             message:serverInfoResp.statusMessage
                                                                                    preferredStyle:UIAlertControllerStyleAlert];
                     [Utils addHelpOptionToDialog:applistAlert];
-                    [applistAlert addAction:[UIAlertAction actionWithTitle:@"OK" style:UIAlertActionStyleDefault handler:nil]];
+                    [applistAlert addAction:[UIAlertAction actionWithTitle:@"确认" style:UIAlertActionStyleDefault handler:nil]];
                     
                     // Only display an alert if this was the result of a real
                     // user action, not just passively entering the foreground again
@@ -1050,44 +1050,69 @@ static NSMutableSet* hostList;
 
 - (void) addHostClicked {
     Log(LOG_D, @"Clicked add host");
-    UIAlertController* alertController = [UIAlertController alertControllerWithTitle:@"Add Host Manually" message:@"If Moonlight doesn't find your local gaming PC automatically,\nenter the IP address of your PC" preferredStyle:UIAlertControllerStyleAlert];
-    [alertController addAction:[UIAlertAction actionWithTitle:@"Cancel" style:UIAlertActionStyleCancel handler:nil]];
-    [alertController addAction:[UIAlertAction actionWithTitle:@"OK" style:UIAlertActionStyleDefault handler:^(UIAlertAction* action){
-        NSString* hostAddress = [((UITextField*)[[alertController textFields] objectAtIndex:0]).text trim];
-        [self showLoadingFrame:^{
-            dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_HIGH, 0), ^{
-                [self->_discMan discoverHost:hostAddress withCallback:^(TemporaryHost* host, NSString* error){
-                    if (host != nil) {
-                        dispatch_async(dispatch_get_main_queue(), ^{
-                            [self hideLoadingFrame:^{
-                                @synchronized(hostList) {
-                                    [hostList addObject:host];
-                                }
-                                [self updateHosts];
-                            }];
-                        });
-                    } else {
-                        unsigned int portTestResults = LiTestClientConnectivity(CONN_TEST_SERVER, 443,
-                                                                                ML_PORT_FLAG_TCP_47984 | ML_PORT_FLAG_TCP_47989);
-                        if (portTestResults != ML_TEST_RESULT_INCONCLUSIVE && portTestResults != 0) {
-                            error = [error stringByAppendingString:@"\n\nYour device's network connection is blocking Moonlight. Streaming may not work while connected to this network."];
-                        }
-                        
-                        UIAlertController* hostNotFoundAlert = [UIAlertController alertControllerWithTitle:@"Add Host Manually" message:error preferredStyle:UIAlertControllerStyleAlert];
-                        [Utils addHelpOptionToDialog:hostNotFoundAlert];
-                        [hostNotFoundAlert addAction:[UIAlertAction actionWithTitle:@"OK" style:UIAlertActionStyleDefault handler:nil]];
-                        dispatch_async(dispatch_get_main_queue(), ^{
-                            [self hideLoadingFrame:^{
-                                [[self activeViewController] presentViewController:hostNotFoundAlert animated:YES completion:nil];
-                            }];
-                        });
-                    }
-                }];
-            });
-        }];
+    UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"手动添加"
+                                                                   message:@"温馨提示：\n1、PC端设备开启N卡GeForce Shield 服务或者安装 Sunshine 并启用串流服务\n2、默认端口 [47989] 无需输入，自定义端口需要自行拼接\n3、支持 IPv4 和 IPv6 地址\nIPv4：192.168.1.123\nIPv6：[fd00:6868:6868:0:fd6:e0ea:84d9:70ea]:47989"
+                                                            preferredStyle:UIAlertControllerStyleAlert];
+    __weak typeof(self) weakSelf = self;
+    [alert addTextFieldWithConfigurationHandler:^(UITextField * _Nonnull textField) {
+        textField.placeholder = @"输入 IPv4 / IPv6 / 主机地址";
+        textField.clearButtonMode = UITextFieldViewModeWhileEditing;
+        textField.keyboardType = UIKeyboardTypeURL;
+        textField.autocapitalizationType = UITextAutocapitalizationTypeNone;
+        textField.autocorrectionType = UITextAutocorrectionTypeNo;
+        textField.returnKeyType = UIReturnKeyDone;
+    }];
+
+    [alert addAction:[UIAlertAction actionWithTitle:@"取消"
+                                              style:UIAlertActionStyleCancel
+                                            handler:nil]];
+
+    [alert addAction:[UIAlertAction actionWithTitle:@"添加"
+                                              style:UIAlertActionStyleDefault
+                                            handler:^(__unused UIAlertAction * _Nonnull action) {
+        UITextField *textField = alert.textFields.firstObject;
+        [weakSelf submitManualHostAddress:[[textField.text ?: @"" trim] copy]];
     }]];
-    [alertController addTextFieldWithConfigurationHandler:nil];
-    [[self activeViewController] presentViewController:alertController animated:YES completion:nil];
+
+    [[self activeViewController] presentViewController:alert animated:YES completion:nil];
+}
+
+- (void)submitManualHostAddress:(NSString *)hostAddress {
+    if (hostAddress.length == 0) {
+        return;
+    }
+
+    [self showLoadingFrame:^{
+        dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_HIGH, 0), ^{
+            [self->_discMan discoverHost:hostAddress withCallback:^(TemporaryHost* host, NSString* error){
+                if (host != nil) {
+                    dispatch_async(dispatch_get_main_queue(), ^{
+                        [self hideLoadingFrame:^{
+                            @synchronized(hostList) {
+                                [hostList addObject:host];
+                            }
+                            [self updateHosts];
+                        }];
+                    });
+                } else {
+                    unsigned int portTestResults = LiTestClientConnectivity(CONN_TEST_SERVER, 443,
+                                                                            ML_PORT_FLAG_TCP_47984 | ML_PORT_FLAG_TCP_47989);
+                    if (portTestResults != ML_TEST_RESULT_INCONCLUSIVE && portTestResults != 0) {
+                        error = [error stringByAppendingString:@"\n\n您的设备网络连接已阻止 Moonlight。连接到此网络时，可能无法进行流媒体播放。"];
+                    }
+
+                    UIAlertController* hostNotFoundAlert = [UIAlertController alertControllerWithTitle:@"提示" message:error preferredStyle:UIAlertControllerStyleAlert];
+                    [Utils addHelpOptionToDialog:hostNotFoundAlert];
+                    [hostNotFoundAlert addAction:[UIAlertAction actionWithTitle:@"确认" style:UIAlertActionStyleDefault handler:nil]];
+                    dispatch_async(dispatch_get_main_queue(), ^{
+                        [self hideLoadingFrame:^{
+                            [[self activeViewController] presentViewController:hostNotFoundAlert animated:YES completion:nil];
+                        }];
+                    });
+                }
+            }];
+        });
+    }];
 }
 
 - (void) prepareToStreamApp:(TemporaryApp *)app {

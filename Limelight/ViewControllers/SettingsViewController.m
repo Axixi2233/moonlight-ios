@@ -303,7 +303,6 @@ BOOL isCustomResolution(CGSize res) {
     snapshot.useFramePacing = currentSettings.useFramePacing;
 
     snapshot.absoluteTouchMode = currentSettings.absoluteTouchMode;
-    snapshot.onscreenControls = [currentSettings.onscreenControls intValue];
     snapshot.optimizeGames = currentSettings.optimizeGames;
     snapshot.multiController = currentSettings.multiController;
     snapshot.swapABXYButtons = currentSettings.swapABXYButtons;
@@ -325,6 +324,8 @@ BOOL isCustomResolution(CGSize res) {
     snapshot.performanceOverlayMargin = (NSInteger)currentSettings.performanceOverlayMargin;
     snapshot.floatingMenuEnabled = currentSettings.floatingMenuEnabled;
     snapshot.virtualButtonSchemeSelection = currentSettings.virtualButtonSchemeSelection;
+    snapshot.virtualGamepadSchemeSelection = currentSettings.virtualGamepadSchemeSelection;
+    snapshot.virtualGamepadOpacity = (NSInteger)lrint(currentSettings.virtualGamepadOpacity * 100.0);
 
     return snapshot;
 }
@@ -352,13 +353,14 @@ BOOL isCustomResolution(CGSize res) {
     NSInteger framerate = snapshot.framerate;
     NSInteger height = [self chosenStreamHeightFromSnapshot:snapshot];
     NSInteger width = [self chosenStreamWidthFromSnapshot:snapshot];
+    CGFloat virtualGamepadOpacity = MAX(0.05, MIN(snapshot.virtualGamepadOpacity / 100.0, 1.0));
 
     [dataMan saveSettingsWithBitrate:snapshot.bitrateKbps
                            framerate:framerate
                               height:height
                                width:width
                          audioConfig:2
-                    onscreenControls:snapshot.onscreenControls
+                    onscreenControls:0
                        optimizeGames:snapshot.optimizeGames
                      multiController:snapshot.multiController
                      swapABXYButtons:snapshot.swapABXYButtons
@@ -381,21 +383,13 @@ BOOL isCustomResolution(CGSize res) {
                 videoAlignmentMargin:snapshot.videoAlignmentMargin
 performanceOverlayPositionSelection:snapshot.performanceOverlayPositionSelection
          performanceOverlayMargin:snapshot.performanceOverlayMargin
-               floatingMenuEnabled:snapshot.floatingMenuEnabled
-       virtualButtonSchemeSelection:snapshot.virtualButtonSchemeSelection];
-}
+              floatingMenuEnabled:snapshot.floatingMenuEnabled
+       virtualButtonSchemeSelection:snapshot.virtualButtonSchemeSelection
+     virtualGamepadSchemeSelection:snapshot.virtualGamepadSchemeSelection
+             virtualGamepadOpacity:virtualGamepadOpacity];
 
-- (void)presentLayoutOnScreenControlsIfNeeded {
-    if (self.layoutOnScreenControlsVC == nil) {
-        self.layoutOnScreenControlsVC = [[LayoutOnScreenControlsViewController alloc] init];
-        if ([UIDevice currentDevice].userInterfaceIdiom != UIUserInterfaceIdiomPhone) {
-            self.layoutOnScreenControlsVC.modalPresentationStyle = UIModalPresentationFullScreen;
-        }
-    }
-
-    if (self.layoutOnScreenControlsVC.isBeingPresented == NO) {
-        [self presentViewController:self.layoutOnScreenControlsVC animated:YES completion:nil];
-    }
+    [dataMan saveVirtualGamepadOpacity:virtualGamepadOpacity
+                     forSchemeSelection:snapshot.virtualGamepadSchemeSelection];
 }
 
 - (void)settingsHostingViewControllerDidRequestCustomResolution:(SettingsHostingViewController *)controller {
@@ -452,10 +446,6 @@ performanceOverlayPositionSelection:snapshot.performanceOverlayPositionSelection
 
     [alertController addAction:[UIAlertAction actionWithTitle:@"Cancel" style:UIAlertActionStyleCancel handler:nil]];
     [self presentViewController:alertController animated:YES completion:nil];
-}
-
-- (void)settingsHostingViewControllerDidRequestOpenOnScreenControls:(SettingsHostingViewController *)controller {
-    [self presentLayoutOnScreenControlsIfNeeded];
 }
 
 - (void)settingsHostingViewController:(SettingsHostingViewController *)controller didRequestOpenExternalURL:(NSString *)urlString {

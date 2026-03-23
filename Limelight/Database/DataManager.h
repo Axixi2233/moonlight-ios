@@ -42,7 +42,9 @@
 performanceOverlayPositionSelection:(NSInteger)performanceOverlayPositionSelection
          performanceOverlayMargin:(CGFloat)performanceOverlayMargin
                floatingMenuEnabled:(BOOL)floatingMenuEnabled
-       virtualButtonSchemeSelection:(NSInteger)virtualButtonSchemeSelection;
+       virtualButtonSchemeSelection:(NSInteger)virtualButtonSchemeSelection
+     virtualGamepadSchemeSelection:(NSInteger)virtualGamepadSchemeSelection
+             virtualGamepadOpacity:(CGFloat)virtualGamepadOpacity;
 
 - (NSArray*) getHosts;
 - (void) updateHost:(TemporaryHost*)host;
@@ -58,6 +60,15 @@ performanceOverlayPositionSelection:(NSInteger)performanceOverlayPositionSelecti
                              opacity:(CGFloat)opacity
                   forSchemeSelection:(NSInteger)schemeSelection
                             portrait:(BOOL)portrait;
+- (NSArray<NSDictionary *> *)virtualGamepadDefinitionsForSchemeSelection:(NSInteger)schemeSelection
+                                                                portrait:(BOOL)portrait;
+- (CGFloat)virtualGamepadOpacityForSchemeSelection:(NSInteger)schemeSelection;
+- (void)saveVirtualGamepadOpacity:(CGFloat)opacity
+                forSchemeSelection:(NSInteger)schemeSelection;
+- (void)saveVirtualGamepadDefinitions:(NSArray<NSDictionary *> *)definitions
+                              opacity:(CGFloat)opacity
+                   forSchemeSelection:(NSInteger)schemeSelection
+                             portrait:(BOOL)portrait;
 
 - (void) updateUniqueId:(NSString*)uniqueId;
 - (NSString*) getUniqueId;

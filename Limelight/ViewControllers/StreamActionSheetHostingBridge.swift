@@ -355,7 +355,7 @@ private struct StreamActionSheetPanelView: View {
                 .font(.system(size: 13, weight: .medium))
                 .foregroundColor(Color.white.opacity(0.72))
 
-            SegmentedOptionsControl(items: ["触控板", "鼠标", "多点触控"],
+            SegmentedOptionsControl(items: ["触控板", "普通鼠标", "多点触控"],
                                     selection: viewModel.touchModeSelection) { newValue in
                 guard viewModel.touchModeSelection != newValue else {
                     return

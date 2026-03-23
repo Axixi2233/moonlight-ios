@@ -176,7 +176,7 @@
     
     NSString* hostProcessingStringLite;
     if (showsExtendedMetrics && stats.framesWithHostProcessingLatency != 0) {
-        hostProcessingStringLite = [NSString stringWithFormat:@" 主机：%.1f ms",
+        hostProcessingStringLite = [NSString stringWithFormat:@" 编码：%.1f ms",
                                     (float)stats.totalHostProcessingLatency / stats.framesWithHostProcessingLatency / 10.f];
     }
     else {

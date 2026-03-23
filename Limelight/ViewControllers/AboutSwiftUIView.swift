@@ -266,7 +266,7 @@ final class AboutHostingViewController: UIViewController {
     override func viewDidLoad() {
         super.viewDidLoad()
         view.backgroundColor = .clear
-        title = "关于我们"
+        title = "关于"
         installHostingControllerIfNeeded()
         applyNavigationBarAppearance()
     }

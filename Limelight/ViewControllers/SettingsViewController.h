@@ -7,10 +7,8 @@
 //
 
 #import <UIKit/UIKit.h>
-#import "LayoutOnScreenControlsViewController.h"
 
 @interface SettingsViewController : UIViewController
-@property (strong, nonatomic) LayoutOnScreenControlsViewController *layoutOnScreenControlsVC;
 
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wunguarded-availability"

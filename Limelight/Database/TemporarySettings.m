@@ -7,7 +7,6 @@
 //
 
 #import "TemporarySettings.h"
-#import "OnScreenControls.h"
 
 NSString * const StreamPreferenceVideoAlignmentSelectionKey = @"StreamPreferenceVideoAlignmentSelection";
 NSString * const StreamPreferenceVideoAlignmentMarginKey = @"StreamPreferenceVideoAlignmentMargin";
@@ -15,6 +14,8 @@ NSString * const StreamPreferencePerformanceOverlayPositionSelectionKey = @"Stre
 NSString * const StreamPreferencePerformanceOverlayMarginKey = @"StreamPreferencePerformanceOverlayMargin";
 NSString * const StreamPreferenceFloatingMenuEnabledKey = @"StreamPreferenceFloatingMenuEnabled";
 NSString * const StreamPreferenceVirtualButtonSchemeSelectionKey = @"StreamPreferenceVirtualButtonSchemeSelection";
+NSString * const StreamPreferenceVirtualGamepadSchemeSelectionKey = @"StreamPreferenceVirtualGamepadSchemeSelection";
+NSString * const StreamPreferenceVirtualGamepadOpacityKey = @"StreamPreferenceVirtualGamepadOpacity";
 
 @implementation TemporarySettings
 
@@ -29,7 +30,9 @@ NSString * const StreamPreferenceVirtualButtonSchemeSelectionKey = @"StreamPrefe
         StreamPreferencePerformanceOverlayPositionSelectionKey: @(0),
         StreamPreferencePerformanceOverlayMarginKey: @(6.0),
         StreamPreferenceFloatingMenuEnabledKey: @(NO),
-        StreamPreferenceVirtualButtonSchemeSelectionKey: @(0)
+        StreamPreferenceVirtualButtonSchemeSelectionKey: @(0),
+        StreamPreferenceVirtualGamepadSchemeSelectionKey: @(0),
+        StreamPreferenceVirtualGamepadOpacityKey: @(0.52)
     };
     [[NSUserDefaults standardUserDefaults] registerDefaults:streamPreferenceDefaults];
     
@@ -84,7 +87,7 @@ NSString * const StreamPreferenceVirtualButtonSchemeSelectionKey = @"StreamPrefe
         default:
             abort();
     }
-    self.onscreenControls = [NSNumber numberWithInteger:OnScreenControlsLevelOff];
+    self.onscreenControls = [NSNumber numberWithInteger:0];
 #else
     self.bitrate = settings.bitrate;
     self.framerate = settings.framerate;
@@ -118,6 +121,8 @@ NSString * const StreamPreferenceVirtualButtonSchemeSelectionKey = @"StreamPrefe
     self.performanceOverlayMargin = (CGFloat)[[NSUserDefaults standardUserDefaults] doubleForKey:StreamPreferencePerformanceOverlayMarginKey];
     self.floatingMenuEnabled = [[NSUserDefaults standardUserDefaults] boolForKey:StreamPreferenceFloatingMenuEnabledKey];
     self.virtualButtonSchemeSelection = [[NSUserDefaults standardUserDefaults] integerForKey:StreamPreferenceVirtualButtonSchemeSelectionKey];
+    self.virtualGamepadSchemeSelection = [[NSUserDefaults standardUserDefaults] integerForKey:StreamPreferenceVirtualGamepadSchemeSelectionKey];
+    self.virtualGamepadOpacity = (CGFloat)[[NSUserDefaults standardUserDefaults] doubleForKey:StreamPreferenceVirtualGamepadOpacityKey];
     
     return self;
 }

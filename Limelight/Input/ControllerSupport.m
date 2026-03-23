@@ -9,7 +9,6 @@
 #import "ControllerSupport.h"
 #import "Controller.h"
 
-#import "OnScreenControls.h"
 #import "DataManager.h"
 #include "Limelight.h"
 
@@ -40,7 +39,6 @@ static const double MOUSE_SPEED_DIVISOR = 1.25;
     float accumulatedScrollX;
     float accumulatedScrollY;
     
-    OnScreenControls *_osc;
     Controller *_oscController;
     
 #define EMULATING_SELECT     0x1
@@ -1046,61 +1044,6 @@ static const double MOUSE_SPEED_DIVISOR = 1.25;
 #endif
 }
 
--(void) updateAutoOnScreenControlMode
-{
-    // Auto on-screen control support may not be enabled
-    if (_osc == NULL) {
-        return;
-    }
-    
-    OnScreenControlsLevel level = OnScreenControlsLevelFull;
-    
-    // We currently stop after the first controller we find.
-    // Maybe we'll want to change that logic later.
-    for (int i = 0; i < [[GCController controllers] count]; i++) {
-        GCController *controller = [GCController controllers][i];
-        
-        if (controller != NULL) {
-            if (controller.extendedGamepad != NULL) {
-                level = OnScreenControlsLevelAutoGCExtendedGamepad;
-                if (@available(iOS 12.1, tvOS 12.1, *)) {
-                    if (controller.extendedGamepad.leftThumbstickButton != nil &&
-                        controller.extendedGamepad.rightThumbstickButton != nil) {
-                        level = OnScreenControlsLevelAutoGCExtendedGamepadWithStickButtons;
-                        if (@available(iOS 13.0, tvOS 13.0, *)) {
-                            if (controller.extendedGamepad.buttonOptions != nil) {
-                                // Has L3/R3 and Select, so we can show nothing :)
-                                level = OnScreenControlsLevelOff;
-                            }
-                        }
-                    }
-                }
-                break;
-            }
-        }
-    }
-    
-    // If we didn't find a gamepad present and we have a keyboard or mouse, turn
-    // the on-screen controls off to get the overlays out of the way.
-    if (level == OnScreenControlsLevelFull && [ControllerSupport hasKeyboardOrMouse]) {
-        level = OnScreenControlsLevelOff;
-        
-        // Ensure the virtual gamepad disappears to avoid confusing some games.
-        // If the mouse and keyboard disconnect later, it will reappear when the
-        // first OSC input is received.
-        LiSendMultiControllerEvent(0, 0, 0, 0, 0, 0, 0, 0, 0);
-    }
-    
-    [_osc setLevel:level];
-}
-
--(void) initAutoOnScreenControlMode:(OnScreenControls*)osc
-{
-    _osc = osc;
-    
-    [self updateAutoOnScreenControlMode];
-}
-
 -(Controller*) assignController:(GCController*)controller {
     for (int i = 0; i < 4; i++) {
         if (!(_controllerNumbers & (1 << i))) {
@@ -1201,17 +1144,6 @@ static const double MOUSE_SPEED_DIVISOR = 1.25;
         mask = 0x1;
     }
     
-    DataManager* dataMan = [[DataManager alloc] init];
-    TemporarySettings* settings = [dataMan getSettings];
-    OnScreenControlsLevel level = (OnScreenControlsLevel)[settings.onscreenControls integerValue];
-    
-    // Even if no gamepads are present, we will always count one if OSC is enabled,
-    // or it's set to auto and no keyboard or mouse is present. Absolute touch mode
-    // disables the OSC.
-    if (level != OnScreenControlsLevelOff && (![ControllerSupport hasKeyboardOrMouse] || level != OnScreenControlsLevelAuto) && !settings.absoluteTouchMode) {
-        mask |= 0x1;
-    }
-    
     return mask;
 }
 
@@ -1237,8 +1169,8 @@ static const double MOUSE_SPEED_DIVISOR = 1.25;
     _oscController = [[Controller alloc] init];
     _oscController.playerIndex = 0;
 
+    _oscEnabled = NO;
     DataManager* dataMan = [[DataManager alloc] init];
-    _oscEnabled = (OnScreenControlsLevel)[[dataMan getSettings].onscreenControls integerValue] != OnScreenControlsLevelOff;
     //iPhone震动
     _rumblePhone=[dataMan getSettings].rumblePhone;
     
@@ -1279,9 +1211,6 @@ static const double MOUSE_SPEED_DIVISOR = 1.25;
             // Report the controller arrival to the host if we're connected
             [self reportControllerArrival:limeController];
             
-            // Re-evaluate the on-screen control mode
-            [self updateAutoOnScreenControlMode];
-            
             // Notify the delegate
             [self->_delegate gamepadPresenceChanged];
         }
@@ -1321,9 +1250,6 @@ static const double MOUSE_SPEED_DIVISOR = 1.25;
             [self updateFinished:limeController];
             [self->_controllers removeObjectForKey:[NSNumber numberWithInteger:controller.playerIndex]];
             
-            // Re-evaluate the on-screen control mode
-            [self updateAutoOnScreenControlMode];
-            
             // Notify the delegate
             [self->_delegate gamepadPresenceChanged];
         }
@@ -1338,9 +1264,6 @@ static const double MOUSE_SPEED_DIVISOR = 1.25;
             // Register for mouse events
             [self registerMouseCallbacks: mouse];
 
-            // Re-evaluate the on-screen control mode
-            [self updateAutoOnScreenControlMode];
-            
             // Notify the delegate
             [self->_delegate mousePresenceChanged];
         }];
@@ -1352,23 +1275,14 @@ static const double MOUSE_SPEED_DIVISOR = 1.25;
             // Unregister for mouse events
             [self unregisterMouseCallbacks: mouse];
 
-            // Re-evaluate the on-screen control mode
-            [self updateAutoOnScreenControlMode];
-            
             // Notify the delegate
             [self->_delegate mousePresenceChanged];
         }];
         _keyboardConnectObserver = [[NSNotificationCenter defaultCenter] addObserverForName:GCKeyboardDidConnectNotification object:nil queue:[NSOperationQueue mainQueue] usingBlock:^(NSNotification *note) {
             Log(LOG_I, @"Keyboard connected!");
-            
-            // Re-evaluate the on-screen control mode
-            [self updateAutoOnScreenControlMode];
         }];
         _keyboardDisconnectObserver = [[NSNotificationCenter defaultCenter] addObserverForName:GCKeyboardDidDisconnectNotification object:nil queue:[NSOperationQueue mainQueue] usingBlock:^(NSNotification *note) {
             Log(LOG_I, @"Keyboard disconnected!");
-
-            // Re-evaluate the on-screen control mode
-            [self updateAutoOnScreenControlMode];
         }];
     }
     

@@ -8,6 +8,13 @@ import QuartzCore
 import AudioToolbox
 
 @available(iOS 13.0, *)
+private struct GamepadTrailPoint: Identifiable {
+    let id = UUID()
+    let point: CGPoint
+    let timestamp: CFTimeInterval
+}
+
+@available(iOS 13.0, *)
 private final class GamepadTestViewModel: NSObject, ObservableObject {
     @Published var controllerName: String = "未连接手柄"
     @Published var connectionDescription: String = "连接手柄后会实时显示按键、摇杆和扳机状态"
@@ -15,6 +22,9 @@ private final class GamepadTestViewModel: NSObject, ObservableObject {
     @Published var playerIndexText: String = "未分配"
     @Published var batteryText: String = "未知"
     @Published var hapticsText: String = "未检测"
+    @Published var connectionTypeText: String = "未知（系统未公开）"
+    @Published var gyroSupportText: String = "未检测"
+    @Published var inferredControllerTypeText: String = "未识别"
     @Published var rumbleStatusText: String = "点击开始震动"
     @Published var isRumbling = false
     @Published var triggerRumbleEnabled = false
@@ -26,6 +36,7 @@ private final class GamepadTestViewModel: NSObject, ObservableObject {
     @Published var pollingMaxText: String = "--"
     @Published var pollingAvgText: String = "--"
     @Published var pollingAnomalyCountText: String = "--"
+    @Published var showStickTrails = false
     @Published var gyroEnabled = false
     @Published var gyroSourceIndex = 0
     @Published var gyroStatusText: String = "机身体感"
@@ -39,6 +50,8 @@ private final class GamepadTestViewModel: NSObject, ObservableObject {
     @Published var leftStickY: Double = 0
     @Published var rightStickX: Double = 0
     @Published var rightStickY: Double = 0
+    @Published var leftStickTrailPoints: [GamepadTrailPoint] = []
+    @Published var rightStickTrailPoints: [GamepadTrailPoint] = []
     @Published var leftTrigger: Double = 0
     @Published var rightTrigger: Double = 0
 
@@ -67,11 +80,13 @@ private final class GamepadTestViewModel: NSObject, ObservableObject {
     private var leftHapticPlayer: CHHapticPatternPlayer?
     private var rightHapticPlayer: CHHapticPatternPlayer?
     private var fallbackVibrationTimer: Timer?
+    private var stickTrailCleanupTimer: Timer?
     private var leftStickPollingTimestamps: [CFTimeInterval] = []
     private var lastPolledLeftStickX: Double = 0
     private var lastPolledLeftStickY: Double = 0
     private let pollingTargetCount = 1000
     private let deviceMotionManager = CMMotionManager()
+    private let stickTrailLifetime: CFTimeInterval = 3.0
 
     override init() {
         super.init()
@@ -120,6 +135,7 @@ private final class GamepadTestViewModel: NSObject, ObservableObject {
         currentController?.motion?.valueChangedHandler = nil
         stopActiveRumble()
         stopGyroMonitoring()
+        stopStickTrailTimer()
     }
 
     private func attachController(_ controller: GCController?) {
@@ -140,7 +156,10 @@ private final class GamepadTestViewModel: NSObject, ObservableObject {
         playerIndexText = playerIndexDescription(for: controller.playerIndex)
         batteryText = batteryDescription(for: controller)
         hapticsText = hapticsDescription(for: controller)
+        connectionTypeText = inferredConnectionType(for: controller)
         controllerGyroSupported = controllerSupportsGyro(controller)
+        gyroSupportText = controllerGyroSupported ? "支持陀螺仪" : "不支持"
+        inferredControllerTypeText = inferredControllerType(for: controller)
         stopActiveRumble()
         triggerRumbleEnabled = false
         rumbleStatusText = "点击开始震动"
@@ -166,6 +185,9 @@ private final class GamepadTestViewModel: NSObject, ObservableObject {
         playerIndexText = "未分配"
         batteryText = "未知"
         hapticsText = "未检测"
+        connectionTypeText = "未知（系统未公开）"
+        gyroSupportText = "未检测"
+        inferredControllerTypeText = "未识别"
         rumbleStatusText = "点击开始震动"
         isRumbling = false
         triggerRumbleEnabled = false
@@ -174,6 +196,8 @@ private final class GamepadTestViewModel: NSObject, ObservableObject {
         leftStickY = 0
         rightStickX = 0
         rightStickY = 0
+        leftStickTrailPoints = []
+        rightStickTrailPoints = []
         leftTrigger = 0
         rightTrigger = 0
         dpadUp = false
@@ -244,6 +268,60 @@ private final class GamepadTestViewModel: NSObject, ObservableObject {
     func setGyroSourceIndex(_ newValue: Int) {
         gyroSourceIndex = newValue
         configureGyroMonitoring()
+    }
+
+    func setShowStickTrails(_ enabled: Bool) {
+        showStickTrails = enabled
+        enabled ? startStickTrailTimer() : stopStickTrailTimer()
+        if !enabled {
+            clearStickTrails()
+        }
+    }
+
+    private func appendStickTrailPoint(_ point: CGPoint, toLeftStick: Bool) {
+        pruneStaleStickTrailPoints()
+        let normalizedPoint = CGPoint(
+            x: CGFloat(min(max(point.x, -1), 1)),
+            y: CGFloat(min(max(point.y, -1), 1))
+        )
+        let maxTrailCount = 48
+        let trailPoint = GamepadTrailPoint(point: normalizedPoint, timestamp: CACurrentMediaTime())
+
+        if toLeftStick {
+            leftStickTrailPoints.append(trailPoint)
+            if leftStickTrailPoints.count > maxTrailCount {
+                leftStickTrailPoints.removeFirst(leftStickTrailPoints.count - maxTrailCount)
+            }
+        }
+        else {
+            rightStickTrailPoints.append(trailPoint)
+            if rightStickTrailPoints.count > maxTrailCount {
+                rightStickTrailPoints.removeFirst(rightStickTrailPoints.count - maxTrailCount)
+            }
+        }
+    }
+
+    private func clearStickTrails() {
+        leftStickTrailPoints = []
+        rightStickTrailPoints = []
+    }
+
+    private func startStickTrailTimer() {
+        guard stickTrailCleanupTimer == nil else { return }
+        stickTrailCleanupTimer = Timer.scheduledTimer(withTimeInterval: 0.12, repeats: true) { [weak self] _ in
+            self?.pruneStaleStickTrailPoints()
+        }
+    }
+
+    private func stopStickTrailTimer() {
+        stickTrailCleanupTimer?.invalidate()
+        stickTrailCleanupTimer = nil
+    }
+
+    private func pruneStaleStickTrailPoints() {
+        let threshold = CACurrentMediaTime() - stickTrailLifetime
+        leftStickTrailPoints.removeAll { $0.timestamp < threshold }
+        rightStickTrailPoints.removeAll { $0.timestamp < threshold }
     }
 
     private func startDeviceGyroMonitoring() {
@@ -364,6 +442,40 @@ private final class GamepadTestViewModel: NSObject, ObservableObject {
         }
 
         return "不支持"
+    }
+
+    private func inferredControllerType(for controller: GCController) -> String {
+        let vendor = (controller.vendorName ?? "").lowercased()
+
+        if vendor.contains("xbox") {
+            return "Xbox 类手柄"
+        }
+        if vendor.contains("dualsense") || vendor.contains("dualshock") || vendor.contains("playstation") || vendor.contains("ps5") || vendor.contains("ps4") {
+            return "PlayStation 类手柄"
+        }
+        if vendor.contains("switch") || vendor.contains("joy-con") || vendor.contains("pro controller") {
+            return "Switch 类手柄"
+        }
+        if vendor.contains("8bitdo") {
+            return "8BitDo 手柄"
+        }
+        if vendor.contains("gamesir") {
+            return "GameSir 手柄"
+        }
+        if vendor.contains("razer") {
+            return "Razer 手柄"
+        }
+        if controller.extendedGamepad != nil {
+            return "通用扩展手柄"
+        }
+        return "通用手柄"
+    }
+
+    private func inferredConnectionType(for controller: GCController) -> String {
+        if controller.isAttachedToDevice {
+            return "贴附/直连设备"
+        }
+        return "外接手柄（蓝牙/USB 未公开）"
     }
 
     private func stopActiveRumble() {
@@ -580,11 +692,18 @@ private final class GamepadTestViewModel: NSObject, ObservableObject {
             self.playerIndexText = self.playerIndexDescription(for: controller.playerIndex)
             self.batteryText = self.batteryDescription(for: controller)
             self.hapticsText = self.hapticsDescription(for: controller)
+            self.connectionTypeText = self.inferredConnectionType(for: controller)
+            self.gyroSupportText = self.controllerSupportsGyro(controller) ? "支持陀螺仪" : "不支持"
+            self.inferredControllerTypeText = self.inferredControllerType(for: controller)
 
             self.leftStickX = Double(gamepad.leftThumbstick.xAxis.value)
             self.leftStickY = Double(-gamepad.leftThumbstick.yAxis.value)
             self.rightStickX = Double(gamepad.rightThumbstick.xAxis.value)
             self.rightStickY = Double(-gamepad.rightThumbstick.yAxis.value)
+            if self.showStickTrails {
+                self.appendStickTrailPoint(CGPoint(x: self.leftStickX, y: self.leftStickY), toLeftStick: true)
+                self.appendStickTrailPoint(CGPoint(x: self.rightStickX, y: self.rightStickY), toLeftStick: false)
+            }
             self.recordLeftStickPollingSample(x: self.leftStickX, y: self.leftStickY)
             self.leftTrigger = Double(gamepad.leftTrigger.value)
             self.rightTrigger = Double(gamepad.rightTrigger.value)
@@ -705,6 +824,9 @@ private struct GamepadDeviceInfoCard: View {
     let playerIndex: String
     let battery: String
     let haptics: String
+    let connectionType: String
+    let gyroSupport: String
+    let inferredControllerType: String
 
     var body: some View {
         GamepadCard {
@@ -716,8 +838,11 @@ private struct GamepadDeviceInfoCard: View {
                 GamepadInfoRow(title: "设备名称", value: vendor)
                 GamepadInfoRow(title: "手柄配置", value: profile)
                 GamepadInfoRow(title: "玩家编号", value: playerIndex)
+                GamepadInfoRow(title: "连接方式", value: connectionType)
                 GamepadInfoRow(title: "电量", value: battery)
                 GamepadInfoRow(title: "震动支持", value: haptics)
+                GamepadInfoRow(title: "陀螺仪支持", value: gyroSupport)
+                GamepadInfoRow(title: "手柄类型", value: inferredControllerType)
             }
         }
     }
@@ -1043,16 +1168,19 @@ private struct GamepadStickView: View {
     let x: Double
     let y: Double
     let isPressed: Bool
+    let showTrail: Bool
+    let trailPoints: [GamepadTrailPoint]
 
     var body: some View {
         VStack(spacing: 6) {
             GeometryReader { proxy in
                 let side = min(proxy.size.width, proxy.size.height)
                 let radius = side / 2
-                let knobDiameter = side * 0.22
+                let knobDiameter = side * 0.12
                 let knobRadius = knobDiameter / 2
                 let ringInset = 1.0
                 let travel = radius - knobRadius - ringInset
+                let currentTime = CACurrentMediaTime()
 
                 ZStack {
                     Circle()
@@ -1060,6 +1188,33 @@ private struct GamepadStickView: View {
 
                     Circle()
                         .stroke(Color(red: 0.63, green: 0.60, blue: 0.72).opacity(0.75), lineWidth: 0.8)
+
+                    if showTrail && trailPoints.count > 1 {
+                        ForEach(Array(trailPoints.indices.dropFirst()), id: \.self) { index in
+                            let previous = trailPoints[index - 1]
+                            let current = trailPoints[index]
+                            let age = max(0, min(1, 1 - ((currentTime - current.timestamp) / 3.0)))
+
+                            Path { path in
+                                path.move(to: CGPoint(
+                                    x: radius + previous.point.x * travel,
+                                    y: radius + previous.point.y * travel
+                                ))
+                                path.addLine(to: CGPoint(
+                                    x: radius + current.point.x * travel,
+                                    y: radius + current.point.y * travel
+                                ))
+                            }
+                            .stroke(
+                                Color(red: 0.55, green: 0.51, blue: 0.93).opacity(0.10 + age * 0.45),
+                                style: StrokeStyle(
+                                    lineWidth: max(1.4, side * 0.02),
+                                    lineCap: .round,
+                                    lineJoin: .round
+                                )
+                            )
+                        }
+                    }
 
                     Circle()
                         .fill(Color.black.opacity(0.08))
@@ -1076,13 +1231,39 @@ private struct GamepadStickView: View {
                 }
             }
             .aspectRatio(1, contentMode: .fit)
-            .frame(maxWidth: 86)
+            .frame(maxWidth: 100)
 
             Text(String(format: "X %.2f  Y %.2f", x, y))
                 .font(.system(size: 10, weight: .medium))
                 .foregroundColor(Color(red: 0.45, green: 0.38, blue: 0.60))
         }
         .frame(maxWidth: .infinity)
+    }
+}
+
+@available(iOS 13.0, *)
+private struct GamepadVisualizationCard: View {
+    let showStickTrails: Bool
+    let onShowStickTrailsChanged: (Bool) -> Void
+
+    var body: some View {
+        GamepadCard {
+            VStack(alignment: .leading, spacing: 12) {
+                Text("手柄 UI可视化")
+                    .font(.system(size: 16, weight: .bold))
+                    .foregroundColor(Color(red: 0.29, green: 0.22, blue: 0.42))
+
+                Toggle(isOn: Binding(get: {
+                    showStickTrails
+                }, set: { newValue in
+                    onShowStickTrailsChanged(newValue)
+                })) {
+                    Text("显示摇杆轨迹")
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundColor(Color(red: 0.29, green: 0.22, blue: 0.42))
+                }
+            }
+        }
     }
 }
 
@@ -1097,14 +1278,14 @@ private struct GamepadDPadView: View {
         ZStack {
             Color.clear
             VStack(spacing: 4) {
-                GamepadRoundButton(title: "↑", isPressed: up)
+                GamepadRoundButton(title: "▲", isPressed: up)
                 HStack(spacing: 4) {
-                    GamepadRoundButton(title: "←", isPressed: left)
+                    GamepadRoundButton(title: "◀", isPressed: left)
                     Color.clear
                         .frame(width: 32, height: 32)
-                    GamepadRoundButton(title: "→", isPressed: right)
+                    GamepadRoundButton(title: "▶", isPressed: right)
                 }
-                GamepadRoundButton(title: "↓", isPressed: down)
+                GamepadRoundButton(title: "▼", isPressed: down)
             }
         }
         .frame(width: 102, height: 102)
@@ -1144,7 +1325,10 @@ private struct GamepadCenterButtonsView: View {
     let options: Bool
     let leftShoulder: Bool
     let rightShoulder: Bool
-
+    
+    let leftPressed: Bool
+    let rightPressed: Bool
+    
     var body: some View {
         VStack(spacing: 8) {
             HStack(spacing: 8) {
@@ -1156,21 +1340,13 @@ private struct GamepadCenterButtonsView: View {
                 GamepadButtonCapsule(title: "select", isPressed: options)
                 GamepadButtonCapsule(title: "start", isPressed: menu)
             }
+            
+            HStack(spacing: 8) {
+                GamepadButtonCapsule(title: "L3", isPressed: leftPressed)
+                GamepadButtonCapsule(title: "R3", isPressed: rightPressed)
+            }
         }
         .frame(maxWidth: .infinity)
-    }
-}
-
-@available(iOS 13.0, *)
-private struct GamepadThumbButtonRow: View {
-    let leftPressed: Bool
-    let rightPressed: Bool
-
-    var body: some View {
-        HStack(spacing: 12) {
-            GamepadButtonCapsule(title: "L3", isPressed: leftPressed)
-            GamepadButtonCapsule(title: "R3", isPressed: rightPressed)
-        }
     }
 }
 
@@ -1200,10 +1376,7 @@ private struct GamepadControllerLayoutCard: View {
                             menu: model.menuButton,
                             options: model.optionsButton,
                             leftShoulder: model.leftShoulder,
-                            rightShoulder: model.rightShoulder
-                        )
-
-                        GamepadThumbButtonRow(
+                            rightShoulder: model.rightShoulder,
                             leftPressed: model.leftThumbstickButton,
                             rightPressed: model.rightThumbstickButton
                         )
@@ -1223,14 +1396,18 @@ private struct GamepadControllerLayoutCard: View {
                         title: "左摇杆",
                         x: model.leftStickX,
                         y: model.leftStickY,
-                        isPressed: model.leftThumbstickButton
+                        isPressed: model.leftThumbstickButton,
+                        showTrail: model.showStickTrails,
+                        trailPoints: model.leftStickTrailPoints
                     )
 
                     GamepadStickView(
                         title: "右摇杆",
                         x: model.rightStickX,
                         y: model.rightStickY,
-                        isPressed: model.rightThumbstickButton
+                        isPressed: model.rightThumbstickButton,
+                        showTrail: model.showStickTrails,
+                        trailPoints: model.rightStickTrailPoints
                     )
                 }
             }
@@ -1255,7 +1432,10 @@ private struct GamepadTestRootView: View {
                         profile: model.profileName,
                         playerIndex: model.playerIndexText,
                         battery: model.batteryText,
-                        haptics: model.hapticsText
+                        haptics: model.hapticsText,
+                        connectionType: model.connectionTypeText,
+                        gyroSupport: model.gyroSupportText,
+                        inferredControllerType: model.inferredControllerTypeText
                     )
 
                     GamepadRumbleTestCard(
@@ -1269,6 +1449,13 @@ private struct GamepadTestRootView: View {
                             model.setTriggerRumbleEnabled(enabled)
                         }
                     )
+
+//                    GamepadVisualizationCard(
+//                        showStickTrails: model.showStickTrails,
+//                        onShowStickTrailsChanged: { enabled in
+//                            model.setShowStickTrails(enabled)
+//                        }
+//                    )
 
                     GamepadGyroTestCard(
                         isEnabled: model.gyroEnabled,

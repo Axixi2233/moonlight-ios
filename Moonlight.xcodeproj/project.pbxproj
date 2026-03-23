@@ -10,19 +10,11 @@
 		693B3A9B218638CD00982F7B /* Settings.bundle in Resources */ = {isa = PBXBuildFile; fileRef = 693B3A9A218638CD00982F7B /* Settings.bundle */; };
 		791F0E5F2BF5D82500837217 /* TouchScreenManager.m in Sources */ = {isa = PBXBuildFile; fileRef = 791F0E5E2BF5D82500837217 /* TouchScreenManager.m */; };
 		791F0E632BF5E33500837217 /* SensitivityBean.m in Sources */ = {isa = PBXBuildFile; fileRef = 791F0E622BF5E33500837217 /* SensitivityBean.m */; };
-		79A316832BCE72B800435DCE /* OnScreenButtonState.m in Sources */ = {isa = PBXBuildFile; fileRef = 79A3167B2BCE72B800435DCE /* OnScreenButtonState.m */; };
-		79A316842BCE72B800435DCE /* OSCProfilesManager.m in Sources */ = {isa = PBXBuildFile; fileRef = 79A3167D2BCE72B800435DCE /* OSCProfilesManager.m */; };
-		79A316852BCE72B800435DCE /* LayoutOnScreenControls.m in Sources */ = {isa = PBXBuildFile; fileRef = 79A3167E2BCE72B800435DCE /* LayoutOnScreenControls.m */; };
-		79A316862BCE72B800435DCE /* OSCProfile.m in Sources */ = {isa = PBXBuildFile; fileRef = 79A316802BCE72B800435DCE /* OSCProfile.m */; };
-		79A3168E2BCE72EE00435DCE /* LayoutOnScreenControlsViewController.m in Sources */ = {isa = PBXBuildFile; fileRef = 79A316892BCE72EE00435DCE /* LayoutOnScreenControlsViewController.m */; };
-		79A3168F2BCE72EE00435DCE /* ToolBarContainerView.m in Sources */ = {isa = PBXBuildFile; fileRef = 79A3168B2BCE72EE00435DCE /* ToolBarContainerView.m */; };
-		79A316902BCE72EE00435DCE /* OSCProfilesTableViewController.m in Sources */ = {isa = PBXBuildFile; fileRef = 79A3168C2BCE72EE00435DCE /* OSCProfilesTableViewController.m */; };
-		79A316962BCE730D00435DCE /* ProfileTableViewCell.m in Sources */ = {isa = PBXBuildFile; fileRef = 79A316942BCE730D00435DCE /* ProfileTableViewCell.m */; };
-		7F0A00012D00000100000001 /* ProfileTableViewCellHostingBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7F0A00012D00000100000002 /* ProfileTableViewCellHostingBridge.swift */; };
 		7F0A00022D00000100000001 /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 7F0A00022D00000100000002 /* LaunchScreen.storyboard */; };
 		7F0A00032D00000100000001 /* MainFrameAppCellHostingBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7F0A00032D00000100000002 /* MainFrameAppCellHostingBridge.swift */; };
 		7F0A00042D00000100000001 /* MainFrameHostListHostingBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7F0A00042D00000100000002 /* MainFrameHostListHostingBridge.swift */; };
 		7F0A00052D00000100000001 /* MainFrameHostActionSheetHostingBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7F0A00052D00000100000002 /* MainFrameHostActionSheetHostingBridge.swift */; };
+		7F0A00092D00000100000001 /* MainFrameAddHostSheetHostingBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7F0A00092D00000100000002 /* MainFrameAddHostSheetHostingBridge.swift */; };
 		7F0A00062D00000100000001 /* StreamActionSheetHostingBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7F0A00062D00000100000002 /* StreamActionSheetHostingBridge.swift */; };
 		7F0A00072D00000100000001 /* AboutSwiftUIView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7F0A00072D00000100000002 /* AboutSwiftUIView.swift */; };
 		7F0A00082D00000100000001 /* GamepadTestSwiftUIView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7F0A00082D00000100000002 /* GamepadTestSwiftUIView.swift */; };
@@ -93,7 +85,6 @@
 		FB1A67D3213245F800507771 /* TemporarySettings.m in Sources */ = {isa = PBXBuildFile; fileRef = 98D5856F1C0ED0E800F6CC00 /* TemporarySettings.m */; };
 		FB1A67D52132460400507771 /* ControllerSupport.m in Sources */ = {isa = PBXBuildFile; fileRef = FB89460B19F646E200339C8A /* ControllerSupport.m */; };
 		FB1A67D82132460400507771 /* StreamView.m in Sources */ = {isa = PBXBuildFile; fileRef = FB89460D19F646E200339C8A /* StreamView.m */; };
-		FB1A67DA2132460400507771 /* OnScreenControls.m in Sources */ = {isa = PBXBuildFile; fileRef = FB4678EC1A50C40900377732 /* OnScreenControls.m */; };
 		FB1A67DC2132460400507771 /* KeyboardSupport.m in Sources */ = {isa = PBXBuildFile; fileRef = FB1A674C2131E65900507771 /* KeyboardSupport.m */; };
 		FB1A67DE2132460A00507771 /* Utils.m in Sources */ = {isa = PBXBuildFile; fileRef = FB89462219F646E200339C8A /* Utils.m */; };
 		FB1A67E02132460A00507771 /* Logger.m in Sources */ = {isa = PBXBuildFile; fileRef = FBD1C8E11A8AD71400C6703C /* Logger.m */; };
@@ -117,7 +108,6 @@
 		FB290D0419B2C406004C83CF /* AppDelegate.m in Sources */ = {isa = PBXBuildFile; fileRef = FB290D0319B2C406004C83CF /* AppDelegate.m */; };
 		FB290D0719B2C406004C83CF /* Limelight.xcdatamodeld in Sources */ = {isa = PBXBuildFile; fileRef = FB290D0519B2C406004C83CF /* Limelight.xcdatamodeld */; };
 		FB290D0919B2C406004C83CF /* Images.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = FB290D0819B2C406004C83CF /* Images.xcassets */; };
-		FB4678ED1A50C40900377732 /* OnScreenControls.m in Sources */ = {isa = PBXBuildFile; fileRef = FB4678EC1A50C40900377732 /* OnScreenControls.m */; };
 		FB4678FA1A55FFAD00377732 /* DiscoveryManager.m in Sources */ = {isa = PBXBuildFile; fileRef = FB4678F91A55FFAD00377732 /* DiscoveryManager.m */; };
 		FB4678FF1A565DAC00377732 /* WakeOnLanManager.m in Sources */ = {isa = PBXBuildFile; fileRef = FB4678FE1A565DAC00377732 /* WakeOnLanManager.m */; };
 		FB4679011A57048000377732 /* CoreFoundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = FB4679001A57048000377732 /* CoreFoundation.framework */; };
@@ -193,27 +183,11 @@
 		791F0E602BF5D85800837217 /* TouchScreenManager.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = TouchScreenManager.h; sourceTree = "<group>"; };
 		791F0E612BF5E31D00837217 /* SensitivityBean.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = SensitivityBean.h; sourceTree = "<group>"; };
 		791F0E622BF5E33500837217 /* SensitivityBean.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = SensitivityBean.m; sourceTree = "<group>"; };
-		79A3167B2BCE72B800435DCE /* OnScreenButtonState.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = OnScreenButtonState.m; sourceTree = "<group>"; };
-		79A3167C2BCE72B800435DCE /* OnScreenButtonState.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = OnScreenButtonState.h; sourceTree = "<group>"; };
-		79A3167D2BCE72B800435DCE /* OSCProfilesManager.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = OSCProfilesManager.m; sourceTree = "<group>"; };
-		79A3167E2BCE72B800435DCE /* LayoutOnScreenControls.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = LayoutOnScreenControls.m; sourceTree = "<group>"; };
-		79A3167F2BCE72B800435DCE /* OSCProfile.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = OSCProfile.h; sourceTree = "<group>"; };
-		79A316802BCE72B800435DCE /* OSCProfile.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = OSCProfile.m; sourceTree = "<group>"; };
-		79A316812BCE72B800435DCE /* LayoutOnScreenControls.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = LayoutOnScreenControls.h; sourceTree = "<group>"; };
-		79A316822BCE72B800435DCE /* OSCProfilesManager.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = OSCProfilesManager.h; sourceTree = "<group>"; };
-		79A316882BCE72EE00435DCE /* ToolBarContainerView.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = ToolBarContainerView.h; sourceTree = "<group>"; };
-		79A316892BCE72EE00435DCE /* LayoutOnScreenControlsViewController.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = LayoutOnScreenControlsViewController.m; sourceTree = "<group>"; };
-		79A3168A2BCE72EE00435DCE /* LayoutOnScreenControlsViewController.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = LayoutOnScreenControlsViewController.h; sourceTree = "<group>"; };
-		79A3168B2BCE72EE00435DCE /* ToolBarContainerView.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = ToolBarContainerView.m; sourceTree = "<group>"; };
-		79A3168C2BCE72EE00435DCE /* OSCProfilesTableViewController.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = OSCProfilesTableViewController.m; sourceTree = "<group>"; };
-		79A3168D2BCE72EE00435DCE /* OSCProfilesTableViewController.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = OSCProfilesTableViewController.h; sourceTree = "<group>"; };
-		79A316922BCE730C00435DCE /* ProfileTableViewCell.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = ProfileTableViewCell.h; sourceTree = "<group>"; };
-		79A316942BCE730D00435DCE /* ProfileTableViewCell.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = ProfileTableViewCell.m; sourceTree = "<group>"; };
-		7F0A00012D00000100000002 /* ProfileTableViewCellHostingBridge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfileTableViewCellHostingBridge.swift; sourceTree = "<group>"; };
 		7F0A00022D00000100000002 /* LaunchScreen.storyboard */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; path = LaunchScreen.storyboard; sourceTree = SOURCE_ROOT; };
 		7F0A00032D00000100000002 /* MainFrameAppCellHostingBridge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MainFrameAppCellHostingBridge.swift; sourceTree = "<group>"; };
 		7F0A00042D00000100000002 /* MainFrameHostListHostingBridge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MainFrameHostListHostingBridge.swift; sourceTree = "<group>"; };
 		7F0A00052D00000100000002 /* MainFrameHostActionSheetHostingBridge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MainFrameHostActionSheetHostingBridge.swift; sourceTree = "<group>"; };
+		7F0A00092D00000100000002 /* MainFrameAddHostSheetHostingBridge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MainFrameAddHostSheetHostingBridge.swift; sourceTree = "<group>"; };
 		7F0A00062D00000100000002 /* StreamActionSheetHostingBridge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StreamActionSheetHostingBridge.swift; sourceTree = "<group>"; };
 		7F0A00072D00000100000002 /* AboutSwiftUIView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AboutSwiftUIView.swift; sourceTree = "<group>"; };
 		7F0A00082D00000100000002 /* GamepadTestSwiftUIView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GamepadTestSwiftUIView.swift; sourceTree = "<group>"; };
@@ -287,8 +261,6 @@
 		FB290D0319B2C406004C83CF /* AppDelegate.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = AppDelegate.m; sourceTree = "<group>"; };
 		FB290D0619B2C406004C83CF /* Limelight.xcdatamodel */ = {isa = PBXFileReference; lastKnownFileType = wrapper.xcdatamodel; path = Limelight.xcdatamodel; sourceTree = "<group>"; };
 		FB290D0819B2C406004C83CF /* Images.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Images.xcassets; sourceTree = "<group>"; };
-		FB4678EB1A50C40900377732 /* OnScreenControls.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = OnScreenControls.h; sourceTree = "<group>"; };
-		FB4678EC1A50C40900377732 /* OnScreenControls.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = OnScreenControls.m; sourceTree = "<group>"; };
 		FB4678F21A51BDCB00377732 /* Limelight 0.3.0.xcdatamodel */ = {isa = PBXFileReference; lastKnownFileType = wrapper.xcdatamodel; path = "Limelight 0.3.0.xcdatamodel"; sourceTree = "<group>"; };
 		FB4678F81A55FFAD00377732 /* DiscoveryManager.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = DiscoveryManager.h; sourceTree = "<group>"; };
 		FB4678F91A55FFAD00377732 /* DiscoveryManager.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = DiscoveryManager.m; sourceTree = "<group>"; };
@@ -408,45 +380,6 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
-		79A3167A2BCE72A300435DCE /* CustomOnScreen */ = {
-			isa = PBXGroup;
-			children = (
-				79A316812BCE72B800435DCE /* LayoutOnScreenControls.h */,
-				79A3167E2BCE72B800435DCE /* LayoutOnScreenControls.m */,
-				79A3167C2BCE72B800435DCE /* OnScreenButtonState.h */,
-				79A3167B2BCE72B800435DCE /* OnScreenButtonState.m */,
-				79A3167F2BCE72B800435DCE /* OSCProfile.h */,
-				79A316802BCE72B800435DCE /* OSCProfile.m */,
-				79A316822BCE72B800435DCE /* OSCProfilesManager.h */,
-				79A3167D2BCE72B800435DCE /* OSCProfilesManager.m */,
-			);
-			path = CustomOnScreen;
-			sourceTree = "<group>";
-		};
-		79A316872BCE72DA00435DCE /* CustomOnScreenControls */ = {
-			isa = PBXGroup;
-			children = (
-				79A316912BCE72F900435DCE /* Cells */,
-				79A3168A2BCE72EE00435DCE /* LayoutOnScreenControlsViewController.h */,
-				79A316892BCE72EE00435DCE /* LayoutOnScreenControlsViewController.m */,
-				79A3168D2BCE72EE00435DCE /* OSCProfilesTableViewController.h */,
-				79A3168C2BCE72EE00435DCE /* OSCProfilesTableViewController.m */,
-				79A316882BCE72EE00435DCE /* ToolBarContainerView.h */,
-				79A3168B2BCE72EE00435DCE /* ToolBarContainerView.m */,
-			);
-			path = CustomOnScreenControls;
-			sourceTree = "<group>";
-		};
-		79A316912BCE72F900435DCE /* Cells */ = {
-			isa = PBXGroup;
-			children = (
-				79A316922BCE730C00435DCE /* ProfileTableViewCell.h */,
-				79A316942BCE730D00435DCE /* ProfileTableViewCell.m */,
-				7F0A00012D00000100000002 /* ProfileTableViewCellHostingBridge.swift */,
-			);
-			path = Cells;
-			sourceTree = "<group>";
-		};
 		9896219423D15C2900211983 /* X1Kit */ = {
 			isa = PBXGroup;
 			children = (
@@ -582,13 +515,10 @@
 		FB89460919F646E200339C8A /* Input */ = {
 			isa = PBXGroup;
 			children = (
-				79A3167A2BCE72A300435DCE /* CustomOnScreen */,
 				FB89460A19F646E200339C8A /* ControllerSupport.h */,
 				FB89460B19F646E200339C8A /* ControllerSupport.m */,
 				FB89460C19F646E200339C8A /* StreamView.h */,
 				FB89460D19F646E200339C8A /* StreamView.m */,
-				FB4678EB1A50C40900377732 /* OnScreenControls.h */,
-				FB4678EC1A50C40900377732 /* OnScreenControls.m */,
 				FB1A674B2131E65900507771 /* KeyboardSupport.h */,
 				FB1A674C2131E65900507771 /* KeyboardSupport.m */,
 				9897B6A0221260EF00966419 /* Controller.m */,
@@ -655,13 +585,13 @@
 		FB89462319F646E200339C8A /* ViewControllers */ = {
 			isa = PBXGroup;
 			children = (
-				79A316872BCE72DA00435DCE /* CustomOnScreenControls */,
 				FBD3495119FF36FB002D2A60 /* SWRevealViewController.h */,
 				FBD3495219FF36FB002D2A60 /* SWRevealViewController.m */,
 				FB89462419F646E200339C8A /* MainFrameViewController.h */,
 				FB89462519F646E200339C8A /* MainFrameViewController.m */,
 				7F0A00072D00000100000002 /* AboutSwiftUIView.swift */,
 				7F0A00082D00000100000002 /* GamepadTestSwiftUIView.swift */,
+				7F0A00092D00000100000002 /* MainFrameAddHostSheetHostingBridge.swift */,
 				7F0A00032D00000100000002 /* MainFrameAppCellHostingBridge.swift */,
 				7F0A00052D00000100000002 /* MainFrameHostActionSheetHostingBridge.swift */,
 				7F0A00042D00000100000002 /* MainFrameHostListHostingBridge.swift */,
@@ -940,7 +870,6 @@
 				FB1A67D52132460400507771 /* ControllerSupport.m in Sources */,
 				FB1A67D82132460400507771 /* StreamView.m in Sources */,
 				9896219A23D56E8100211983 /* X1Kit.swift in Sources */,
-				FB1A67DA2132460400507771 /* OnScreenControls.m in Sources */,
 				FB1A67DC2132460400507771 /* KeyboardSupport.m in Sources */,
 				FB1A67CD213245F800507771 /* DataManager.m in Sources */,
 				FB1A67CF213245F800507771 /* TemporaryApp.m in Sources */,
@@ -979,7 +908,6 @@
 				FB290D0719B2C406004C83CF /* Limelight.xcdatamodeld in Sources */,
 				9819CC22254F180F008A7C8E /* AbsoluteTouchHandler.m in Sources */,
 				9819CC14254F107A008A7C8E /* RelativeTouchHandler.m in Sources */,
-				79A3168E2BCE72EE00435DCE /* LayoutOnScreenControlsViewController.m in Sources */,
 				FB1A674D2131E65900507771 /* KeyboardSupport.m in Sources */,
 				FB89463219F646E200339C8A /* VideoDecoderRenderer.m in Sources */,
 				FB290D0419B2C406004C83CF /* AppDelegate.m in Sources */,
@@ -990,7 +918,6 @@
 				FB9AFD321A7D867C00872C98 /* AppAssetRetriever.m in Sources */,
 				FB4678FF1A565DAC00377732 /* WakeOnLanManager.m in Sources */,
 				FB53E1431BE5DC4400CD6ECE /* IdManager.m in Sources */,
-				79A316902BCE72EE00435DCE /* OSCProfilesTableViewController.m in Sources */,
 				9897B6A1221260EF00966419 /* Controller.m in Sources */,
 				FB89462919F646E200339C8A /* mkcert.c in Sources */,
 				FB9AFD281A7C84ED00872C98 /* HttpResponse.m in Sources */,
@@ -1007,9 +934,9 @@
 				98D5856D1C0EA79600F6CC00 /* TemporaryHost.m in Sources */,
 				7F0A00072D00000100000001 /* AboutSwiftUIView.swift in Sources */,
 				7F0A00082D00000100000001 /* GamepadTestSwiftUIView.swift in Sources */,
-				79A316832BCE72B800435DCE /* OnScreenButtonState.m in Sources */,
 				791F0E632BF5E33500837217 /* SensitivityBean.m in Sources */,
 				FB89463519F646E200339C8A /* MainFrameViewController.m in Sources */,
+				7F0A00092D00000100000001 /* MainFrameAddHostSheetHostingBridge.swift in Sources */,
 				7F0A00032D00000100000001 /* MainFrameAppCellHostingBridge.swift in Sources */,
 				7F0A00052D00000100000001 /* MainFrameHostActionSheetHostingBridge.swift in Sources */,
 				7F0A00042D00000100000001 /* MainFrameHostListHostingBridge.swift in Sources */,
@@ -1020,20 +947,14 @@
 				9827E7A32514366900F25707 /* HapticContext.m in Sources */,
 				9832D1361BBCD5C50036EF48 /* TemporaryApp.m in Sources */,
 				98D585701C0ED0E800F6CC00 /* TemporarySettings.m in Sources */,
-				79A316852BCE72B800435DCE /* LayoutOnScreenControls.m in Sources */,
 				FB89462819F646E200339C8A /* CryptoManager.m in Sources */,
 				DC1F5A07206436B20037755F /* ConnectionHelper.m in Sources */,
 				FB89462E19F646E200339C8A /* PairManager.m in Sources */,
-				79A316862BCE72B800435DCE /* OSCProfile.m in Sources */,
 				FB9AFD371A7E02DB00872C98 /* HttpRequest.m in Sources */,
-				FB4678ED1A50C40900377732 /* OnScreenControls.m in Sources */,
 				FB290D0019B2C406004C83CF /* main.m in Sources */,
-				79A3168F2BCE72EE00435DCE /* ToolBarContainerView.m in Sources */,
 				9896219723D15C7000211983 /* X1Kit.swift in Sources */,
 				FBD3494319FC9C04002D2A60 /* AppAssetManager.m in Sources */,
 				FB6549561A57907E001C8F39 /* DiscoveryWorker.m in Sources */,
-				7F0A00012D00000100000001 /* ProfileTableViewCellHostingBridge.swift in Sources */,
-				79A316962BCE730D00435DCE /* ProfileTableViewCell.m in Sources */,
 				791F0E5F2BF5D82500837217 /* TouchScreenManager.m in Sources */,
 				FB89462A19F646E200339C8A /* ControllerSupport.m in Sources */,
 				FB9AFD3D1A7E111600872C98 /* AppAssetResponse.m in Sources */,
@@ -1041,7 +962,6 @@
 				FB4A23B81A9D3637004D2EF2 /* LoadingFrameViewController.m in Sources */,
 				FB9AFD3A1A7E05CE00872C98 /* ServerInfoResponse.m in Sources */,
 				FB89463119F646E200339C8A /* StreamManager.m in Sources */,
-				79A316842BCE72B800435DCE /* OSCProfilesManager.m in Sources */,
 				988FCD41293B091B003050E2 /* KeyboardInputField.m in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

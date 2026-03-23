@@ -9,8 +9,6 @@
 #import "StreamConfiguration.h"
 #import "Controller.h"
 
-@class OnScreenControls;
-
 @protocol ControllerSupportDelegate <NSObject>
 
 - (void) gamepadPresenceChanged;
@@ -24,7 +22,6 @@
 -(id) initWithConfig:(StreamConfiguration*)streamConfig delegate:(id<ControllerSupportDelegate>)delegate;
 -(void) connectionEstablished;
 
--(void) initAutoOnScreenControlMode:(OnScreenControls*)osc;
 -(void) cleanup;
 -(Controller*) getOscController;
 -(void) setOscEnabledForCurrentSession:(BOOL)enabled;

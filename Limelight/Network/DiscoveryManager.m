@@ -128,7 +128,7 @@
 
 - (void) discoverHost:(NSString *)hostAddress withCallback:(void (^)(TemporaryHost *, NSString*))callback {
     BOOL prohibitedAddress = [DiscoveryManager isProhibitedAddress:hostAddress];
-    NSString* prohibitedAddressMessage = [NSString stringWithFormat: @"Moonlight only supports adding PCs on your local network on %s.",
+    NSString* prohibitedAddressMessage = [NSString stringWithFormat: @"Moonlight 仅支持在 %s 上添加本地网络上的 PC。",
     #if TARGET_OS_TV
                                    "tvOS"
     #else
@@ -197,12 +197,12 @@
         }
         
         if (![self addHostToDiscovery:host]) {
-            callback(nil, @"Host information updated");
+            callback(nil, @"主机信息已更新");
         } else {
             callback(host, nil);
         }
     } else if (!prohibitedAddress) {
-        callback(nil, @"Could not connect to host.\n\nIf you're hosting using GeForce Experience, make sure you've enabled the toggle on the SHIELD tab.\n\nIf you're hosting using Sunshine, ensure it is running properly. If you're using a non-default port, you will need to include that here.");
+        callback(nil, @"无法连接到主机。\n\n如果您使用 GeForce Experience 托管服务器，请确保已在 SHIELD 选项卡上启用相应开关。\n\n如果您使用 Sunshine 托管服务器，请确保其运行正常。如果您使用的是非默认端口，则需要在此处添加该端口号。");
     } else {
         callback(nil, prohibitedAddressMessage);
     }
