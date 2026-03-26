@@ -190,7 +190,8 @@ private struct AboutRootView: View {
     private let links: [AboutLinkItem] = [
         AboutLinkItem(title: "Bilibili", systemIconName: "play.rectangle.fill", assetName: "AboutBilibiliIcon", urlString: "https://space.bilibili.com/16893379"),
         AboutLinkItem(title: "小红书", systemIconName: "book.closed.fill", assetName: "AboutXiaohongshuIcon", urlString: "https://www.xiaohongshu.com/user/profile/5d21be61000000001600b878"),
-        AboutLinkItem(title: "抖音", systemIconName: "music.note.tv.fill", assetName: "AboutDouyinIcon", urlString: "https://v.douyin.com/zm9GLKUfBW8/")
+        AboutLinkItem(title: "抖音", systemIconName: "music.note.tv.fill", assetName: "AboutDouyinIcon", urlString: "https://v.douyin.com/zm9GLKUfBW8/"),
+        AboutLinkItem(title: "Github", systemIconName: "book.note.tv.fill", assetName: "AboutGithub", urlString: "https://github.com/Axixi2233/moonlight-ios"),
     ]
 
     private var appName: String {

@@ -14,10 +14,10 @@
 		7F0A00032D00000100000001 /* MainFrameAppCellHostingBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7F0A00032D00000100000002 /* MainFrameAppCellHostingBridge.swift */; };
 		7F0A00042D00000100000001 /* MainFrameHostListHostingBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7F0A00042D00000100000002 /* MainFrameHostListHostingBridge.swift */; };
 		7F0A00052D00000100000001 /* MainFrameHostActionSheetHostingBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7F0A00052D00000100000002 /* MainFrameHostActionSheetHostingBridge.swift */; };
-		7F0A00092D00000100000001 /* MainFrameAddHostSheetHostingBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7F0A00092D00000100000002 /* MainFrameAddHostSheetHostingBridge.swift */; };
 		7F0A00062D00000100000001 /* StreamActionSheetHostingBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7F0A00062D00000100000002 /* StreamActionSheetHostingBridge.swift */; };
 		7F0A00072D00000100000001 /* AboutSwiftUIView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7F0A00072D00000100000002 /* AboutSwiftUIView.swift */; };
 		7F0A00082D00000100000001 /* GamepadTestSwiftUIView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7F0A00082D00000100000002 /* GamepadTestSwiftUIView.swift */; };
+		7F0A00092D00000100000001 /* MainFrameAddHostSheetHostingBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7F0A00092D00000100000002 /* MainFrameAddHostSheetHostingBridge.swift */; };
 		98181BE92791277400E43572 /* libSDL2.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 98181BE82791275D00E43572 /* libSDL2.a */; };
 		98181BEB2791278F00E43572 /* libSDL2.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 98181BEA2791278300E43572 /* libSDL2.a */; };
 		98181BED2791281100E43572 /* CoreMotion.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 98181BEC2791281100E43572 /* CoreMotion.framework */; };
@@ -187,10 +187,10 @@
 		7F0A00032D00000100000002 /* MainFrameAppCellHostingBridge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MainFrameAppCellHostingBridge.swift; sourceTree = "<group>"; };
 		7F0A00042D00000100000002 /* MainFrameHostListHostingBridge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MainFrameHostListHostingBridge.swift; sourceTree = "<group>"; };
 		7F0A00052D00000100000002 /* MainFrameHostActionSheetHostingBridge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MainFrameHostActionSheetHostingBridge.swift; sourceTree = "<group>"; };
-		7F0A00092D00000100000002 /* MainFrameAddHostSheetHostingBridge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MainFrameAddHostSheetHostingBridge.swift; sourceTree = "<group>"; };
 		7F0A00062D00000100000002 /* StreamActionSheetHostingBridge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StreamActionSheetHostingBridge.swift; sourceTree = "<group>"; };
 		7F0A00072D00000100000002 /* AboutSwiftUIView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AboutSwiftUIView.swift; sourceTree = "<group>"; };
 		7F0A00082D00000100000002 /* GamepadTestSwiftUIView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GamepadTestSwiftUIView.swift; sourceTree = "<group>"; };
+		7F0A00092D00000100000002 /* MainFrameAddHostSheetHostingBridge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MainFrameAddHostSheetHostingBridge.swift; sourceTree = "<group>"; };
 		9803CCAB254F9EAF00EE185E /* ConnectionCallbacks.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = ConnectionCallbacks.h; sourceTree = "<group>"; };
 		98132E8C20BC9A62007A053F /* Moonlight v1.1.xcdatamodel */ = {isa = PBXFileReference; lastKnownFileType = wrapper.xcdatamodel; path = "Moonlight v1.1.xcdatamodel"; sourceTree = "<group>"; };
 		98181BE82791275D00E43572 /* libSDL2.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; name = libSDL2.a; path = libs/SDL2/lib/iOS/libSDL2.a; sourceTree = "<group>"; };
@@ -1117,6 +1117,7 @@
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
 				CLANG_ALLOW_NON_MODULAR_INCLUDES_IN_FRAMEWORK_MODULES = YES;
+				CLANG_ANALYZER_LOCALIZABILITY_NONLOCALIZED = YES;
 				CLANG_CXX_LANGUAGE_STANDARD = "gnu++0x";
 				CLANG_CXX_LIBRARY = "libc++";
 				CLANG_ENABLE_MODULES = YES;
@@ -1173,6 +1174,7 @@
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
 				CLANG_ALLOW_NON_MODULAR_INCLUDES_IN_FRAMEWORK_MODULES = YES;
+				CLANG_ANALYZER_LOCALIZABILITY_NONLOCALIZED = YES;
 				CLANG_CXX_LANGUAGE_STANDARD = "gnu++0x";
 				CLANG_CXX_LIBRARY = "libc++";
 				CLANG_ENABLE_MODULES = YES;
@@ -1259,7 +1261,7 @@
 					"$(PROJECT_DIR)/libs/FFmpeg/lib/iOS-Sim",
 				);
 				MARKETING_VERSION = 1.0.0;
-				PRODUCT_BUNDLE_IDENTIFIER = cn.axi.moonlight.ap1;
+				PRODUCT_BUNDLE_IDENTIFIER = cn.axi.moonlight.ios;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				PROVISIONING_PROFILE = "";
 				PROVISIONING_PROFILE_SPECIFIER = "";
@@ -1310,7 +1312,7 @@
 					"$(PROJECT_DIR)/libs/FFmpeg/lib/iOS-Sim",
 				);
 				MARKETING_VERSION = 1.0.0;
-				PRODUCT_BUNDLE_IDENTIFIER = cn.axi.moonlight.ap1;
+				PRODUCT_BUNDLE_IDENTIFIER = cn.axi.moonlight.ios;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				PROVISIONING_PROFILE = "";
 				PROVISIONING_PROFILE_SPECIFIER = "";
