@@ -25,24 +25,87 @@ private struct MainFrameHostListRootView: View {
 
     var body: some View {
         ScrollView(.vertical, showsIndicators: false) {
-            VStack(spacing: 16) {
-                ForEach(Array(items.enumerated()), id: \.offset) { index, item in
-                    MainFrameHostRowView(item: item)
-                        .contentShape(Rectangle())
-                        .onTapGesture {
-                            onSelect(index)
-                        }
-                        .onLongPressGesture(minimumDuration: 0.6) {
-                            if !item.addCard {
-                                onLongPress(index)
+            if items.isEmpty {
+                emptyState
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 28)
+            } else {
+                VStack(spacing: 16) {
+                    ForEach(Array(items.enumerated()), id: \.offset) { index, item in
+                        MainFrameHostRowView(item: item)
+                            .contentShape(Rectangle())
+                            .onTapGesture {
+                                onSelect(index)
                             }
-                        }
+                            .onLongPressGesture(minimumDuration: 0.6) {
+                                if !item.addCard {
+                                    onLongPress(index)
+                                }
+                            }
+                    }
                 }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 8)
             }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 8)
         }
         .background(Color.clear)
+    }
+
+    private var emptyState: some View {
+        VStack(spacing: 16) {
+            ZStack {
+                Circle()
+                    .fill(
+                        LinearGradient(
+                            gradient: Gradient(colors: [
+                                Color(red: 0.94, green: 0.92, blue: 1.0),
+                                Color.white.opacity(0.95)
+                            ]),
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+                    .frame(width: 78, height: 78)
+
+                Image(systemName: "display")
+                    .font(.system(size: 30, weight: .semibold))
+                    .foregroundColor(Color(red: 0.34, green: 0.28, blue: 0.50))
+            }
+
+            VStack(spacing: 8) {
+                Text("还没有添加可控设备")
+                    .font(.system(size: 22, weight: .bold))
+                    .foregroundColor(Color(red: 0.26, green: 0.20, blue: 0.37))
+                    .multilineTextAlignment(.center)
+
+                Text("点击右上角的加号按钮添加可控设备")
+                    .font(.system(size: 14, weight: .medium))
+                    .foregroundColor(Color(red: 0.40, green: 0.34, blue: 0.52))
+                    .multilineTextAlignment(.center)
+                    .lineSpacing(2)
+            }
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.horizontal, 20)
+        .padding(.vertical, 34)
+        .background(
+            RoundedRectangle(cornerRadius: 24, style: .continuous)
+                .fill(
+                    LinearGradient(
+                        gradient: Gradient(colors: [
+                            Color.white.opacity(0.90),
+                            Color(red: 0.97, green: 0.95, blue: 1.0).opacity(0.84)
+                        ]),
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                )
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 24, style: .continuous)
+                .stroke(Color.white.opacity(0.74), lineWidth: 1)
+        )
+        .shadow(color: .black.opacity(0.05), radius: 16, x: 0, y: 8)
     }
 }
 

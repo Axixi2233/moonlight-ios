@@ -63,6 +63,7 @@ typedef NS_ENUM(NSInteger, StreamViewVideoAlignmentMode) {
                    secondaryKeyCodes:(NSArray<NSNumber *> *)secondaryKeyCodes;
 - (void) applyTemporaryTouchModeWithAbsoluteTouchMode:(BOOL)absoluteTouchMode
                                      multiTouchScreen:(BOOL)multiTouchScreen;
+- (void) setDirectScreenTouchInputDisabled:(BOOL)disabled;
 - (void) resetAfterTemporaryTouchModeChange;
 
 #if !TARGET_OS_TV

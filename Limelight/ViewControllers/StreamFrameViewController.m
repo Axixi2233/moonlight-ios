@@ -87,6 +87,7 @@ static const CGFloat kStreamFloatingMenuExpandedAlpha = 0.96f;
     BOOL _floatingMenuDragMoved;
     NSMutableArray<NSDictionary *> *_virtualButtonDefinitions;
     NSMutableArray<NSDictionary *> *_virtualGamepadDefinitions;
+    NSMutableArray<NSDictionary *> *_customShortcutDefinitions;
     UIView *_virtualButtonEditorView;
     UILabel *_virtualButtonEditorTitleLabel;
     UISegmentedControl *_virtualButtonEditorShapeControl;
@@ -96,6 +97,10 @@ static const CGFloat kStreamFloatingMenuExpandedAlpha = 0.96f;
     UISlider *_virtualButtonEditorWidthSlider;
     UILabel *_virtualButtonEditorHeightValueLabel;
     UISlider *_virtualButtonEditorHeightSlider;
+    UILabel *_virtualButtonEditorTouchSensitivityXValueLabel;
+    UISlider *_virtualButtonEditorTouchSensitivityXSlider;
+    UILabel *_virtualButtonEditorTouchSensitivityYValueLabel;
+    UISlider *_virtualButtonEditorTouchSensitivityYSlider;
     UIButton *_virtualButtonEditorCloseButton;
     UIButton *_virtualButtonEditorDeleteButton;
     UIButton *_virtualButtonEditorSaveButton;
@@ -161,7 +166,7 @@ static const CGFloat kStreamFloatingMenuExpandedAlpha = 0.96f;
     BOOL hasCellular = NO;
 
     if (getifaddrs(&ifaList) == -1) {
-        return @"wifi";
+        return @"wifi.circle";
     }
 
     for (ifa = ifaList; ifa != NULL; ifa = ifa->ifa_next) {
@@ -195,14 +200,14 @@ static const CGFloat kStreamFloatingMenuExpandedAlpha = 0.96f;
 
     freeifaddrs(ifaList);
     if (hasWiFi) {
-        return @"wifi";
+        return @"wifi.circle";
     }
 
     if (hasCellular) {
-        return @"cellularbars";
+        return @"cellularbars.circle";
     }
 
-    return @"wifi";
+    return @"wifi.circle";
 }
 
 - (BOOL)prefersStatusBarHidden {
@@ -668,6 +673,7 @@ static const CGFloat kStreamFloatingMenuExpandedAlpha = 0.96f;
     _currentSessionVirtualGamepadLayoutPortrait = _currentSessionVirtualButtonLayoutPortrait;
     [self loadVirtualButtonDefinitionsFromCurrentScheme];
     [self loadVirtualGamepadDefinitionsFromCurrentScheme];
+    [self loadCustomShortcutDefinitions];
     _currentSessionTouchModeSelection = !_settings.absoluteTouchMode ? 0 : (_settings.multiTouchScreen ? 2 : 1);
     _currentSessionVideoAlignmentSelection = MAX(0, MIN(_settings.videoAlignmentSelection, 2));
     _currentSessionVideoAlignmentMargin = MAX(0.0f, MIN(_settings.videoAlignmentMargin, 150.0f));
@@ -1246,6 +1252,7 @@ static const CGFloat kStreamFloatingMenuExpandedAlpha = 0.96f;
 - (void)applyTouchModeSelectionToCurrentSession:(NSInteger)selection {
     BOOL absoluteTouchMode = NO;
     BOOL multiTouchScreen = NO;
+    BOOL directScreenTouchInputDisabled = NO;
 
     switch (selection) {
         case 1:
@@ -1255,6 +1262,11 @@ static const CGFloat kStreamFloatingMenuExpandedAlpha = 0.96f;
         case 2:
             absoluteTouchMode = YES;
             multiTouchScreen = YES;
+            break;
+        case 3:
+            absoluteTouchMode = NO;
+            multiTouchScreen = NO;
+            directScreenTouchInputDisabled = YES;
             break;
         default:
             absoluteTouchMode = NO;
@@ -1268,6 +1280,7 @@ static const CGFloat kStreamFloatingMenuExpandedAlpha = 0.96f;
 
     [_streamView applyTemporaryTouchModeWithAbsoluteTouchMode:absoluteTouchMode
                                              multiTouchScreen:multiTouchScreen];
+    [_streamView setDirectScreenTouchInputDisabled:directScreenTouchInputDisabled];
     [self updateStreamingTouchModeLayout];
     [_streamView resetAfterTemporaryTouchModeChange];
 }
@@ -1374,6 +1387,8 @@ static const CGFloat kStreamFloatingMenuExpandedAlpha = 0.96f;
             return @"鼠标";
         case 2:
             return @"多点触控";
+        case 3:
+            return @"禁止触控";
         default:
             return @"触控板";
     }
@@ -1792,6 +1807,44 @@ static const CGFloat kStreamFloatingMenuExpandedAlpha = 0.96f;
     [_virtualButtonEditorHeightSlider addTarget:self action:@selector(handleVirtualButtonEditorHeightChanged:) forControlEvents:UIControlEventValueChanged];
     [_virtualButtonEditorView addSubview:_virtualButtonEditorHeightSlider];
 
+    UILabel *touchSensitivityXLabel = [[UILabel alloc] initWithFrame:CGRectZero];
+    touchSensitivityXLabel.tag = 9104;
+    touchSensitivityXLabel.text = @"X轴灵敏度";
+    touchSensitivityXLabel.textColor = [[UIColor whiteColor] colorWithAlphaComponent:0.74];
+    touchSensitivityXLabel.font = [UIFont systemFontOfSize:12.0f weight:UIFontWeightMedium];
+    [_virtualButtonEditorView addSubview:touchSensitivityXLabel];
+
+    _virtualButtonEditorTouchSensitivityXValueLabel = [[UILabel alloc] initWithFrame:CGRectZero];
+    _virtualButtonEditorTouchSensitivityXValueLabel.textColor = [[UIColor whiteColor] colorWithAlphaComponent:0.66];
+    _virtualButtonEditorTouchSensitivityXValueLabel.font = [UIFont systemFontOfSize:11.0f weight:UIFontWeightSemibold];
+    _virtualButtonEditorTouchSensitivityXValueLabel.textAlignment = NSTextAlignmentRight;
+    [_virtualButtonEditorView addSubview:_virtualButtonEditorTouchSensitivityXValueLabel];
+
+    _virtualButtonEditorTouchSensitivityXSlider = [[UISlider alloc] initWithFrame:CGRectZero];
+    _virtualButtonEditorTouchSensitivityXSlider.minimumValue = 0.5f;
+    _virtualButtonEditorTouchSensitivityXSlider.maximumValue = 3.0f;
+    [_virtualButtonEditorTouchSensitivityXSlider addTarget:self action:@selector(handleVirtualButtonEditorTouchSensitivityXChanged:) forControlEvents:UIControlEventValueChanged];
+    [_virtualButtonEditorView addSubview:_virtualButtonEditorTouchSensitivityXSlider];
+
+    UILabel *touchSensitivityYLabel = [[UILabel alloc] initWithFrame:CGRectZero];
+    touchSensitivityYLabel.tag = 9105;
+    touchSensitivityYLabel.text = @"Y轴灵敏度";
+    touchSensitivityYLabel.textColor = [[UIColor whiteColor] colorWithAlphaComponent:0.74];
+    touchSensitivityYLabel.font = [UIFont systemFontOfSize:12.0f weight:UIFontWeightMedium];
+    [_virtualButtonEditorView addSubview:touchSensitivityYLabel];
+
+    _virtualButtonEditorTouchSensitivityYValueLabel = [[UILabel alloc] initWithFrame:CGRectZero];
+    _virtualButtonEditorTouchSensitivityYValueLabel.textColor = [[UIColor whiteColor] colorWithAlphaComponent:0.66];
+    _virtualButtonEditorTouchSensitivityYValueLabel.font = [UIFont systemFontOfSize:11.0f weight:UIFontWeightSemibold];
+    _virtualButtonEditorTouchSensitivityYValueLabel.textAlignment = NSTextAlignmentRight;
+    [_virtualButtonEditorView addSubview:_virtualButtonEditorTouchSensitivityYValueLabel];
+
+    _virtualButtonEditorTouchSensitivityYSlider = [[UISlider alloc] initWithFrame:CGRectZero];
+    _virtualButtonEditorTouchSensitivityYSlider.minimumValue = 0.5f;
+    _virtualButtonEditorTouchSensitivityYSlider.maximumValue = 3.0f;
+    [_virtualButtonEditorTouchSensitivityYSlider addTarget:self action:@selector(handleVirtualButtonEditorTouchSensitivityYChanged:) forControlEvents:UIControlEventValueChanged];
+    [_virtualButtonEditorView addSubview:_virtualButtonEditorTouchSensitivityYSlider];
+
     _virtualButtonEditorSaveButton = [UIButton buttonWithType:UIButtonTypeSystem];
     [_virtualButtonEditorSaveButton setTitle:@"保存" forState:UIControlStateNormal];
     _virtualButtonEditorSaveButton.titleLabel.font = [UIFont systemFontOfSize:13.0f weight:UIFontWeightSemibold];
@@ -1844,10 +1897,15 @@ static const CGFloat kStreamFloatingMenuExpandedAlpha = 0.96f;
     BOOL isCircle = _virtualButtonEditorShapeControl.selectedSegmentIndex == 1;
     BOOL hideDeleteButton = _virtualButtonEditorDeleteButton.hidden;
     BOOL hideShapeControl = _virtualButtonEditorShapeControl.hidden;
+    NSDictionary *definition = [_streamView isTemporaryVirtualButtonsEditingEnabled] ? [self selectedVirtualButtonDefinition] : [self selectedVirtualGamepadDefinition];
+    NSString *mouseAction = definition[@"mouseAction"];
+    BOOL showsTouchpadSensitivity = [mouseAction isKindOfClass:[NSString class]] && [mouseAction hasPrefix:@"touchpad_"];
 
     UILabel *scaleLabel = [_virtualButtonEditorView viewWithTag:9101];
     UILabel *widthLabel = [_virtualButtonEditorView viewWithTag:9102];
     UILabel *heightLabel = [_virtualButtonEditorView viewWithTag:9103];
+    UILabel *touchSensitivityXLabel = [_virtualButtonEditorView viewWithTag:9104];
+    UILabel *touchSensitivityYLabel = [_virtualButtonEditorView viewWithTag:9105];
 
     _virtualButtonEditorTitleLabel.frame = CGRectMake(contentX, rowY, contentWidth - (hideDeleteButton ? 132.0f : 194.0f), 20.0f);
     _virtualButtonEditorCloseButton.frame = CGRectMake(panelWidth - (hideDeleteButton ? 130.0f : 192.0f), 10.0f, 54.0f, 32.0f);
@@ -1873,6 +1931,12 @@ static const CGFloat kStreamFloatingMenuExpandedAlpha = 0.96f;
     heightLabel.hidden = isCircle;
     _virtualButtonEditorHeightSlider.hidden = isCircle;
     _virtualButtonEditorHeightValueLabel.hidden = isCircle;
+    touchSensitivityXLabel.hidden = !showsTouchpadSensitivity;
+    _virtualButtonEditorTouchSensitivityXSlider.hidden = !showsTouchpadSensitivity;
+    _virtualButtonEditorTouchSensitivityXValueLabel.hidden = !showsTouchpadSensitivity;
+    touchSensitivityYLabel.hidden = !showsTouchpadSensitivity;
+    _virtualButtonEditorTouchSensitivityYSlider.hidden = !showsTouchpadSensitivity;
+    _virtualButtonEditorTouchSensitivityYValueLabel.hidden = !showsTouchpadSensitivity;
 
     if (isCircle) {
         scaleLabel.frame = CGRectMake(contentX, rowY, 60.0f, 18.0f);
@@ -1893,6 +1957,20 @@ static const CGFloat kStreamFloatingMenuExpandedAlpha = 0.96f;
         rowY = CGRectGetMaxY(heightLabel.frame) + 4.0f;
         _virtualButtonEditorHeightSlider.frame = CGRectMake(contentX, rowY, contentWidth, 24.0f);
         rowY = CGRectGetMaxY(_virtualButtonEditorHeightSlider.frame) + 12.0f;
+
+        if (showsTouchpadSensitivity) {
+            touchSensitivityXLabel.frame = CGRectMake(contentX, rowY, 88.0f, 18.0f);
+            _virtualButtonEditorTouchSensitivityXValueLabel.frame = CGRectMake(panelWidth - 74.0f, rowY, 60.0f, 18.0f);
+            rowY = CGRectGetMaxY(touchSensitivityXLabel.frame) + 4.0f;
+            _virtualButtonEditorTouchSensitivityXSlider.frame = CGRectMake(contentX, rowY, contentWidth, 24.0f);
+            rowY = CGRectGetMaxY(_virtualButtonEditorTouchSensitivityXSlider.frame) + 10.0f;
+
+            touchSensitivityYLabel.frame = CGRectMake(contentX, rowY, 88.0f, 18.0f);
+            _virtualButtonEditorTouchSensitivityYValueLabel.frame = CGRectMake(panelWidth - 74.0f, rowY, 60.0f, 18.0f);
+            rowY = CGRectGetMaxY(touchSensitivityYLabel.frame) + 4.0f;
+            _virtualButtonEditorTouchSensitivityYSlider.frame = CGRectMake(contentX, rowY, contentWidth, 24.0f);
+            rowY = CGRectGetMaxY(_virtualButtonEditorTouchSensitivityYSlider.frame) + 12.0f;
+        }
     }
 
     _virtualButtonEditorView.frame = CGRectMake(MIN(MAX(x, 0.0f), MAX(CGRectGetWidth(bounds) - panelWidth - 12.0f, 0.0f)),
@@ -1913,22 +1991,31 @@ static const CGFloat kStreamFloatingMenuExpandedAlpha = 0.96f;
     [self installVirtualButtonEditorIfNeeded];
     _virtualButtonEditorDeleteButton.hidden = editingVirtualGamepad;
     NSString *controlAction = definition[@"controlAction"];
-    BOOL shapeLocked = [controlAction isKindOfClass:[NSString class]] &&
+    NSString *mouseAction = definition[@"mouseAction"];
+    BOOL isTouchpadButton = [mouseAction isKindOfClass:[NSString class]] && [mouseAction hasPrefix:@"touchpad_"];
+    BOOL shapeLocked = ([controlAction isKindOfClass:[NSString class]] &&
         ([controlAction hasPrefix:@"joystick_"] ||
          [controlAction hasPrefix:@"dpad_"] ||
          [controlAction isEqualToString:@"gamepad_left_stick"] ||
          [controlAction isEqualToString:@"gamepad_right_stick"] ||
          [controlAction isEqualToString:@"gamepad_dpad"] ||
-         [controlAction isEqualToString:@"gamepad_face_buttons"]);
+         [controlAction isEqualToString:@"gamepad_face_buttons"])) ||
+        isTouchpadButton;
     _virtualButtonEditorShapeControl.hidden = shapeLocked;
     _virtualButtonEditorTitleLabel.text = definition[@"title"] ?: (editingVirtualGamepad ? @"虚拟手柄" : @"虚拟按键");
     _virtualButtonEditorShapeControl.selectedSegmentIndex = [definition[@"shape"] isEqualToString:@"circle"] ? 1 : 0;
     _virtualButtonEditorScaleSlider.value = MAX(0.5f, MIN([definition[@"scale"] floatValue], 2.0f));
-    _virtualButtonEditorWidthSlider.value = MAX(0.5f, MIN([definition[@"widthScale"] floatValue], 2.0f));
-    _virtualButtonEditorHeightSlider.value = MAX(0.5f, MIN([definition[@"heightScale"] floatValue], 2.0f));
+    _virtualButtonEditorWidthSlider.maximumValue = isTouchpadButton ? 5.0f : 2.0f;
+    _virtualButtonEditorHeightSlider.maximumValue = isTouchpadButton ? 5.0f : 2.0f;
+    _virtualButtonEditorWidthSlider.value = MAX(0.5f, MIN([definition[@"widthScale"] floatValue], _virtualButtonEditorWidthSlider.maximumValue));
+    _virtualButtonEditorHeightSlider.value = MAX(0.5f, MIN([definition[@"heightScale"] floatValue], _virtualButtonEditorHeightSlider.maximumValue));
+    _virtualButtonEditorTouchSensitivityXSlider.value = MAX(0.5f, MIN([definition[@"touchSensitivityX"] floatValue] > 0.0f ? [definition[@"touchSensitivityX"] floatValue] : 1.0f, 3.0f));
+    _virtualButtonEditorTouchSensitivityYSlider.value = MAX(0.5f, MIN([definition[@"touchSensitivityY"] floatValue] > 0.0f ? [definition[@"touchSensitivityY"] floatValue] : 1.0f, 3.0f));
     _virtualButtonEditorScaleValueLabel.text = [NSString stringWithFormat:@"%.2f", _virtualButtonEditorScaleSlider.value];
     _virtualButtonEditorWidthValueLabel.text = [NSString stringWithFormat:@"%.2f", _virtualButtonEditorWidthSlider.value];
     _virtualButtonEditorHeightValueLabel.text = [NSString stringWithFormat:@"%.2f", _virtualButtonEditorHeightSlider.value];
+    _virtualButtonEditorTouchSensitivityXValueLabel.text = [NSString stringWithFormat:@"%.0f%%", _virtualButtonEditorTouchSensitivityXSlider.value * 100.0f];
+    _virtualButtonEditorTouchSensitivityYValueLabel.text = [NSString stringWithFormat:@"%.0f%%", _virtualButtonEditorTouchSensitivityYSlider.value * 100.0f];
     _virtualButtonEditorView.hidden = NO;
     [self.view bringSubviewToFront:_virtualButtonEditorView];
     [self layoutVirtualButtonEditorForCurrentBounds];
@@ -1956,17 +2043,23 @@ static const CGFloat kStreamFloatingMenuExpandedAlpha = 0.96f;
 
     NSMutableDictionary *updatedDefinition = [[definitions objectAtIndex:index] mutableCopy];
     NSString *controlAction = updatedDefinition[@"controlAction"];
-    BOOL shapeLocked = [controlAction isKindOfClass:[NSString class]] &&
+    NSString *mouseAction = updatedDefinition[@"mouseAction"];
+    BOOL shapeLockedToCircle = [controlAction isKindOfClass:[NSString class]] &&
         ([controlAction hasPrefix:@"joystick_"] ||
          [controlAction hasPrefix:@"dpad_"] ||
          [controlAction isEqualToString:@"gamepad_left_stick"] ||
          [controlAction isEqualToString:@"gamepad_right_stick"] ||
          [controlAction isEqualToString:@"gamepad_dpad"] ||
          [controlAction isEqualToString:@"gamepad_face_buttons"]);
-    updatedDefinition[@"shape"] = shapeLocked ? @"circle" : (_virtualButtonEditorShapeControl.selectedSegmentIndex == 1 ? @"circle" : @"roundedRect");
+    BOOL shapeLockedToRoundedRect = [mouseAction isKindOfClass:[NSString class]] && [mouseAction hasPrefix:@"touchpad_"];
+    updatedDefinition[@"shape"] = shapeLockedToCircle ? @"circle" : (shapeLockedToRoundedRect ? @"roundedRect" : (_virtualButtonEditorShapeControl.selectedSegmentIndex == 1 ? @"circle" : @"roundedRect"));
     updatedDefinition[@"scale"] = @(_virtualButtonEditorScaleSlider.value);
-    updatedDefinition[@"widthScale"] = @(_virtualButtonEditorWidthSlider.value);
-    updatedDefinition[@"heightScale"] = @(_virtualButtonEditorHeightSlider.value);
+    updatedDefinition[@"widthScale"] = @(MAX(0.5f, MIN(_virtualButtonEditorWidthSlider.value, shapeLockedToRoundedRect ? 5.0f : 2.0f)));
+    updatedDefinition[@"heightScale"] = @(MAX(0.5f, MIN(_virtualButtonEditorHeightSlider.value, shapeLockedToRoundedRect ? 5.0f : 2.0f)));
+    if (shapeLockedToRoundedRect) {
+        updatedDefinition[@"touchSensitivityX"] = @(MAX(0.5f, MIN(_virtualButtonEditorTouchSensitivityXSlider.value, 3.0f)));
+        updatedDefinition[@"touchSensitivityY"] = @(MAX(0.5f, MIN(_virtualButtonEditorTouchSensitivityYSlider.value, 3.0f)));
+    }
     [definitions replaceObjectAtIndex:index withObject:updatedDefinition];
     if (editingVirtualButtons) {
         [self applyVirtualButtonDefinitionsToStreamView];
@@ -2014,6 +2107,16 @@ static const CGFloat kStreamFloatingMenuExpandedAlpha = 0.96f;
 
 - (void)handleVirtualButtonEditorHeightChanged:(UISlider *)sender {
     _virtualButtonEditorHeightValueLabel.text = [NSString stringWithFormat:@"%.2f", sender.value];
+    [self applyVirtualButtonEditorValuesToSelectedItem];
+}
+
+- (void)handleVirtualButtonEditorTouchSensitivityXChanged:(UISlider *)sender {
+    _virtualButtonEditorTouchSensitivityXValueLabel.text = [NSString stringWithFormat:@"%.0f%%", sender.value * 100.0f];
+    [self applyVirtualButtonEditorValuesToSelectedItem];
+}
+
+- (void)handleVirtualButtonEditorTouchSensitivityYChanged:(UISlider *)sender {
+    _virtualButtonEditorTouchSensitivityYValueLabel.text = [NSString stringWithFormat:@"%.0f%%", sender.value * 100.0f];
     [self applyVirtualButtonEditorValuesToSelectedItem];
 }
 
@@ -2091,8 +2194,8 @@ static const CGFloat kStreamFloatingMenuExpandedAlpha = 0.96f;
                                                           buttonOpacity:[self currentVirtualButtonOpacity]];
 }
 
-- (NSArray<NSDictionary *> *)shortcutDefinitions {
-    NSArray<NSDictionary *> *definitions = @[
+- (NSArray<NSDictionary *> *)defaultShortcutDefinitions {
+    return @[
         @{@"id": @"shortcut_escape", @"title": @"返回/关闭页面", @"subtitle": @"ESC", @"symbol": @"escape", @"primary": @[@0x1B], @"secondary": @[]},
         @{@"id": @"shortcut_f11", @"title": @"网页全屏切换", @"subtitle": @"F11", @"symbol": @"macwindow.on.rectangle", @"primary": @[@0x7A], @"secondary": @[]},
         @{@"id": @"shortcut_alt_f4", @"title": @"关闭应用", @"subtitle": @"Alt+F4", @"symbol": @"xmark.circle", @"primary": @[@0xA4, @0x73], @"secondary": @[]},
@@ -2123,13 +2226,40 @@ static const CGFloat kStreamFloatingMenuExpandedAlpha = 0.96f;
         @{@"id": @"shortcut_desktop_left", @"title": @"切换桌面左", @"subtitle": @"Win+Shift+Left", @"symbol": @"arrow.left.circle", @"primary": @[@0x5B, @0xA0, @0x25], @"secondary": @[]},
         @{@"id": @"shortcut_desktop_right", @"title": @"切换桌面右", @"subtitle": @"Win+Shift+Right", @"symbol": @"arrow.right.circle", @"primary": @[@0x5B, @0xA0, @0x27], @"secondary": @[]}
     ];
-
-    return definitions;
 }
 
-- (NSArray<StreamShortcutPanelItem *> *)shortcutItems {
-    NSArray<NSDictionary *> *definitions = [self shortcutDefinitions];
+- (void)loadCustomShortcutDefinitions {
+    DataManager *dataManager = [[DataManager alloc] init];
+    NSArray<NSDictionary *> *definitions = [dataManager customShortcutDefinitions];
+    if ([definitions isKindOfClass:[NSArray class]]) {
+        _customShortcutDefinitions = [definitions mutableCopy];
+    }
+    else {
+        _customShortcutDefinitions = [[NSMutableArray alloc] init];
+    }
+}
 
+- (void)persistCustomShortcutDefinitions {
+    DataManager *dataManager = [[DataManager alloc] init];
+    [dataManager saveCustomShortcutDefinitions:[self customShortcutDefinitions]];
+}
+
+- (NSMutableArray<NSDictionary *> *)customShortcutDefinitions {
+    if (_customShortcutDefinitions == nil) {
+        _customShortcutDefinitions = [[NSMutableArray alloc] init];
+    }
+
+    return _customShortcutDefinitions;
+}
+
+- (NSArray<NSDictionary *> *)shortcutDefinitions {
+    NSMutableArray<NSDictionary *> *definitions = [[self defaultShortcutDefinitions] mutableCopy];
+    [definitions addObjectsFromArray:[self customShortcutDefinitions]];
+    return [definitions copy];
+}
+
+- (NSArray<StreamShortcutPanelItem *> *)shortcutItemsFromDefinitions:(NSArray<NSDictionary *> *)definitions
+                                                           deletable:(BOOL)deletable {
     NSMutableArray<StreamShortcutPanelItem *> *items = [NSMutableArray arrayWithCapacity:definitions.count];
     for (NSDictionary *definition in definitions) {
         StreamShortcutPanelItem *item = [[StreamShortcutPanelItem alloc] init];
@@ -2137,20 +2267,41 @@ static const CGFloat kStreamFloatingMenuExpandedAlpha = 0.96f;
         item.title = definition[@"title"];
         item.subtitle = definition[@"subtitle"] ?: @"";
         item.symbolName = definition[@"symbol"];
+        item.deletable = deletable;
         [items addObject:item];
     }
     return items;
+}
+
+- (NSArray<StreamShortcutPanelItem *> *)defaultShortcutItems {
+    return [self shortcutItemsFromDefinitions:[self defaultShortcutDefinitions] deletable:NO];
+}
+
+- (NSArray<StreamShortcutPanelItem *> *)customShortcutItems {
+    return [self shortcutItemsFromDefinitions:[self customShortcutDefinitions] deletable:YES];
 }
 
 - (void)showShortcutPanel {
     if (@available(iOS 13.0, *)) {
         StreamShortcutPanelHostingViewController *controller = [[StreamShortcutPanelHostingViewController alloc] init];
         controller.delegate = (id<StreamShortcutPanelHostingViewControllerDelegate>)self;
-        [controller configureWithTitle:@"快捷键" items:[self shortcutItems]];
+        [controller configureWithTitle:@"快捷键"
+                          builtInItems:[self defaultShortcutItems]
+                           customItems:[self customShortcutItems]];
         controller.modalPresentationStyle = UIModalPresentationOverFullScreen;
         _streamShortcutPanelHostingViewController = controller;
         [self presentViewController:controller animated:YES completion:nil];
     }
+}
+
+- (void)refreshShortcutPanelIfNeeded {
+    if (_streamShortcutPanelHostingViewController == nil) {
+        return;
+    }
+
+    [_streamShortcutPanelHostingViewController configureWithTitle:@"快捷键"
+                                                     builtInItems:[self defaultShortcutItems]
+                                                      customItems:[self customShortcutItems]];
 }
 
 - (void)showVirtualKeyboardPanel {
@@ -2333,8 +2484,8 @@ static const CGFloat kStreamFloatingMenuExpandedAlpha = 0.96f;
         NSString* message;
         
         if (portTestResults != ML_TEST_RESULT_INCONCLUSIVE && portTestResults != 0) {
-            title = @"Connection Error";
-            message = @"Your device's network connection is blocking Moonlight. Streaming may not work while connected to this network.";
+            title = @"连接错误";
+            message = @"您的设备网络连接受限，可能无法进行串流。";
         }
         else {
             switch (errorCode) {
@@ -2343,29 +2494,29 @@ static const CGFloat kStreamFloatingMenuExpandedAlpha = 0.96f;
                     return;
                     
                 case ML_ERROR_NO_VIDEO_TRAFFIC:
-                    title = @"Connection Error";
-                    message = @"No video received from host.";
+                    title = @"连接错误";
+                    message = @"未收到主机发送的视频。";
                     if (portFlags != 0) {
                         char failingPorts[256];
                         LiStringifyPortFlags(portFlags, "\n", failingPorts, sizeof(failingPorts));
-                        message = [message stringByAppendingString:[NSString stringWithFormat:@"\n\nCheck your firewall and port forwarding rules for port(s):\n%s", failingPorts]];
+                        message = [message stringByAppendingString:[NSString stringWithFormat:@"请检查您的防火墙和端口转发规则，确认端口是否已启用：\n%s", failingPorts]];
                     }
                     break;
                     
                 case ML_ERROR_NO_VIDEO_FRAME:
-                    title = @"Connection Error";
-                    message = @"Your network connection isn't performing well. Reduce your video bitrate setting or try a faster connection.";
+                    title = @"连接错误";
+                    message = @"您的网络连接性能不佳。请降低视频比特率设置或尝试更快的连接。";
                     break;
                     
                 case ML_ERROR_UNEXPECTED_EARLY_TERMINATION:
                 case ML_ERROR_PROTECTED_CONTENT:
-                    title = @"Connection Error";
-                    message = @"Something went wrong on your host PC when starting the stream.\n\nMake sure you don't have any DRM-protected content open on your host PC. You can also try restarting your host PC.\n\nIf the issue persists, try reinstalling your GPU drivers and GeForce Experience.";
+                    title = @"连接错误";
+                    message = @"启动串流时，主机电脑出现问题。\n\n请确保主机电脑上没有打开任何受 DRM 保护的内容。您也可以尝试重启主机电脑。\n\n如果问题仍然存在，请尝试重新安装显卡驱动程序和 GeForce Experience。";
                     break;
                     
                 case ML_ERROR_FRAME_CONVERSION:
-                    title = @"Connection Error";
-                    message = @"The host PC reported a fatal video encoding error.\n\nTry disabling HDR mode, changing the streaming resolution, or changing your host PC's display resolution.";
+                    title = @"连接错误";
+                    message = @"主机报告出现致命的视频编码错误。\n\n请尝试禁用 HDR 模式、更改流媒体分辨率或更改主机的显示分辨率。";
                     break;
                     
                 default:
@@ -2380,8 +2531,8 @@ static const CGFloat kStreamFloatingMenuExpandedAlpha = 0.96f;
                         errorString = [NSString stringWithFormat:@"%d", errorCode];
                     }
                     
-                    title = @"Connection Terminated";
-                    message = [NSString stringWithFormat: @"The connection was terminated\n\nError code: %@", errorString];
+                    title = @"连接已终止";
+                    message = [NSString stringWithFormat: @"连接已终止\in\错误代码：%@", errorString];
                     break;
                 }
             }
@@ -2426,17 +2577,17 @@ static const CGFloat kStreamFloatingMenuExpandedAlpha = 0.96f;
         if (portTestFlags != 0) {
             char failingPorts[256];
             LiStringifyPortFlags(portTestFlags, "\n", failingPorts, sizeof(failingPorts));
-            message = [message stringByAppendingString:[NSString stringWithFormat:@"\n\nCheck your firewall and port forwarding rules for port(s):\n%s", failingPorts]];
+            message = [message stringByAppendingString:[NSString stringWithFormat:@"请检查您的防火墙和端口转发规则，确认端口是否已启用：\n%s", failingPorts]];
         }
         if (portTestResults != ML_TEST_RESULT_INCONCLUSIVE && portTestResults != 0) {
-            message = [message stringByAppendingString:@"\n\nYour device's network connection is blocking Moonlight. Streaming may not work while connected to this network."];
+            message = [message stringByAppendingString:@"您的设备网络连接受限，可能无法进行串流。"];
         }
         
-        UIAlertController* alert = [UIAlertController alertControllerWithTitle:@"Connection Failed"
+        UIAlertController* alert = [UIAlertController alertControllerWithTitle:@"连接失败"
                                                                        message:message
                                                                 preferredStyle:UIAlertControllerStyleAlert];
         [Utils addHelpOptionToDialog:alert];
-        [alert addAction:[UIAlertAction actionWithTitle:@"OK" style:UIAlertActionStyleDefault handler:^(UIAlertAction* action){
+        [alert addAction:[UIAlertAction actionWithTitle:@"确认" style:UIAlertActionStyleDefault handler:^(UIAlertAction* action){
             [self returnToMainFrame];
         }]];
         [self presentViewController:alert animated:YES completion:nil];
@@ -2452,11 +2603,11 @@ static const CGFloat kStreamFloatingMenuExpandedAlpha = 0.96f;
         // Allow the display to go to sleep now
         [UIApplication sharedApplication].idleTimerDisabled = NO;
         
-        UIAlertController* alert = [UIAlertController alertControllerWithTitle:@"Connection Error"
+        UIAlertController* alert = [UIAlertController alertControllerWithTitle:@"连接错误"
                                                                        message:message
                                                                 preferredStyle:UIAlertControllerStyleAlert];
         [Utils addHelpOptionToDialog:alert];
-        [alert addAction:[UIAlertAction actionWithTitle:@"OK" style:UIAlertActionStyleDefault handler:^(UIAlertAction* action){
+        [alert addAction:[UIAlertAction actionWithTitle:@"确认" style:UIAlertActionStyleDefault handler:^(UIAlertAction* action){
             [self returnToMainFrame];
         }]];
         [self presentViewController:alert animated:YES completion:nil];
@@ -2503,10 +2654,10 @@ static const CGFloat kStreamFloatingMenuExpandedAlpha = 0.96f;
                 
             case CONN_STATUS_POOR:
                 if (self->_streamConfig.bitRate > 5000) {
-                    [self updateOverlayText:@"Slow connection to PC\nReduce your bitrate"];
+                    [self updateOverlayText:@"电脑连接速度缓慢，请降低码率！"];
                 }
                 else {
-                    [self updateOverlayText:@"Poor connection to PC"];
+                    [self updateOverlayText:@"电脑连接不良"];
                 }
                 break;
         }
@@ -2767,6 +2918,47 @@ static const CGFloat kStreamFloatingMenuExpandedAlpha = 0.96f;
     }
 }
 
+- (void)streamShortcutPanelHostingViewController:(StreamShortcutPanelHostingViewController *)controller
+                          didSubmitItemWithTitle:(NSString *)title
+                                       keyLabels:(NSArray<NSString *> *)keyLabels
+                                        keyCodes:(NSArray<NSNumber *> *)keyCodes {
+    (void)controller;
+    if (title.length == 0 || keyCodes.count == 0) {
+        return;
+    }
+
+    NSString *identifier = [NSString stringWithFormat:@"shortcut_custom_%@", [[NSUUID UUID] UUIDString]];
+    NSString *subtitle = [keyLabels componentsJoinedByString:@" + "];
+    NSDictionary *definition = @{
+        @"id": identifier,
+        @"title": title,
+        @"subtitle": subtitle.length > 0 ? subtitle : title,
+        @"symbol": @"command.square",
+        @"primary": keyCodes,
+        @"secondary": @[]
+    };
+    [[self customShortcutDefinitions] addObject:definition];
+    [self persistCustomShortcutDefinitions];
+    [self refreshShortcutPanelIfNeeded];
+    [self showTemporaryTipText:@"快捷键已添加"];
+}
+
+- (void)streamShortcutPanelHostingViewController:(StreamShortcutPanelHostingViewController *)controller
+                     didDeleteItemWithIdentifier:(NSString *)identifier {
+    (void)controller;
+    NSIndexSet *indexes = [[self customShortcutDefinitions] indexesOfObjectsPassingTest:^BOOL(NSDictionary *definition, NSUInteger idx, BOOL *stop) {
+        return [definition[@"id"] isEqualToString:identifier];
+    }];
+    if (indexes.count == 0) {
+        return;
+    }
+
+    [[self customShortcutDefinitions] removeObjectsAtIndexes:indexes];
+    [self persistCustomShortcutDefinitions];
+    [self refreshShortcutPanelIfNeeded];
+    [self showTemporaryTipText:@"快捷键已删除"];
+}
+
 - (void)streamVirtualKeyboardPanelHostingViewControllerDidCancel:(StreamVirtualKeyboardPanelHostingViewController *)controller {
     _streamVirtualKeyboardPanelHostingViewController = nil;
     [controller dismissViewControllerAnimated:YES completion:nil];
@@ -2861,15 +3053,18 @@ static const CGFloat kStreamFloatingMenuExpandedAlpha = 0.96f;
     }
 
     NSString *identifier = [NSString stringWithFormat:@"virtual_button_mouse_%@", [[NSUUID UUID] UUIDString]];
+    BOOL isTouchpadAction = [mouseActionIdentifier hasPrefix:@"touchpad_"];
     NSDictionary *definition = @{
         @"id": identifier,
         @"title": title,
         @"subtitle": subtitle.length > 0 ? subtitle : title,
         @"mouseAction": mouseActionIdentifier,
-        @"shape": @"circle",
+        @"shape": isTouchpadAction ? @"roundedRect" : @"circle",
         @"scale": @1.0,
-        @"widthScale": @1.0,
-        @"heightScale": @1.0,
+        @"widthScale": isTouchpadAction ? @2.0 : @1.0,
+        @"heightScale": isTouchpadAction ? @2.0 : @1.0,
+        @"touchSensitivityX": isTouchpadAction ? @1.0 : @1.0,
+        @"touchSensitivityY": isTouchpadAction ? @1.0 : @1.0,
         @"xRatio": @0.5,
         @"yRatio": @0.5
     };
@@ -2927,10 +3122,12 @@ static const CGFloat kStreamFloatingMenuExpandedAlpha = 0.96f;
     }
 
     NSMutableDictionary *updatedDefinition = [[[self virtualButtonDefinitions] objectAtIndex:index] mutableCopy];
-    updatedDefinition[@"shape"] = [shape isEqualToString:@"circle"] ? @"circle" : @"roundedRect";
+    NSString *mouseAction = updatedDefinition[@"mouseAction"];
+    BOOL shapeLocked = [mouseAction isKindOfClass:[NSString class]] && [mouseAction hasPrefix:@"touchpad_"];
+    updatedDefinition[@"shape"] = shapeLocked ? @"roundedRect" : ([shape isEqualToString:@"circle"] ? @"circle" : @"roundedRect");
     updatedDefinition[@"scale"] = @(MAX(0.5, MIN(scale, 2.0)));
-    updatedDefinition[@"widthScale"] = @(MAX(0.5, MIN(widthScale, 2.0)));
-    updatedDefinition[@"heightScale"] = @(MAX(0.5, MIN(heightScale, 2.0)));
+    updatedDefinition[@"widthScale"] = @(MAX(0.5, MIN(widthScale, shapeLocked ? 5.0 : 2.0)));
+    updatedDefinition[@"heightScale"] = @(MAX(0.5, MIN(heightScale, shapeLocked ? 5.0 : 2.0)));
     [[self virtualButtonDefinitions] replaceObjectAtIndex:index withObject:updatedDefinition];
     [self applyVirtualButtonDefinitionsToStreamView];
     [self refreshVirtualButtonEditorForCurrentSelection];

@@ -191,17 +191,26 @@
     else {
         clientLatencyStringLite = @"";
     }
-    
+
     float interval = stats.endTime - stats.startTime;
+
+    NSString* droppedFramesStringLite;
+    if (showsExtendedMetrics) {
+        droppedFramesStringLite = [NSString stringWithFormat:@" 丢帧：%.2f%%",
+                                   stats.networkDroppedFrames / interval];
+    }
+    else {
+        droppedFramesStringLite = @"";
+    }
     
-    return [NSString stringWithFormat:@"%dx%d %@ %@%@%@ 丢帧：%.2f%% FPS：%.2f",
+    return [NSString stringWithFormat:@"%dx%d %@ %@%@%@%@ FPS：%.2f",
             _config.width,
             _config.height,
             [_connection getActiveCodecNameLite],
             latencyStringLite,
             hostProcessingStringLite,
             clientLatencyStringLite,
-            stats.networkDroppedFrames / interval,
+            droppedFramesStringLite,
             stats.totalFrames / interval];
     
 //    return [NSString stringWithFormat:@"Video stream: %dx%d %.2f FPS (Codec: %@)\nFrames dropped by your network connection: %.2f%%\nAverage network latency: %@%@",

@@ -39,6 +39,8 @@ static NSString *VirtualGamepadOpacityDefaultsKeyForSchemeSelection(NSInteger sc
     return [NSString stringWithFormat:@"StreamPreferenceVirtualGamepadOpacityScheme%ld", (long)clampedSelection];
 }
 
+static NSString * const CustomShortcutDefinitionsDefaultsKey = @"StreamPreferenceCustomShortcutDefinitions";
+
 - (id) init {
     self = [super init];
     
@@ -276,12 +278,82 @@ performanceOverlayPositionSelection:(NSInteger)performanceOverlayPositionSelecti
     [defaults synchronize];
 }
 
+- (NSArray<NSDictionary *> *)customShortcutDefinitions {
+    NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
+    NSArray *definitions = [defaults arrayForKey:CustomShortcutDefinitionsDefaultsKey];
+    if (![definitions isKindOfClass:[NSArray class]]) {
+        return nil;
+    }
+    return definitions;
+}
+
+- (void)saveCustomShortcutDefinitions:(NSArray<NSDictionary *> *)definitions {
+    NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
+    [defaults setObject:(definitions ?: @[]) forKey:CustomShortcutDefinitionsDefaultsKey];
+    [defaults synchronize];
+}
+
+- (void)resetSettingsToDefaultsClearingCustomData:(BOOL)clearCustomData {
+    [_managedObjectContext performBlockAndWait:^{
+        NSArray<Settings *> *fetchedRecords = [self fetchRecords:@"Settings"];
+        NSString *uniqueId = fetchedRecords.firstObject.uniqueId;
+
+        for (Settings *settings in fetchedRecords) {
+            [self->_managedObjectContext deleteObject:settings];
+        }
+
+        NSEntityDescription *entity = [NSEntityDescription entityForName:@"Settings" inManagedObjectContext:self->_managedObjectContext];
+        Settings *settings = [[Settings alloc] initWithEntity:entity insertIntoManagedObjectContext:self->_managedObjectContext];
+        settings.uniqueId = uniqueId;
+        settings.bitrate = @30000;
+        settings.width = @1920;
+        settings.height = @1080;
+        settings.statsOverlay = YES;
+
+        NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
+        NSArray<NSString *> *preferenceKeys = @[
+            StreamPreferenceVideoAlignmentSelectionKey,
+            StreamPreferenceVideoAlignmentMarginKey,
+            StreamPreferencePerformanceOverlayPositionSelectionKey,
+            StreamPreferencePerformanceOverlayMarginKey,
+            StreamPreferenceFloatingMenuEnabledKey,
+            StreamPreferenceVirtualButtonSchemeSelectionKey,
+            StreamPreferenceVirtualGamepadSchemeSelectionKey,
+            StreamPreferenceVirtualGamepadOpacityKey
+        ];
+
+        for (NSString *key in preferenceKeys) {
+            [defaults removeObjectForKey:key];
+        }
+
+        if (clearCustomData) {
+            for (NSInteger schemeSelection = 0; schemeSelection < 5; schemeSelection++) {
+                [defaults removeObjectForKey:VirtualButtonDefinitionsDefaultsKeyForSchemeSelectionAndOrientation(schemeSelection, NO)];
+                [defaults removeObjectForKey:VirtualButtonDefinitionsDefaultsKeyForSchemeSelectionAndOrientation(schemeSelection, YES)];
+                [defaults removeObjectForKey:VirtualButtonOpacityDefaultsKeyForSchemeSelection(schemeSelection)];
+                [defaults removeObjectForKey:VirtualGamepadDefinitionsDefaultsKeyForSchemeSelectionAndOrientation(schemeSelection, NO)];
+                [defaults removeObjectForKey:VirtualGamepadDefinitionsDefaultsKeyForSchemeSelectionAndOrientation(schemeSelection, YES)];
+                [defaults removeObjectForKey:VirtualGamepadOpacityDefaultsKeyForSchemeSelection(schemeSelection)];
+            }
+
+            [defaults removeObjectForKey:CustomShortcutDefinitionsDefaultsKey];
+        }
+
+        [defaults synchronize];
+        [self saveData];
+    }];
+}
+
 - (Settings*) retrieveSettings {
     NSArray* fetchedRecords = [self fetchRecords:@"Settings"];
     if (fetchedRecords.count == 0) {
         // create a new settings object with the default values
         NSEntityDescription* entity = [NSEntityDescription entityForName:@"Settings" inManagedObjectContext:_managedObjectContext];
         Settings* settings = [[Settings alloc] initWithEntity:entity insertIntoManagedObjectContext:_managedObjectContext];
+        settings.bitrate = @30000;
+        settings.width = @1920;
+        settings.height = @1080;
+        settings.statsOverlay = YES;
         
         return settings;
     } else {

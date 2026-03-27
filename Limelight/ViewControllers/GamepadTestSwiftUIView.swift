@@ -15,6 +15,39 @@ private struct GamepadTrailPoint: Identifiable {
 }
 
 @available(iOS 13.0, *)
+private enum GamepadTrailStyle {
+    static let fadeDelay: CFTimeInterval = 2.0
+    static let fadeDuration: CFTimeInterval = 1.0
+    static let lifetime: CFTimeInterval = fadeDelay + fadeDuration
+    static let minimumSampleInterval: CFTimeInterval = 1.0 / 45.0
+    static let minimumDistance: CGFloat = 0.025
+    static let opacityBucketCount = 6
+}
+
+@available(iOS 13.0, *)
+private struct GamepadPollingAnomalyDetail: Identifiable {
+    let id = UUID()
+    let sampleIndex: Int
+    let intervalMs: Double
+    let averageMs: Double
+    let kind: Kind
+
+    enum Kind {
+        case tooFast
+        case tooSlow
+
+        var title: String {
+            switch self {
+            case .tooFast:
+                return "偏快"
+            case .tooSlow:
+                return "偏慢"
+            }
+        }
+    }
+}
+
+@available(iOS 13.0, *)
 private final class GamepadTestViewModel: NSObject, ObservableObject {
     @Published var controllerName: String = "未连接手柄"
     @Published var connectionDescription: String = "连接手柄后会实时显示按键、摇杆和扳机状态"
@@ -36,6 +69,8 @@ private final class GamepadTestViewModel: NSObject, ObservableObject {
     @Published var pollingMaxText: String = "--"
     @Published var pollingAvgText: String = "--"
     @Published var pollingAnomalyCountText: String = "--"
+    @Published var pollingAnomalyDetails: [GamepadPollingAnomalyDetail] = []
+    @Published var isShowingPollingAnomalySheet = false
     @Published var showStickTrails = false
     @Published var gyroEnabled = false
     @Published var gyroSourceIndex = 0
@@ -84,9 +119,10 @@ private final class GamepadTestViewModel: NSObject, ObservableObject {
     private var leftStickPollingTimestamps: [CFTimeInterval] = []
     private var lastPolledLeftStickX: Double = 0
     private var lastPolledLeftStickY: Double = 0
+    private var lastLeftStickTrailPoint: GamepadTrailPoint?
+    private var lastRightStickTrailPoint: GamepadTrailPoint?
     private let pollingTargetCount = 1000
     private let deviceMotionManager = CMMotionManager()
-    private let stickTrailLifetime: CFTimeInterval = 3.0
 
     override init() {
         super.init()
@@ -284,26 +320,28 @@ private final class GamepadTestViewModel: NSObject, ObservableObject {
             x: CGFloat(min(max(point.x, -1), 1)),
             y: CGFloat(min(max(point.y, -1), 1))
         )
-        let maxTrailCount = 48
         let trailPoint = GamepadTrailPoint(point: normalizedPoint, timestamp: CACurrentMediaTime())
+        let previousPoint = toLeftStick ? lastLeftStickTrailPoint : lastRightStickTrailPoint
+
+        guard shouldAppendTrailPoint(trailPoint, previousPoint: previousPoint) else {
+            return
+        }
 
         if toLeftStick {
             leftStickTrailPoints.append(trailPoint)
-            if leftStickTrailPoints.count > maxTrailCount {
-                leftStickTrailPoints.removeFirst(leftStickTrailPoints.count - maxTrailCount)
-            }
+            lastLeftStickTrailPoint = trailPoint
         }
         else {
             rightStickTrailPoints.append(trailPoint)
-            if rightStickTrailPoints.count > maxTrailCount {
-                rightStickTrailPoints.removeFirst(rightStickTrailPoints.count - maxTrailCount)
-            }
+            lastRightStickTrailPoint = trailPoint
         }
     }
 
     private func clearStickTrails() {
         leftStickTrailPoints = []
         rightStickTrailPoints = []
+        lastLeftStickTrailPoint = nil
+        lastRightStickTrailPoint = nil
     }
 
     private func startStickTrailTimer() {
@@ -319,9 +357,24 @@ private final class GamepadTestViewModel: NSObject, ObservableObject {
     }
 
     private func pruneStaleStickTrailPoints() {
-        let threshold = CACurrentMediaTime() - stickTrailLifetime
+        let threshold = CACurrentMediaTime() - GamepadTrailStyle.lifetime
         leftStickTrailPoints.removeAll { $0.timestamp < threshold }
         rightStickTrailPoints.removeAll { $0.timestamp < threshold }
+        lastLeftStickTrailPoint = leftStickTrailPoints.last
+        lastRightStickTrailPoint = rightStickTrailPoints.last
+    }
+
+    private func shouldAppendTrailPoint(_ point: GamepadTrailPoint, previousPoint: GamepadTrailPoint?) -> Bool {
+        guard let previousPoint else {
+            return true
+        }
+
+        let elapsed = point.timestamp - previousPoint.timestamp
+        let deltaX = point.point.x - previousPoint.point.x
+        let deltaY = point.point.y - previousPoint.point.y
+        let distance = sqrt(deltaX * deltaX + deltaY * deltaY)
+
+        return elapsed >= GamepadTrailStyle.minimumSampleInterval || distance >= GamepadTrailStyle.minimumDistance
     }
 
     private func startDeviceGyroMonitoring() {
@@ -383,6 +436,8 @@ private final class GamepadTestViewModel: NSObject, ObservableObject {
         leftStickPollingTimestamps.removeAll()
         pollingProgressText = "0 / \(pollingTargetCount)"
         pollingStatusText = "点击开始，转动左摇杆"
+        pollingAnomalyDetails = []
+        isShowingPollingAnomalySheet = false
         lastPolledLeftStickX = leftStickX
         lastPolledLeftStickY = leftStickY
 
@@ -627,13 +682,15 @@ private final class GamepadTestViewModel: NSObject, ObservableObject {
 
         leftStickPollingTimestamps.removeAll()
         isPollingTestRunning = true
-        pollingStatusText = "测试中，请持续转动左摇杆"
+        pollingStatusText = pollingRunningStatusText(currentIntervalMs: nil)
         pollingProgressText = "0 / \(pollingTargetCount)"
         pollingHzText = "--"
         pollingMinText = "--"
         pollingMaxText = "--"
         pollingAvgText = "--"
         pollingAnomalyCountText = "--"
+        pollingAnomalyDetails = []
+        isShowingPollingAnomalySheet = false
         lastPolledLeftStickX = leftStickX
         lastPolledLeftStickY = leftStickY
     }
@@ -647,11 +704,25 @@ private final class GamepadTestViewModel: NSObject, ObservableObject {
 
         lastPolledLeftStickX = x
         lastPolledLeftStickY = y
-        leftStickPollingTimestamps.append(CACurrentMediaTime())
+        let timestamp = CACurrentMediaTime()
+        leftStickPollingTimestamps.append(timestamp)
         pollingProgressText = "\(leftStickPollingTimestamps.count) / \(pollingTargetCount)"
+
+        if leftStickPollingTimestamps.count > 1 {
+            let previousTimestamp = leftStickPollingTimestamps[leftStickPollingTimestamps.count - 2]
+            pollingStatusText = pollingRunningStatusText(currentIntervalMs: (timestamp - previousTimestamp) * 1000)
+        }
 
         guard leftStickPollingTimestamps.count >= pollingTargetCount else { return }
         finalizePollingTest()
+    }
+
+    private func pollingRunningStatusText(currentIntervalMs: Double?) -> String {
+        guard let currentIntervalMs = currentIntervalMs else {
+            return "测试中，请持续转动左摇杆！当前延迟 -- ms"
+        }
+
+        return String(format: "测试中，请持续转动左摇杆！当前延迟 %.2f ms", currentIntervalMs)
     }
 
     private func finalizePollingTest() {
@@ -668,13 +739,32 @@ private final class GamepadTestViewModel: NSObject, ObservableObject {
             pollingMaxText = "--"
             pollingAvgText = "--"
             pollingAnomalyCountText = "--"
+            pollingAnomalyDetails = []
             return
         }
 
         let averageInterval = intervals.reduce(0, +) / Double(intervals.count)
         let minimumInterval = intervals.min() ?? averageInterval
         let maximumInterval = intervals.max() ?? averageInterval
-        let anomalyCount = intervals.filter { $0 > averageInterval * 2.0 || $0 < averageInterval * 0.5 }.count
+        let anomalyDetails = intervals.enumerated().compactMap { offset, interval -> GamepadPollingAnomalyDetail? in
+            if interval > averageInterval * 2.5 {
+                return GamepadPollingAnomalyDetail(
+                    sampleIndex: offset + 2,
+                    intervalMs: interval * 1000,
+                    averageMs: averageInterval * 1000,
+                    kind: .tooSlow
+                )
+            }
+            if interval < averageInterval * 0.4 {
+                return GamepadPollingAnomalyDetail(
+                    sampleIndex: offset + 2,
+                    intervalMs: interval * 1000,
+                    averageMs: averageInterval * 1000,
+                    kind: .tooFast
+                )
+            }
+            return nil
+        }
         let hz = averageInterval > 0 ? 1.0 / averageInterval : 0
 
         pollingStatusText = "测试完成"
@@ -682,7 +772,13 @@ private final class GamepadTestViewModel: NSObject, ObservableObject {
         pollingMinText = String(format: "%.2f ms", minimumInterval * 1000)
         pollingMaxText = String(format: "%.2f ms", maximumInterval * 1000)
         pollingAvgText = String(format: "%.2f ms", averageInterval * 1000)
-        pollingAnomalyCountText = "\(anomalyCount)"
+        pollingAnomalyCountText = "\(anomalyDetails.count)"
+        pollingAnomalyDetails = anomalyDetails
+    }
+
+    func presentPollingAnomalySheet() {
+        guard !pollingAnomalyDetails.isEmpty else { return }
+        isShowingPollingAnomalySheet = true
     }
 
     private func update(with gamepad: GCExtendedGamepad) {
@@ -1001,17 +1097,17 @@ private struct GamepadGyroTestCard: View {
 
                 if isEnabled {
                     GamepadGyroMeterRow(
-                        title: "X轴",
+                        title: "X轴角速度",
                         value: x,
                         tint: Color(red: 0.46, green: 0.52, blue: 0.95)
                     )
                     GamepadGyroMeterRow(
-                        title: "Y轴",
+                        title: "Y轴角速度",
                         value: y,
                         tint: Color(red: 0.39, green: 0.78, blue: 0.69)
                     )
                     GamepadGyroMeterRow(
-                        title: "Z轴",
+                        title: "Z轴角速度",
                         value: z,
                         tint: Color(red: 0.93, green: 0.65, blue: 0.24)
                     )
@@ -1025,8 +1121,23 @@ private struct GamepadGyroTestCard: View {
 private struct GamepadPollingStatRow: View {
     let title: String
     let value: String
+    var isInteractive: Bool = false
+    var action: (() -> Void)? = nil
 
     var body: some View {
+        Group {
+            if let action = action {
+                Button(action: action) {
+                    rowContent
+                }
+                .buttonStyle(PlainButtonStyle())
+            } else {
+                rowContent
+            }
+        }
+    }
+
+    private var rowContent: some View {
         HStack(spacing: 10) {
             Text(title)
                 .font(.system(size: 12, weight: .semibold))
@@ -1034,7 +1145,12 @@ private struct GamepadPollingStatRow: View {
             Spacer(minLength: 8)
             Text(value)
                 .font(.system(size: 12, weight: .medium))
-                .foregroundColor(Color(red: 0.26, green: 0.21, blue: 0.39))
+                .foregroundColor(isInteractive ? Color(red: 0.46, green: 0.34, blue: 0.78) : Color(red: 0.26, green: 0.21, blue: 0.39))
+            if isInteractive {
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundColor(Color(red: 0.56, green: 0.49, blue: 0.75))
+            }
         }
     }
 }
@@ -1048,7 +1164,9 @@ private struct GamepadPollingTestCard: View {
     let maxText: String
     let avgText: String
     let anomalyCountText: String
+    let hasAnomalyDetails: Bool
     let isRunning: Bool
+    let onShowAnomalies: () -> Void
     let onTrigger: () -> Void
 
     var body: some View {
@@ -1062,12 +1180,41 @@ private struct GamepadPollingTestCard: View {
                     .font(.system(size: 12, weight: .medium))
                     .foregroundColor(Color(red: 0.43, green: 0.35, blue: 0.60))
 
+                VStack(spacing: 4) {
+                    Text("轮询率")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundColor(Color(red: 0.43, green: 0.35, blue: 0.60))
+
+                    Text(hzText)
+                        .font(.system(size: 28, weight: .bold, design: .rounded))
+                        .foregroundColor(Color(red: 0.30, green: 0.21, blue: 0.54))
+                        .minimumScaleFactor(0.8)
+                        .lineLimit(1)
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 12)
+                .background(
+                    RoundedRectangle(cornerRadius: 18, style: .continuous)
+                        .fill(Color.white.opacity(0.62))
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 18, style: .continuous)
+                        .stroke(Color.white.opacity(0.80), lineWidth: 1)
+                )
+
                 GamepadPollingStatRow(title: "采样进度", value: progressText)
-                GamepadPollingStatRow(title: "轮询率", value: hzText)
                 GamepadPollingStatRow(title: "最小值", value: minText)
                 GamepadPollingStatRow(title: "最大值", value: maxText)
                 GamepadPollingStatRow(title: "平均值", value: avgText)
-                GamepadPollingStatRow(title: "异常值数量", value: anomalyCountText)
+                GamepadPollingStatRow(title: "异常值数量",
+                                      value: anomalyCountText,
+                                      isInteractive: hasAnomalyDetails,
+                                      action: hasAnomalyDetails ? onShowAnomalies : nil)
+
+                Text("异常值按当前平均间隔统计：大于 2.5 倍平均值或小于 0.4 倍平均值。蓝牙抖动、系统调度和快速变向都可能让数量偏多。")
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundColor(Color(red: 0.43, green: 0.35, blue: 0.60))
+                    .fixedSize(horizontal: false, vertical: true)
 
                 Button(action: onTrigger) {
                     HStack(spacing: 10) {
@@ -1085,6 +1232,61 @@ private struct GamepadPollingTestCard: View {
                 }
                 .buttonStyle(PlainButtonStyle())
             }
+        }
+    }
+}
+
+@available(iOS 13.0, *)
+private struct GamepadPollingAnomalySheet: View {
+    let anomalyDetails: [GamepadPollingAnomalyDetail]
+    @Environment(\.presentationMode) private var presentationMode
+
+    var body: some View {
+        NavigationView {
+            Group {
+                if anomalyDetails.isEmpty {
+                    VStack(spacing: 10) {
+                        Image(systemName: "checkmark.circle")
+                            .font(.system(size: 28, weight: .semibold))
+                            .foregroundColor(Color(red: 0.39, green: 0.78, blue: 0.69))
+                        Text("当前没有异常值")
+                            .font(.system(size: 16, weight: .semibold))
+                            .foregroundColor(Color(red: 0.29, green: 0.22, blue: 0.42))
+                    }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .background(Color(UIColor.systemGroupedBackground))
+                } else {
+                    List(anomalyDetails) { detail in
+                        VStack(alignment: .leading, spacing: 6) {
+                            HStack(spacing: 8) {
+                                Text("样本 #\(detail.sampleIndex)")
+                                    .font(.system(size: 14, weight: .semibold))
+                                    .foregroundColor(Color(red: 0.29, green: 0.22, blue: 0.42))
+
+                                Text(detail.kind.title)
+                                    .font(.system(size: 11, weight: .semibold))
+                                    .foregroundColor(detail.kind == .tooSlow ? Color(red: 0.76, green: 0.38, blue: 0.28) : Color(red: 0.30, green: 0.55, blue: 0.86))
+                                    .padding(.horizontal, 8)
+                                    .padding(.vertical, 4)
+                                    .background(
+                                        Capsule()
+                                            .fill((detail.kind == .tooSlow ? Color(red: 0.99, green: 0.91, blue: 0.86) : Color(red: 0.88, green: 0.94, blue: 0.99)))
+                                    )
+                            }
+
+                            Text(String(format: "间隔 %.2f ms，平均 %.2f ms", detail.intervalMs, detail.averageMs))
+                                .font(.system(size: 12, weight: .medium))
+                                .foregroundColor(Color(red: 0.43, green: 0.35, blue: 0.60))
+                        }
+                        .padding(.vertical, 4)
+                    }
+                    .listStyle(GroupedListStyle())
+                }
+            }
+            .navigationBarTitle("异常值详情", displayMode: .inline)
+            .navigationBarItems(trailing: Button("完成") {
+                presentationMode.wrappedValue.dismiss()
+            })
         }
     }
 }
@@ -1171,6 +1373,12 @@ private struct GamepadStickView: View {
     let showTrail: Bool
     let trailPoints: [GamepadTrailPoint]
 
+    private struct TrailBucket: Identifiable {
+        let id: Int
+        let path: Path
+        let opacity: Double
+    }
+
     var body: some View {
         VStack(spacing: 6) {
             GeometryReader { proxy in
@@ -1181,6 +1389,7 @@ private struct GamepadStickView: View {
                 let ringInset = 1.0
                 let travel = radius - knobRadius - ringInset
                 let currentTime = CACurrentMediaTime()
+                let trailBuckets = makeTrailBuckets(radius: radius, travel: travel, currentTime: currentTime)
 
                 ZStack {
                     Circle()
@@ -1189,24 +1398,10 @@ private struct GamepadStickView: View {
                     Circle()
                         .stroke(Color(red: 0.63, green: 0.60, blue: 0.72).opacity(0.75), lineWidth: 0.8)
 
-                    if showTrail && trailPoints.count > 1 {
-                        ForEach(Array(trailPoints.indices.dropFirst()), id: \.self) { index in
-                            let previous = trailPoints[index - 1]
-                            let current = trailPoints[index]
-                            let age = max(0, min(1, 1 - ((currentTime - current.timestamp) / 3.0)))
-
-                            Path { path in
-                                path.move(to: CGPoint(
-                                    x: radius + previous.point.x * travel,
-                                    y: radius + previous.point.y * travel
-                                ))
-                                path.addLine(to: CGPoint(
-                                    x: radius + current.point.x * travel,
-                                    y: radius + current.point.y * travel
-                                ))
-                            }
-                            .stroke(
-                                Color(red: 0.55, green: 0.51, blue: 0.93).opacity(0.10 + age * 0.45),
+                    if showTrail && !trailBuckets.isEmpty {
+                        ForEach(trailBuckets) { bucket in
+                            bucket.path.stroke(
+                                Color(red: 0.55, green: 0.51, blue: 0.93).opacity(0.08 + bucket.opacity * 0.42),
                                 style: StrokeStyle(
                                     lineWidth: max(1.4, side * 0.02),
                                     lineCap: .round,
@@ -1238,6 +1433,59 @@ private struct GamepadStickView: View {
                 .foregroundColor(Color(red: 0.45, green: 0.38, blue: 0.60))
         }
         .frame(maxWidth: .infinity)
+    }
+
+    private func trailOpacity(for timestamp: CFTimeInterval, currentTime: CFTimeInterval) -> Double {
+        let age = max(0, currentTime - timestamp)
+        if age <= GamepadTrailStyle.fadeDelay {
+            return 1.0
+        }
+
+        let fadeProgress = min(max((age - GamepadTrailStyle.fadeDelay) / GamepadTrailStyle.fadeDuration, 0), 1)
+        return 1.0 - fadeProgress
+    }
+
+    private func makeTrailBuckets(radius: CGFloat, travel: CGFloat, currentTime: CFTimeInterval) -> [TrailBucket] {
+        guard trailPoints.count > 1 else {
+            return []
+        }
+
+        var bucketPaths = Array(repeating: Path(), count: GamepadTrailStyle.opacityBucketCount)
+
+        for index in trailPoints.indices.dropFirst() {
+            let previous = trailPoints[index - 1]
+            let current = trailPoints[index]
+            let previousOpacity = trailOpacity(for: previous.timestamp, currentTime: currentTime)
+            let currentOpacity = trailOpacity(for: current.timestamp, currentTime: currentTime)
+            let segmentOpacity = min(previousOpacity, currentOpacity)
+
+            guard segmentOpacity > 0 else {
+                continue
+            }
+
+            let bucketIndex = min(
+                GamepadTrailStyle.opacityBucketCount - 1,
+                max(0, Int(segmentOpacity * Double(GamepadTrailStyle.opacityBucketCount - 1)))
+            )
+
+            bucketPaths[bucketIndex].move(to: CGPoint(
+                x: radius + previous.point.x * travel,
+                y: radius + previous.point.y * travel
+            ))
+            bucketPaths[bucketIndex].addLine(to: CGPoint(
+                x: radius + current.point.x * travel,
+                y: radius + current.point.y * travel
+            ))
+        }
+
+        return bucketPaths.enumerated().compactMap { index, path in
+            guard !path.isEmpty else {
+                return nil
+            }
+
+            let opacity = Double(index + 1) / Double(GamepadTrailStyle.opacityBucketCount)
+            return TrailBucket(id: index, path: path, opacity: opacity)
+        }
     }
 }
 
@@ -1450,13 +1698,6 @@ private struct GamepadTestRootView: View {
                         }
                     )
 
-//                    GamepadVisualizationCard(
-//                        showStickTrails: model.showStickTrails,
-//                        onShowStickTrailsChanged: { enabled in
-//                            model.setShowStickTrails(enabled)
-//                        }
-//                    )
-
                     GamepadGyroTestCard(
                         isEnabled: model.gyroEnabled,
                         selectedSourceIndex: model.gyroSourceIndex,
@@ -1482,9 +1723,20 @@ private struct GamepadTestRootView: View {
                         maxText: model.pollingMaxText,
                         avgText: model.pollingAvgText,
                         anomalyCountText: model.pollingAnomalyCountText,
+                        hasAnomalyDetails: !model.pollingAnomalyDetails.isEmpty,
                         isRunning: model.isPollingTestRunning,
+                        onShowAnomalies: {
+                            model.presentPollingAnomalySheet()
+                        },
                         onTrigger: {
                             model.togglePollingTest()
+                        }
+                    )
+
+                    GamepadVisualizationCard(
+                        showStickTrails: model.showStickTrails,
+                        onShowStickTrailsChanged: { enabled in
+                            model.setShowStickTrails(enabled)
                         }
                     )
 
@@ -1494,6 +1746,13 @@ private struct GamepadTestRootView: View {
                 .padding(.top, 18)
                 .padding(.bottom, 24)
             }
+        }
+        .sheet(isPresented: Binding(get: {
+            model.isShowingPollingAnomalySheet
+        }, set: { newValue in
+            model.isShowingPollingAnomalySheet = newValue
+        })) {
+            GamepadPollingAnomalySheet(anomalyDetails: model.pollingAnomalyDetails)
         }
     }
 }

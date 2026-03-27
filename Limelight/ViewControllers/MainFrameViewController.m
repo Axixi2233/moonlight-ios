@@ -170,7 +170,7 @@ static NSMutableSet* hostList;
         UIImage *settingsImage = nil;
         if (@available(iOS 13.0, *)) {
             UIImageSymbolConfiguration *symbolConfig = [UIImageSymbolConfiguration configurationWithPointSize:18 weight:UIImageSymbolWeightSemibold];
-            settingsImage = [[UIImage systemImageNamed:@"gearshape"] imageByApplyingSymbolConfiguration:symbolConfig];
+            settingsImage = [[UIImage systemImageNamed:@"gear"] imageByApplyingSymbolConfiguration:symbolConfig];
         }
 
         if (settingsImage != nil) {
@@ -578,7 +578,7 @@ static NSMutableSet* hostList;
         if (appTitle.length == 0) {
             appTitle = [[NSBundle mainBundle] objectForInfoDictionaryKey:@"CFBundleName"];
         }
-        self.title = appTitle.length > 0 ? appTitle : @"月光·阿西西";
+        self.title = appTitle.length > 0 ? appTitle : @"Asisi Link";
     }
 }
 
@@ -936,13 +936,13 @@ static NSMutableSet* hostList;
     MainFrameHostActionSheetItem *networkItem = [[MainFrameHostActionSheetItem alloc] init];
     networkItem.identifier = @"test_network";
     networkItem.title = @"Test Network";
-    networkItem.subtitle = @"检测当前网络是否屏蔽 Moonlight";
+    networkItem.subtitle = @"检测当前网络是否被屏蔽";
     [items addObject:networkItem];
 
     MainFrameHostActionSheetItem *removeItem = [[MainFrameHostActionSheetItem alloc] init];
     removeItem.identifier = @"remove_host";
     removeItem.title = @"Remove Host";
-    removeItem.subtitle = @"从设备列表中移除这台主机";
+    removeItem.subtitle = @"从设备列表中移除此设备";
     removeItem.destructive = YES;
     [items addObject:removeItem];
 
@@ -996,15 +996,15 @@ static NSMutableSet* hostList;
 }
 
 - (void)presentWakeHostAlertForHost:(TemporaryHost *)host {
-    UIAlertController* wolAlert = [UIAlertController alertControllerWithTitle:@"Wake-On-LAN" message:@"" preferredStyle:UIAlertControllerStyleAlert];
-    [wolAlert addAction:[UIAlertAction actionWithTitle:@"OK" style:UIAlertActionStyleDefault handler:nil]];
+    UIAlertController* wolAlert = [UIAlertController alertControllerWithTitle:@"网络唤醒" message:@"" preferredStyle:UIAlertControllerStyleAlert];
+    [wolAlert addAction:[UIAlertAction actionWithTitle:@"确认" style:UIAlertActionStyleDefault handler:nil]];
     if (host.mac == nil || [host.mac isEqualToString:@"00:00:00:00:00:00"]) {
-        wolAlert.message = @"Host MAC unknown, unable to send WOL Packet";
+        wolAlert.message = @"主机MAC地址未知，无法发送WOL数据包";
     } else {
         dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
             [WakeOnLanManager wakeHost:host];
         });
-        wolAlert.message = @"Successfully sent wake-up request. It may take a few moments for the PC to wake. If it never wakes up, ensure it's properly configured for Wake-on-LAN.";
+        wolAlert.message = @"唤醒请求已成功发送。电脑可能需要一些时间才能唤醒。如果电脑始终无法唤醒，请确保已正确配置网络唤醒 (Wake-on-LAN) 功能。";
     }
     [[self activeViewController] presentViewController:wolAlert animated:YES completion:nil];
 }
@@ -1018,19 +1018,19 @@ static NSMutableSet* hostList;
                     NSString* message;
 
                     if (portTestResult == 0) {
-                        message = @"This network does not appear to be blocking Moonlight. If you still have trouble connecting, check your PC's firewall settings.\n\nVisit the Moonlight Setup Guide on GitHub for additional setup help and troubleshooting steps.";
+                        message = @"此网络似乎并未阻止连接此应用。如果仍然无法连接，请检查您电脑的防火墙设置。";
                     }
                     else if (portTestResult == ML_TEST_RESULT_INCONCLUSIVE) {
-                        message = @"The network test could not be performed because none of Moonlight's connection testing servers were reachable. Check your Internet connection or try again later.";
+                        message = @"暂时无法执行网络测试。请检查您的互联网连接或稍后重试。";
                     }
                     else {
                         char blockedPorts[512];
                         LiStringifyPortFlags(portTestResult, "\n", blockedPorts, sizeof(blockedPorts));
-                        message = [NSString stringWithFormat:@"Your current network connection seems to be blocking Moonlight. Streaming may not work while connected to this network.\n\nThe following network ports were blocked:\n%s", blockedPorts];
+                        message = [NSString stringWithFormat:@"您当前的网络连接似乎被限制了，无法进行串流。\n\n以下网络端口已被阻止：\n%s", blockedPorts];
                     }
 
-                    UIAlertController* netTestAlert = [UIAlertController alertControllerWithTitle:@"Network Test Complete" message:message preferredStyle:UIAlertControllerStyleAlert];
-                    [netTestAlert addAction:[UIAlertAction actionWithTitle:@"OK" style:UIAlertActionStyleDefault handler:nil]];
+                    UIAlertController* netTestAlert = [UIAlertController alertControllerWithTitle:@"网络测试完成" message:message preferredStyle:UIAlertControllerStyleAlert];
+                    [netTestAlert addAction:[UIAlertAction actionWithTitle:@"确认" style:UIAlertActionStyleDefault handler:nil]];
                     [[self activeViewController] presentViewController:netTestAlert animated:YES completion:nil];
                 }];
             });
@@ -1098,7 +1098,7 @@ static NSMutableSet* hostList;
                     unsigned int portTestResults = LiTestClientConnectivity(CONN_TEST_SERVER, 443,
                                                                             ML_PORT_FLAG_TCP_47984 | ML_PORT_FLAG_TCP_47989);
                     if (portTestResults != ML_TEST_RESULT_INCONCLUSIVE && portTestResults != 0) {
-                        error = [error stringByAppendingString:@"\n\n您的设备网络连接已阻止 Moonlight。连接到此网络时，可能无法进行流媒体播放。"];
+                        error = [error stringByAppendingString:@"\n\n您的设备网络连接受限，可能无法进行串流。"];
                     }
 
                     UIAlertController* hostNotFoundAlert = [UIAlertController alertControllerWithTitle:@"提示" message:error preferredStyle:UIAlertControllerStyleAlert];

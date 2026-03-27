@@ -191,7 +191,7 @@ private struct AboutRootView: View {
         AboutLinkItem(title: "Bilibili", systemIconName: "play.rectangle.fill", assetName: "AboutBilibiliIcon", urlString: "https://space.bilibili.com/16893379"),
         AboutLinkItem(title: "小红书", systemIconName: "book.closed.fill", assetName: "AboutXiaohongshuIcon", urlString: "https://www.xiaohongshu.com/user/profile/5d21be61000000001600b878"),
         AboutLinkItem(title: "抖音", systemIconName: "music.note.tv.fill", assetName: "AboutDouyinIcon", urlString: "https://v.douyin.com/zm9GLKUfBW8/"),
-        AboutLinkItem(title: "Github", systemIconName: "book.note.tv.fill", assetName: "AboutGithub", urlString: "https://github.com/Axixi2233/moonlight-ios"),
+        AboutLinkItem(title: "Github", systemIconName: "book.note.tv.fill", assetName: "AboutGithub", urlString: "https://axixi2233.github.io/"),
     ]
 
     private var appName: String {
@@ -201,7 +201,7 @@ private struct AboutRootView: View {
         if let name = Bundle.main.object(forInfoDictionaryKey: "CFBundleName") as? String, !name.isEmpty {
             return name
         }
-        return "Moonlight"
+        return "Asisi Link"
     }
 
     private var versionText: String {
@@ -221,7 +221,7 @@ private struct AboutRootView: View {
                 VStack(spacing: 22) {
                     AboutInfoCard(
                         appName: appName,
-                        subtitle: "一款流畅易用的 Moonlight 串流客户端",
+                        subtitle: "随时随地，畅联你的电脑！",
                         versionText: versionText
                     )
 

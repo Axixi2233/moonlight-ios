@@ -1,2 +1,6 @@
 /* Localized versions of Info.plist keys */
 
+"CFBundleDisplayName" = "星光·阿西西";
+"NSBluetoothAlwaysUsageDescription" = "Bluetooth is used to connect to compatible peripherals.";
+"NSBluetoothPeripheralUsageDescription" = "Bluetooth is used to connect to compatible peripherals.";
+"NSLocalNetworkUsageDescription" = "Local network access is used to connect to your gaming PC for streaming.";

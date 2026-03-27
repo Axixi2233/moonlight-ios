@@ -16,6 +16,8 @@
 #import "KeyboardInputField.h"
 
 static const double X1_MOUSE_SPEED_DIVISOR = 2.5;
+static const CGFloat kVirtualTouchpadReferenceWidth = 1280.0f;
+static const CGFloat kVirtualTouchpadReferenceHeight = 720.0f;
 NSString * const StreamViewBoundsDidChangeNotification = @"StreamViewBoundsDidChangeNotification";
 NSString * const StreamViewVirtualButtonsDidChangeNotification = @"StreamViewVirtualButtonsDidChangeNotification";
 NSString * const StreamViewVirtualButtonSelectionDidChangeNotification = @"StreamViewVirtualButtonSelectionDidChangeNotification";
@@ -73,7 +75,8 @@ typedef NS_OPTIONS(NSUInteger, StreamVirtualDirectionMask) {
     self = [super initWithFrame:frame];
     if (self != nil) {
         self.backgroundColor = [UIColor clearColor];
-        self.exclusiveTouch = YES;
+        self.exclusiveTouch = NO;
+        self.multipleTouchEnabled = YES;
 
         _baseView = [[UIView alloc] initWithFrame:CGRectZero];
         _baseView.userInteractionEnabled = NO;
@@ -131,6 +134,10 @@ typedef NS_OPTIONS(NSUInteger, StreamVirtualDirectionMask) {
     return [_controlAction isEqualToString:@"gamepad_face_buttons"];
 }
 
+- (BOOL)isVirtualButtonDPad {
+    return [_controlAction hasPrefix:@"dpad_"];
+}
+
 - (BOOL)usesWASDMapping {
     return [_controlAction hasSuffix:@"_wasd"];
 }
@@ -171,7 +178,7 @@ typedef NS_OPTIONS(NSUInteger, StreamVirtualDirectionMask) {
         labels = @[ @"Y", @"A", @"X", @"B" ];
     }
     else {
-        labels = [self usesWASDMapping] ? @[ @"W", @"S", @"A", @"D" ] : @[ @"↑", @"↓", @"←", @"→" ];
+        labels = [self usesWASDMapping] ? @[ @"W", @"S", @"A", @"D" ] : @[ @"▲", @"▼", @"◀", @"▶" ];
     }
     [_directionLabels enumerateObjectsUsingBlock:^(UILabel *label, NSUInteger idx, BOOL *stop) {
         label.text = idx < labels.count ? labels[idx] : @"";
@@ -222,9 +229,12 @@ typedef NS_OPTIONS(NSUInteger, StreamVirtualDirectionMask) {
                                        centerY + _normalizedVector.y * travelRadius);
     }
     else {
-        BOOL isGamepadCluster = [self isGamepadDPad] || [self isGamepadFaceButtons];
-        CGFloat buttonSide = floor(side * (isGamepadCluster ? 0.255f : 0.22f));
-        CGFloat inset = floor(side * (isGamepadCluster ? 0.125f : 0.16f));
+        BOOL isGamepadDPad = [self isGamepadDPad];
+        BOOL isGamepadFaceButtons = [self isGamepadFaceButtons];
+        BOOL isVirtualButtonDPad = [self isVirtualButtonDPad];
+        BOOL usesDetachedButtons = isGamepadDPad || isGamepadFaceButtons || isVirtualButtonDPad;
+        CGFloat buttonSide = floor(side * (usesDetachedButtons ? (isVirtualButtonDPad ? 0.275f : 0.305f) : 0.22f));
+        CGFloat inset = floor(side * (usesDetachedButtons ? (isVirtualButtonDPad ? 0.110f : 0.090f) : 0.16f));
 
         upLabel.frame = CGRectMake(centerX - buttonSide * 0.5f,
                                    inset,
@@ -448,6 +458,10 @@ typedef NS_OPTIONS(NSUInteger, StreamVirtualDirectionMask) {
 
 - (void)updateVisualState {
     BOOL joystick = [self isJoystick];
+    BOOL isGamepadDPad = [self isGamepadDPad];
+    BOOL isGamepadFaceButtons = [self isGamepadFaceButtons];
+    BOOL isVirtualButtonDPad = [self isVirtualButtonDPad];
+    BOOL usesDetachedButtons = isGamepadDPad || isGamepadFaceButtons || isVirtualButtonDPad;
     CGFloat visualOpacity = MIN(MAX(self.controlOpacity, 0.05f), 1.0f);
     CGFloat borderWidth = self.editingEnabled ? (self.selectedForEditing ? 2.0f : 1.3f) : ([self isGamepadJoystick] ? 1.1f : 1.0f);
     UIColor *editingBorderColor = self.editingEnabled ?
@@ -457,14 +471,18 @@ typedef NS_OPTIONS(NSUInteger, StreamVirtualDirectionMask) {
         (self.selectedForEditing ? [UIColor colorWithRed:0.19 green:0.19 blue:0.25 alpha:0.90] : [[UIColor blackColor] colorWithAlphaComponent:self.controlOpacity]) :
         ([self isGamepadJoystick] ? [[UIColor blackColor] colorWithAlphaComponent:(0.10f + 0.58f * visualOpacity)] : [[UIColor blackColor] colorWithAlphaComponent:(0.08f + 0.56f * visualOpacity)]);
 
-    _baseView.backgroundColor = fillColor;
-    _baseView.layer.borderWidth = borderWidth;
-    _baseView.layer.borderColor = editingBorderColor.CGColor;
-    _baseView.layer.cornerRadius = CGRectGetWidth(self.bounds) * 0.5f;
+    _baseView.backgroundColor = usesDetachedButtons ? [UIColor clearColor] : fillColor;
+    _baseView.layer.borderWidth = usesDetachedButtons ? 0.0f : borderWidth;
+    _baseView.layer.borderColor = usesDetachedButtons ? [UIColor clearColor].CGColor : editingBorderColor.CGColor;
+    _baseView.layer.cornerRadius = usesDetachedButtons ? 0.0f : (CGRectGetWidth(self.bounds) * 0.5f);
 
     UIColor *joystickActiveFill = [UIColor clearColor];
-    UIColor *dpadActiveFill = [[UIColor whiteColor] colorWithAlphaComponent:(0.06f + 0.10f * visualOpacity)];
-    UIColor *faceActiveFill = [[UIColor whiteColor] colorWithAlphaComponent:(0.08f + 0.12f * visualOpacity)];
+    UIColor *detachedInactiveFill = isVirtualButtonDPad ?
+        [[UIColor blackColor] colorWithAlphaComponent:(0.10f + 0.38f * visualOpacity)] :
+        [[UIColor blackColor] colorWithAlphaComponent:(0.08f + 0.34f * visualOpacity)];
+    UIColor *detachedActiveFill = isVirtualButtonDPad ?
+        [[UIColor whiteColor] colorWithAlphaComponent:(0.20f + 0.20f * visualOpacity)] :
+        [[UIColor whiteColor] colorWithAlphaComponent:(0.18f + 0.18f * visualOpacity)];
     UIColor *inactiveFill = [UIColor clearColor];
     UIColor *textColor = [UIColor colorWithWhite:1.0 alpha:(0.28f + 0.60f * visualOpacity)];
 
@@ -485,16 +503,16 @@ typedef NS_OPTIONS(NSUInteger, StreamVirtualDirectionMask) {
         BOOL hideLabelForGamepadJoystick = joystick && [self isGamepadJoystick];
         label.hidden = hideLabelForGamepadJoystick;
         label.textColor = active ? [[UIColor whiteColor] colorWithAlphaComponent:(0.42f + 0.58f * visualOpacity)] : textColor;
-        UIColor *activeFill = [self isGamepadFaceButtons] ? faceActiveFill : (joystick ? joystickActiveFill : dpadActiveFill);
-        label.backgroundColor = active ? activeFill : inactiveFill;
+        UIColor *activeFill = usesDetachedButtons ? detachedActiveFill : (joystick ? joystickActiveFill : detachedActiveFill);
+        label.backgroundColor = active ? activeFill : (usesDetachedButtons ? detachedInactiveFill : inactiveFill);
         label.layer.cornerRadius = CGRectGetWidth(label.bounds) * 0.5f;
         label.layer.masksToBounds = YES;
-        label.layer.borderWidth = joystick ? 0.0f : 0.8f;
+        label.layer.borderWidth = joystick ? 0.0f : (usesDetachedButtons ? 1.0f : 0.8f);
         label.layer.borderColor = [[UIColor whiteColor] colorWithAlphaComponent:(active ? (0.36f + 0.58f * visualOpacity) : (0.18f + 0.42f * visualOpacity))].CGColor;
         label.layer.shadowColor = [UIColor blackColor].CGColor;
-        label.layer.shadowOpacity = 0.0f;
-        label.layer.shadowRadius = 0.0f;
-        label.layer.shadowOffset = CGSizeMake(0, 4);
+        label.layer.shadowOpacity = usesDetachedButtons ? (active ? 0.16f : 0.08f) : 0.0f;
+        label.layer.shadowRadius = usesDetachedButtons ? 8.0f : 0.0f;
+        label.layer.shadowOffset = usesDetachedButtons ? CGSizeMake(0, 4) : CGSizeMake(0, 4);
         label.transform = (!joystick && active) ? CGAffineTransformMakeScale(0.92f, 0.92f) : CGAffineTransformIdentity;
     }
 
@@ -514,6 +532,7 @@ typedef NS_OPTIONS(NSUInteger, StreamVirtualDirectionMask) {
     NSMutableSet* keysDown;
     
     float streamAspectRatio;
+    BOOL directScreenTouchInputDisabled;
     
     // iOS 13.4 mouse support
     NSInteger lastMouseButtonMask;
@@ -651,6 +670,10 @@ typedef NS_OPTIONS(NSUInteger, StreamVirtualDirectionMask) {
 #endif
 }
 
+- (void)setDirectScreenTouchInputDisabled:(BOOL)disabled {
+    directScreenTouchInputDisabled = disabled;
+}
+
 - (void)resetAfterTemporaryTouchModeChange {
 #if !TARGET_OS_TV
     if (isInputingText) {
@@ -782,10 +805,13 @@ typedef NS_OPTIONS(NSUInteger, StreamVirtualDirectionMask) {
         return CGSizeMake(side, side);
     }
 
+    NSString *mouseAction = descriptor[@"mouseAction"];
+    BOOL isTouchpadAction = [mouseAction isKindOfClass:[NSString class]] && [mouseAction hasPrefix:@"touchpad_"];
+    CGFloat maxRectScale = isTouchpadAction ? 5.00 : 2.00;
     NSNumber *widthScaleNumber = descriptor[@"widthScale"];
     NSNumber *heightScaleNumber = descriptor[@"heightScale"];
-    CGFloat widthScale = MIN(MAX(widthScaleNumber != nil ? widthScaleNumber.doubleValue : 1.0, 0.50), 2.00);
-    CGFloat heightScale = MIN(MAX(heightScaleNumber != nil ? heightScaleNumber.doubleValue : 1.0, 0.50), 2.00);
+    CGFloat widthScale = MIN(MAX(widthScaleNumber != nil ? widthScaleNumber.doubleValue : 1.0, 0.50), maxRectScale);
+    CGFloat heightScale = MIN(MAX(heightScaleNumber != nil ? heightScaleNumber.doubleValue : 1.0, 0.50), maxRectScale);
     return CGSizeMake(baseRoundedWidth * widthScale, baseRoundedHeight * heightScale);
 }
 
@@ -848,6 +874,7 @@ typedef NS_OPTIONS(NSUInteger, StreamVirtualDirectionMask) {
     virtualGamepadContainerView = [[UIView alloc] initWithFrame:CGRectZero];
     virtualGamepadContainerView.backgroundColor = [UIColor clearColor];
     virtualGamepadContainerView.hidden = YES;
+    virtualGamepadContainerView.multipleTouchEnabled = YES;
     [self addSubview:virtualGamepadContainerView];
 }
 
@@ -989,6 +1016,8 @@ typedef NS_OPTIONS(NSUInteger, StreamVirtualDirectionMask) {
             UIButton *button = [UIButton buttonWithType:UIButtonTypeCustom];
             button.translatesAutoresizingMaskIntoConstraints = YES;
             button.autoresizingMask = UIViewAutoresizingNone;
+            button.exclusiveTouch = NO;
+            button.multipleTouchEnabled = YES;
             [button addTarget:self action:@selector(virtualGamepadButtonTapped:) forControlEvents:UIControlEventTouchUpInside];
             if (!temporaryVirtualGamepadEditingEnabled) {
                 [button addTarget:self action:@selector(virtualGamepadButtonPressDown:) forControlEvents:UIControlEventTouchDown];
@@ -1002,6 +1031,9 @@ typedef NS_OPTIONS(NSUInteger, StreamVirtualDirectionMask) {
             [self applyAppearanceForVirtualGamepadButton:button descriptor:descriptor size:[self virtualGamepadSizeForDescriptor:descriptor]];
             controlView = button;
         }
+
+        controlView.exclusiveTouch = NO;
+        controlView.multipleTouchEnabled = YES;
 
         UILongPressGestureRecognizer *dragGestureRecognizer = [[UILongPressGestureRecognizer alloc] initWithTarget:self action:@selector(handleVirtualGamepadLongPressDrag:)];
         dragGestureRecognizer.minimumPressDuration = 0.20;
@@ -1350,6 +1382,139 @@ typedef NS_OPTIONS(NSUInteger, StreamVirtualDirectionMask) {
     return [controlAction isKindOfClass:[NSString class]] && [controlAction hasPrefix:@"joystick_"];
 }
 
+- (BOOL)isTouchpadMouseAction:(NSString *)mouseAction {
+    return [mouseAction isEqualToString:@"touchpad_move"] ||
+        [mouseAction isEqualToString:@"touchpad_left_drag"] ||
+        [mouseAction isEqualToString:@"touchpad_right_drag"] ||
+        [mouseAction isEqualToString:@"touchpad_tap_left"];
+}
+
+- (int)heldMouseButtonForTouchpadAction:(NSString *)mouseAction {
+    if ([mouseAction isEqualToString:@"touchpad_left_drag"]) {
+        return BUTTON_LEFT;
+    }
+    if ([mouseAction isEqualToString:@"touchpad_right_drag"]) {
+        return BUTTON_RIGHT;
+    }
+    return 0;
+}
+
+- (BOOL)touchpadActionTriggersLeftClickOnTap:(NSString *)mouseAction {
+    return [mouseAction isEqualToString:@"touchpad_tap_left"];
+}
+
+- (void)sendVirtualTouchpadLeftClick {
+    dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_HIGH, 0), ^{
+        LiSendMouseButtonEvent(BUTTON_ACTION_PRESS, BUTTON_LEFT);
+        usleep(100 * 1000);
+        LiSendMouseButtonEvent(BUTTON_ACTION_RELEASE, BUTTON_LEFT);
+    });
+}
+
+- (void)virtualTouchpadTap:(UITapGestureRecognizer *)gestureRecognizer {
+    if (temporaryVirtualButtonsEditingEnabled) {
+        return;
+    }
+
+    UIButton *button = (UIButton *)gestureRecognizer.view;
+    if (![button isKindOfClass:[UIButton class]]) {
+        return;
+    }
+
+    NSString *mouseAction = objc_getAssociatedObject(button, "virtualMouseAction");
+    if (![mouseAction isKindOfClass:[NSString class]] || ![self touchpadActionTriggersLeftClickOnTap:mouseAction]) {
+        return;
+    }
+
+    [self toolbarButtonPressDown:button];
+    [self sendVirtualTouchpadLeftClick];
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.12 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+        [self toolbarButtonPressRelease:button];
+    });
+}
+
+- (void)sendVirtualTouchpadMovementFromPoint:(CGPoint)previousPoint
+                                     toPoint:(CGPoint)currentPoint
+                                sensitivityX:(CGFloat)sensitivityX
+                                sensitivityY:(CGFloat)sensitivityY {
+    CGFloat viewWidth = CGRectGetWidth(self.bounds);
+    CGFloat viewHeight = CGRectGetHeight(self.bounds);
+    if (viewWidth <= 0.0f || viewHeight <= 0.0f) {
+        return;
+    }
+
+    CGFloat clampedSensitivityX = MIN(MAX(sensitivityX, 0.5f), 3.0f);
+    CGFloat clampedSensitivityY = MIN(MAX(sensitivityY, 0.5f), 3.0f);
+    int deltaX = (int)lrintf((currentPoint.x - previousPoint.x) * (kVirtualTouchpadReferenceWidth / viewWidth) * clampedSensitivityX);
+    int deltaY = (int)lrintf((currentPoint.y - previousPoint.y) * (kVirtualTouchpadReferenceHeight / viewHeight) * clampedSensitivityY);
+    if (deltaX != 0 || deltaY != 0) {
+        LiSendMouseMoveEvent(deltaX, deltaY);
+    }
+}
+
+- (void)virtualTouchpadPan:(UIPanGestureRecognizer *)gestureRecognizer {
+    if (temporaryVirtualButtonsEditingEnabled) {
+        return;
+    }
+
+    UIButton *button = (UIButton *)gestureRecognizer.view;
+    if (![button isKindOfClass:[UIButton class]]) {
+        return;
+    }
+
+    NSString *mouseAction = objc_getAssociatedObject(button, "virtualMouseAction");
+    if (![mouseAction isKindOfClass:[NSString class]] || ![self isTouchpadMouseAction:mouseAction]) {
+        return;
+    }
+    NSNumber *sensitivityXNumber = objc_getAssociatedObject(button, "virtualTouchpadSensitivityX");
+    NSNumber *sensitivityYNumber = objc_getAssociatedObject(button, "virtualTouchpadSensitivityY");
+    CGFloat sensitivityX = sensitivityXNumber != nil ? (CGFloat)sensitivityXNumber.doubleValue : 1.0f;
+    CGFloat sensitivityY = sensitivityYNumber != nil ? (CGFloat)sensitivityYNumber.doubleValue : 1.0f;
+
+    CGPoint currentPoint = [gestureRecognizer locationInView:self];
+    NSValue *lastPointValue = objc_getAssociatedObject(button, "virtualTouchpadLastPoint");
+    CGPoint lastPoint = lastPointValue != nil ? lastPointValue.CGPointValue : currentPoint;
+    int heldMouseButton = [self heldMouseButtonForTouchpadAction:mouseAction];
+
+    if (gestureRecognizer.state == UIGestureRecognizerStateBegan) {
+        objc_setAssociatedObject(button, "virtualTouchpadLastPoint", [NSValue valueWithCGPoint:currentPoint], OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+        objc_setAssociatedObject(button, "virtualTouchpadStartPoint", [NSValue valueWithCGPoint:currentPoint], OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+        if (heldMouseButton != 0) {
+            LiSendMouseButtonEvent(BUTTON_ACTION_PRESS, heldMouseButton);
+            objc_setAssociatedObject(button, "virtualTouchpadHeldMouseButton", @(heldMouseButton), OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+        }
+        [self toolbarButtonPressDown:button];
+        return;
+    }
+
+    if (gestureRecognizer.state == UIGestureRecognizerStateChanged) {
+        [self sendVirtualTouchpadMovementFromPoint:lastPoint toPoint:currentPoint sensitivityX:sensitivityX sensitivityY:sensitivityY];
+        objc_setAssociatedObject(button, "virtualTouchpadLastPoint", [NSValue valueWithCGPoint:currentPoint], OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+        return;
+    }
+
+    if (gestureRecognizer.state == UIGestureRecognizerStateEnded ||
+        gestureRecognizer.state == UIGestureRecognizerStateCancelled ||
+        gestureRecognizer.state == UIGestureRecognizerStateFailed) {
+        [self sendVirtualTouchpadMovementFromPoint:lastPoint toPoint:currentPoint sensitivityX:sensitivityX sensitivityY:sensitivityY];
+        NSValue *startPointValue = objc_getAssociatedObject(button, "virtualTouchpadStartPoint");
+        CGPoint startPoint = startPointValue != nil ? startPointValue.CGPointValue : currentPoint;
+        NSNumber *heldButtonNumber = objc_getAssociatedObject(button, "virtualTouchpadHeldMouseButton");
+        if (heldButtonNumber.intValue != 0) {
+            LiSendMouseButtonEvent(BUTTON_ACTION_RELEASE, heldButtonNumber.intValue);
+        }
+        else if (gestureRecognizer.state == UIGestureRecognizerStateEnded &&
+                 [self touchpadActionTriggersLeftClickOnTap:mouseAction] &&
+                 hypot(currentPoint.x - startPoint.x, currentPoint.y - startPoint.y) < 8.0f) {
+            [self sendVirtualTouchpadLeftClick];
+        }
+        objc_setAssociatedObject(button, "virtualTouchpadHeldMouseButton", nil, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+        objc_setAssociatedObject(button, "virtualTouchpadLastPoint", nil, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+        objc_setAssociatedObject(button, "virtualTouchpadStartPoint", nil, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+        [self toolbarButtonPressRelease:button];
+    }
+}
+
 - (void)rebuildVirtualButtonsOverlay {
     if (virtualButtonsContainerView == nil) {
         return;
@@ -1391,8 +1556,12 @@ typedef NS_OPTIONS(NSUInteger, StreamVirtualDirectionMask) {
         }
         else {
             UIButton *button = [UIButton buttonWithType:UIButtonTypeCustom];
+            NSString *mouseAction = descriptor[@"mouseAction"];
+            BOOL isTouchpadAction = [mouseAction isKindOfClass:[NSString class]] && [self isTouchpadMouseAction:mouseAction];
             button.translatesAutoresizingMaskIntoConstraints = YES;
             button.autoresizingMask = UIViewAutoresizingNone;
+            button.exclusiveTouch = NO;
+            button.multipleTouchEnabled = YES;
             button.backgroundColor = [[UIColor blackColor] colorWithAlphaComponent:0.52];
             button.layer.borderWidth = temporaryVirtualButtonsEditingEnabled ? 1.3f : 1.0f;
             button.clipsToBounds = YES;
@@ -1401,22 +1570,44 @@ typedef NS_OPTIONS(NSUInteger, StreamVirtualDirectionMask) {
             button.titleLabel.adjustsFontSizeToFitWidth = YES;
             button.titleLabel.minimumScaleFactor = 0.60f;
             [button addTarget:self action:@selector(virtualShortcutButtonTapped:) forControlEvents:UIControlEventTouchUpInside];
-            [button addTarget:self action:@selector(virtualMouseButtonPressDown:) forControlEvents:UIControlEventTouchDown];
-            [button addTarget:self action:@selector(virtualMouseButtonPressRelease:) forControlEvents:UIControlEventTouchUpInside];
-            [button addTarget:self action:@selector(virtualMouseButtonPressRelease:) forControlEvents:UIControlEventTouchUpOutside];
-            [button addTarget:self action:@selector(virtualMouseButtonPressRelease:) forControlEvents:UIControlEventTouchCancel];
-            [button addTarget:self action:@selector(virtualMouseButtonPressDown:) forControlEvents:UIControlEventTouchDragEnter];
-            [button addTarget:self action:@selector(virtualMouseButtonPressRelease:) forControlEvents:UIControlEventTouchDragExit];
-            [button addTarget:self action:@selector(toolbarButtonPressDown:) forControlEvents:UIControlEventTouchDown];
-            [button addTarget:self action:@selector(toolbarButtonPressRelease:) forControlEvents:UIControlEventTouchUpInside];
-            [button addTarget:self action:@selector(toolbarButtonPressRelease:) forControlEvents:UIControlEventTouchUpOutside];
-            [button addTarget:self action:@selector(toolbarButtonPressRelease:) forControlEvents:UIControlEventTouchCancel];
-            [button addTarget:self action:@selector(toolbarButtonPressDown:) forControlEvents:UIControlEventTouchDragEnter];
-            [button addTarget:self action:@selector(toolbarButtonPressRelease:) forControlEvents:UIControlEventTouchDragExit];
+            if (isTouchpadAction) {
+                UIPanGestureRecognizer *touchpadPanGestureRecognizer = [[UIPanGestureRecognizer alloc] initWithTarget:self action:@selector(virtualTouchpadPan:)];
+                touchpadPanGestureRecognizer.minimumNumberOfTouches = 1;
+                touchpadPanGestureRecognizer.maximumNumberOfTouches = 1;
+                touchpadPanGestureRecognizer.cancelsTouchesInView = YES;
+                touchpadPanGestureRecognizer.enabled = !temporaryVirtualButtonsEditingEnabled;
+                [button addGestureRecognizer:touchpadPanGestureRecognizer];
+                if ([self touchpadActionTriggersLeftClickOnTap:mouseAction]) {
+                    UITapGestureRecognizer *touchpadTapGestureRecognizer = [[UITapGestureRecognizer alloc] initWithTarget:self action:@selector(virtualTouchpadTap:)];
+                    touchpadTapGestureRecognizer.numberOfTapsRequired = 1;
+                    touchpadTapGestureRecognizer.cancelsTouchesInView = YES;
+                    touchpadTapGestureRecognizer.enabled = !temporaryVirtualButtonsEditingEnabled;
+                    [touchpadTapGestureRecognizer requireGestureRecognizerToFail:touchpadPanGestureRecognizer];
+                    [button addGestureRecognizer:touchpadTapGestureRecognizer];
+                }
+            }
+            else {
+                [button addTarget:self action:@selector(virtualMouseButtonPressDown:) forControlEvents:UIControlEventTouchDown];
+                [button addTarget:self action:@selector(virtualMouseButtonPressRelease:) forControlEvents:UIControlEventTouchUpInside];
+                [button addTarget:self action:@selector(virtualMouseButtonPressRelease:) forControlEvents:UIControlEventTouchUpOutside];
+                [button addTarget:self action:@selector(virtualMouseButtonPressRelease:) forControlEvents:UIControlEventTouchCancel];
+                [button addTarget:self action:@selector(virtualMouseButtonPressDown:) forControlEvents:UIControlEventTouchDragEnter];
+                [button addTarget:self action:@selector(virtualMouseButtonPressRelease:) forControlEvents:UIControlEventTouchDragExit];
+                [button addTarget:self action:@selector(toolbarButtonPressDown:) forControlEvents:UIControlEventTouchDown];
+                [button addTarget:self action:@selector(toolbarButtonPressRelease:) forControlEvents:UIControlEventTouchUpInside];
+                [button addTarget:self action:@selector(toolbarButtonPressRelease:) forControlEvents:UIControlEventTouchUpOutside];
+                [button addTarget:self action:@selector(toolbarButtonPressRelease:) forControlEvents:UIControlEventTouchCancel];
+                [button addTarget:self action:@selector(toolbarButtonPressDown:) forControlEvents:UIControlEventTouchDragEnter];
+                [button addTarget:self action:@selector(toolbarButtonPressRelease:) forControlEvents:UIControlEventTouchDragExit];
+            }
             objc_setAssociatedObject(button, "virtualPrimaryKeyCodes", descriptor[@"primary"], OBJC_ASSOCIATION_RETAIN_NONATOMIC);
             objc_setAssociatedObject(button, "virtualSecondaryKeyCodes", descriptor[@"secondary"], OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+            objc_setAssociatedObject(button, "virtualMouseAction", mouseAction, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
             controlView = button;
         }
+
+        controlView.exclusiveTouch = NO;
+        controlView.multipleTouchEnabled = YES;
 
         UIPanGestureRecognizer *panGestureRecognizer = [[UIPanGestureRecognizer alloc] initWithTarget:self action:@selector(handleVirtualButtonPan:)];
         panGestureRecognizer.enabled = temporaryVirtualButtonsEditingEnabled;
@@ -1439,6 +1630,7 @@ typedef NS_OPTIONS(NSUInteger, StreamVirtualDirectionMask) {
     virtualButtonsContainerView = [[UIView alloc] initWithFrame:CGRectZero];
     virtualButtonsContainerView.backgroundColor = [UIColor clearColor];
     virtualButtonsContainerView.hidden = YES;
+    virtualButtonsContainerView.multipleTouchEnabled = YES;
     [self addSubview:virtualButtonsContainerView];
     [self rebuildVirtualButtonsOverlay];
 }
@@ -1464,10 +1656,13 @@ typedef NS_OPTIONS(NSUInteger, StreamVirtualDirectionMask) {
             return CGSizeMake(side, side);
         }
 
+        NSString *mouseAction = descriptor[@"mouseAction"];
+        BOOL isTouchpadAction = [mouseAction isKindOfClass:[NSString class]] && [mouseAction hasPrefix:@"touchpad_"];
+        CGFloat maxRectScale = isTouchpadAction ? 5.00 : 2.00;
         NSNumber *widthScaleNumber = descriptor[@"widthScale"];
         NSNumber *heightScaleNumber = descriptor[@"heightScale"];
-        CGFloat widthScale = MIN(MAX(widthScaleNumber != nil ? widthScaleNumber.doubleValue : 1.0, 0.50), 2.00);
-        CGFloat heightScale = MIN(MAX(heightScaleNumber != nil ? heightScaleNumber.doubleValue : 1.0, 0.50), 2.00);
+        CGFloat widthScale = MIN(MAX(widthScaleNumber != nil ? widthScaleNumber.doubleValue : 1.0, 0.50), maxRectScale);
+        CGFloat heightScale = MIN(MAX(heightScaleNumber != nil ? heightScaleNumber.doubleValue : 1.0, 0.50), maxRectScale);
         return CGSizeMake(baseDirectionalSide * widthScale, baseDirectionalSide * heightScale);
     }
 
@@ -1478,10 +1673,13 @@ typedef NS_OPTIONS(NSUInteger, StreamVirtualDirectionMask) {
         return CGSizeMake(side, side);
     }
 
+    NSString *mouseAction = descriptor[@"mouseAction"];
+    BOOL isTouchpadAction = [mouseAction isKindOfClass:[NSString class]] && [mouseAction hasPrefix:@"touchpad_"];
+    CGFloat maxRectScale = isTouchpadAction ? 5.00 : 2.00;
     NSNumber *widthScaleNumber = descriptor[@"widthScale"];
     NSNumber *heightScaleNumber = descriptor[@"heightScale"];
-    CGFloat widthScale = MIN(MAX(widthScaleNumber != nil ? widthScaleNumber.doubleValue : 1.0, 0.50), 2.00);
-    CGFloat heightScale = MIN(MAX(heightScaleNumber != nil ? heightScaleNumber.doubleValue : 1.0, 0.50), 2.00);
+    CGFloat widthScale = MIN(MAX(widthScaleNumber != nil ? widthScaleNumber.doubleValue : 1.0, 0.50), maxRectScale);
+    CGFloat heightScale = MIN(MAX(heightScaleNumber != nil ? heightScaleNumber.doubleValue : 1.0, 0.50), maxRectScale);
     return CGSizeMake(baseRoundedWidth * widthScale, baseRoundedHeight * heightScale);
 }
 
@@ -1637,7 +1835,8 @@ typedef NS_OPTIONS(NSUInteger, StreamVirtualDirectionMask) {
     BOOL isCircle = [self isCircularVirtualButtonDescriptor:descriptor];
     BOOL isSelected = selectedVirtualButtonIdentifier != nil && [selectedVirtualButtonIdentifier isEqualToString:descriptor[@"id"]];
     NSString *mouseAction = descriptor[@"mouseAction"];
-    BOOL isMouseButton = [mouseAction isKindOfClass:[NSString class]] && mouseAction.length > 0;
+    BOOL isTouchpadButton = [mouseAction isKindOfClass:[NSString class]] && [self isTouchpadMouseAction:mouseAction];
+    BOOL isMouseButton = [mouseAction isKindOfClass:[NSString class]] && mouseAction.length > 0 && !isTouchpadButton;
     BOOL isLockedMouseButton = isMouseButton && [self isLockingMouseAction:mouseAction] && [lockedMouseActionIdentifiers containsObject:mouseAction];
     NSNumber *opacityNumber = descriptor[@"opacity"];
     CGFloat buttonOpacity = MIN(MAX(opacityNumber != nil ? opacityNumber.doubleValue : 0.52, 0.05), 1.0);
@@ -1740,6 +1939,8 @@ typedef NS_OPTIONS(NSUInteger, StreamVirtualDirectionMask) {
         if ([button isKindOfClass:[UIButton class]]) {
             [self applyAppearanceForVirtualButton:(UIButton *)button descriptor:descriptor ?: @{} size:buttonSize];
             objc_setAssociatedObject(button, "virtualMouseAction", descriptor[@"mouseAction"], OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+            objc_setAssociatedObject(button, "virtualTouchpadSensitivityX", descriptor[@"touchSensitivityX"], OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+            objc_setAssociatedObject(button, "virtualTouchpadSensitivityY", descriptor[@"touchSensitivityY"], OBJC_ASSOCIATION_RETAIN_NONATOMIC);
         }
         else if ([button isKindOfClass:[StreamVirtualDirectionalControl class]]) {
             StreamVirtualDirectionalControl *directionalControl = (StreamVirtualDirectionalControl *)button;
@@ -2355,6 +2556,10 @@ typedef NS_OPTIONS(NSUInteger, StreamVirtualDirectionMask) {
         // If it's a mouse event, we're done
         return;
     }
+
+    if (directScreenTouchInputDisabled) {
+        return;
+    }
     
     Log(LOG_D, @"Touch down");
     
@@ -2362,6 +2567,23 @@ typedef NS_OPTIONS(NSUInteger, StreamVirtualDirectionMask) {
     [self startInteractionTimer];
     
 #if !TARGET_OS_TV
+    if (directScreenTouchInputDisabled) {
+        if (@available(iOS 13.4, *)) {
+            UITouch *touch = [touches anyObject];
+            if (touch.type == UITouchTypeIndirectPointer) {
+                if (@available(iOS 14.0, *)) {
+                    if ([GCMouse current] != nil) {
+                        // We'll handle this with GCMouse. Do nothing here.
+                        return;
+                    }
+                }
+
+                [self updateCursorLocation:[touch locationInView:self] isMouse:YES];
+            }
+        }
+        return;
+    }
+
     for (UITouch* touch in touches) {
         if (@available(iOS 13.4, *)) {
             if(touch.type == UITouchTypePencil){
@@ -2803,7 +3025,7 @@ typedef NS_OPTIONS(NSUInteger, StreamVirtualDirectionMask) {
         }
     }
 #endif
-    
+
     hasUserInteracted = YES;
     
     [touchHandler touchesMoved:touches withEvent:event];
@@ -2859,6 +3081,10 @@ typedef NS_OPTIONS(NSUInteger, StreamVirtualDirectionMask) {
         // If it's a mouse event, we're done
         return;
     }
+
+    if (directScreenTouchInputDisabled) {
+        return;
+    }
     
     Log(LOG_D, @"Touch up");
     
@@ -2887,6 +3113,13 @@ typedef NS_OPTIONS(NSUInteger, StreamVirtualDirectionMask) {
 - (void)touchesCancelled:(NSSet *)touches withEvent:(UIEvent *)event {
     if (viewOnlyModeEnabled) {
         [super touchesCancelled:touches withEvent:event];
+        return;
+    }
+
+    if (directScreenTouchInputDisabled) {
+        [self handleMouseButtonEvent:BUTTON_ACTION_RELEASE
+                          forTouches:touches
+                           withEvent:event];
         return;
     }
 

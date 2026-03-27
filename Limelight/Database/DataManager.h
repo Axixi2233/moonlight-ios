@@ -69,6 +69,9 @@ performanceOverlayPositionSelection:(NSInteger)performanceOverlayPositionSelecti
                               opacity:(CGFloat)opacity
                    forSchemeSelection:(NSInteger)schemeSelection
                              portrait:(BOOL)portrait;
+- (NSArray<NSDictionary *> *)customShortcutDefinitions;
+- (void)saveCustomShortcutDefinitions:(NSArray<NSDictionary *> *)definitions;
+- (void)resetSettingsToDefaultsClearingCustomData:(BOOL)clearCustomData;
 
 - (void) updateUniqueId:(NSString*)uniqueId;
 - (NSString*) getUniqueId;

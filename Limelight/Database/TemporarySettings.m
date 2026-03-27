@@ -29,7 +29,7 @@ NSString * const StreamPreferenceVirtualGamepadOpacityKey = @"StreamPreferenceVi
         StreamPreferenceVideoAlignmentMarginKey: @(0.0),
         StreamPreferencePerformanceOverlayPositionSelectionKey: @(0),
         StreamPreferencePerformanceOverlayMarginKey: @(6.0),
-        StreamPreferenceFloatingMenuEnabledKey: @(NO),
+        StreamPreferenceFloatingMenuEnabledKey: @(YES),
         StreamPreferenceVirtualButtonSchemeSelectionKey: @(0),
         StreamPreferenceVirtualGamepadSchemeSelectionKey: @(0),
         StreamPreferenceVirtualGamepadOpacityKey: @(0.52)

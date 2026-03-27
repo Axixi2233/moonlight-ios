@@ -112,6 +112,10 @@ BOOL isCustomResolution(CGSize res) {
                                                                                  target:self
                                                                                  action:@selector(closeSettings:)];
     }
+    self.navigationItem.rightBarButtonItem = [[UIBarButtonItem alloc] initWithTitle:@"重置"
+                                                                               style:UIBarButtonItemStylePlain
+                                                                              target:self
+                                                                              action:@selector(promptResetToDefaults:)];
     [self applyNavigationBarAppearance];
     [self installSwiftUISettingsIfPossible];
 }
@@ -175,6 +179,44 @@ BOOL isCustomResolution(CGSize res) {
     [self saveSettingsUsingSnapshot:[_settingsHostingViewController currentSnapshot]];
 }
 
+- (void)promptResetToDefaults:(id)sender {
+    UIAlertController *alertController = [UIAlertController alertControllerWithTitle:@"恢复初始化设置"
+                                                                             message:@"这会重置当前设置项，但不会删除已配对的设备列表信息。\n\n默认不会清空虚拟按键、虚拟手柄和快捷键数据。"
+                                                                      preferredStyle:UIAlertControllerStyleAlert];
+
+    [alertController addAction:[UIAlertAction actionWithTitle:@"仅重置设置"
+                                                        style:UIAlertActionStyleDefault
+                                                      handler:^(UIAlertAction *action) {
+        [self resetSettingsToDefaultsClearingCustomData:NO];
+    }]];
+
+    [alertController addAction:[UIAlertAction actionWithTitle:@"重置并清空自定义数据"
+                                                        style:UIAlertActionStyleDestructive
+                                                      handler:^(UIAlertAction *action) {
+        [self resetSettingsToDefaultsClearingCustomData:YES];
+    }]];
+
+    [alertController addAction:[UIAlertAction actionWithTitle:@"取消"
+                                                        style:UIAlertActionStyleCancel
+                                                      handler:nil]];
+
+    [self presentViewController:alertController animated:YES completion:nil];
+}
+
+- (void)resetSettingsToDefaultsClearingCustomData:(BOOL)clearCustomData {
+    DataManager *dataManager = [[DataManager alloc] init];
+    [dataManager resetSettingsToDefaultsClearingCustomData:clearCustomData];
+    [self reloadSettingsUIFromCurrentSettings];
+}
+
+- (void)reloadSettingsUIFromCurrentSettings {
+    TemporarySettings *currentSettings = [self currentSettingsForSettingsUI];
+    [self configureResolutionTableForSettings:currentSettings];
+
+    SettingsFormSnapshot *snapshot = [self makeSnapshotFromSettings:currentSettings];
+    [_settingsHostingViewController configureWith:snapshot];
+}
+
 
 - (void)installSwiftUISettingsIfPossible {
     TemporarySettings *currentSettings = [self currentSettingsForSettingsUI];
@@ -233,6 +275,9 @@ BOOL isCustomResolution(CGSize res) {
     snapshot.bitrateMinimumKbps = minimumBitrateKbps;
     snapshot.bitrateMaximumKbps = maximumBitrateKbps;
     NSInteger savedBitrate = [currentSettings.bitrate intValue];
+    if (savedBitrate <= 0) {
+        savedBitrate = 30000;
+    }
     snapshot.bitrateKbps = MAX(minimumBitrateKbps, MIN(savedBitrate, maximumBitrateKbps));
 
     BOOL enable120Fps = NO;
@@ -261,7 +306,7 @@ BOOL isCustomResolution(CGSize res) {
     }
     snapshot.resolutionDetailTitles = resolutionDetailTitles;
 
-    NSInteger resolution = 1;
+    NSInteger resolution = 2;
     for (int i = 0; i < RESOLUTION_TABLE_SIZE; i++) {
         if ((int)resolutionTable[i].height == [currentSettings.height intValue] &&
             (int)resolutionTable[i].width == [currentSettings.width intValue]) {

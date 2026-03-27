@@ -1,2 +1,6 @@
 /* Localized versions of Info.plist keys */
 
+"CFBundleDisplayName" = "星光·阿西西";
+"NSBluetoothAlwaysUsageDescription" = "通过蓝牙连接，应用可以连接到蓝牙外设。";
+"NSBluetoothPeripheralUsageDescription" = "通过蓝牙连接，应用可以连接到蓝牙外设。";
+"NSLocalNetworkUsageDescription" = "使用本地网络连接到您的游戏电脑进行流媒体播放。";
