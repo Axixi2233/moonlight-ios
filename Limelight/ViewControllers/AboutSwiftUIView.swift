@@ -2,6 +2,14 @@ import UIKit
 #if canImport(SwiftUI)
 import SwiftUI
 
+private func AboutLocalized(_ key: String) -> String {
+    NSLocalizedString(key, comment: "")
+}
+
+private func AboutLocalizedFormat(_ key: String, _ args: CVarArg...) -> String {
+    String(format: AboutLocalized(key), locale: Locale.current, arguments: args)
+}
+
 @available(iOS 13.0, *)
 private struct AboutPurpleBackground: View {
     var body: some View {
@@ -189,8 +197,8 @@ private struct AboutRootView: View {
 
     private let links: [AboutLinkItem] = [
         AboutLinkItem(title: "Bilibili", systemIconName: "play.rectangle.fill", assetName: "AboutBilibiliIcon", urlString: "https://space.bilibili.com/16893379"),
-        AboutLinkItem(title: "小红书", systemIconName: "book.closed.fill", assetName: "AboutXiaohongshuIcon", urlString: "https://www.xiaohongshu.com/user/profile/5d21be61000000001600b878"),
-        AboutLinkItem(title: "抖音", systemIconName: "music.note.tv.fill", assetName: "AboutDouyinIcon", urlString: "https://v.douyin.com/zm9GLKUfBW8/"),
+        AboutLinkItem(title: AboutLocalized("about.links.xiaohongshu"), systemIconName: "book.closed.fill", assetName: "AboutXiaohongshuIcon", urlString: "https://www.xiaohongshu.com/user/profile/5d21be61000000001600b878"),
+        AboutLinkItem(title: AboutLocalized("about.links.douyin"), systemIconName: "music.note.tv.fill", assetName: "AboutDouyinIcon", urlString: "https://v.douyin.com/zm9GLKUfBW8/"),
         AboutLinkItem(title: "Github", systemIconName: "book.note.tv.fill", assetName: "AboutGithub", urlString: "https://axixi2233.github.io/"),
     ]
 
@@ -208,9 +216,9 @@ private struct AboutRootView: View {
         let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "1.0.0"
         let build = Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? ""
         if build.isEmpty || build == version {
-            return "版本号：\(version)"
+            return AboutLocalizedFormat("about.version", version)
         }
-        return "版本号：\(version) (\(build))"
+        return AboutLocalizedFormat("about.version_build", version, build)
     }
 
     var body: some View {
@@ -221,19 +229,19 @@ private struct AboutRootView: View {
                 VStack(spacing: 22) {
                     AboutInfoCard(
                         appName: appName,
-                        subtitle: "随时随地，畅联你的电脑！",
+                        subtitle: AboutLocalized("about.subtitle"),
                         versionText: versionText
                     )
 
                     AboutActionCard(
-                        title: "手柄测试",
-                        subtitle: "实时查看摇杆、按键和扳机状态，手柄震动，体感测试。",
+                        title: AboutLocalized("about.gamepad_test.title"),
+                        subtitle: AboutLocalized("about.gamepad_test.subtitle"),
                         iconName: "gamecontroller.fill",
                         action: requestGamepadTest
                     )
 
                     VStack(alignment: .leading, spacing: 14) {
-                        Text("在这里找到开发者")
+                        Text(AboutLocalized("about.find_developer"))
                             .font(.system(size: 14, weight: .semibold))
                             .foregroundColor(Color(red: 0.35, green: 0.29, blue: 0.50))
 
@@ -267,7 +275,7 @@ final class AboutHostingViewController: UIViewController {
     override func viewDidLoad() {
         super.viewDidLoad()
         view.backgroundColor = .clear
-        title = "关于"
+        title = AboutLocalized("about.title")
         installHostingControllerIfNeeded()
         applyNavigationBarAppearance()
     }

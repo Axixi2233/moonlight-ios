@@ -39,6 +39,8 @@
 
 #include <Limelight.h>
 
+#define MainFrameLocalized(key) NSLocalizedString((key), nil)
+
 static NSString * const MainFrameSettingsDidCloseNotification = @"MainFrameSettingsDidCloseNotification";
 #if !TARGET_OS_TV
 static void *MainFrameAppCellHostingBridgeAssociationKey = &MainFrameAppCellHostingBridgeAssociationKey;
@@ -180,7 +182,7 @@ static NSMutableSet* hostList;
                                                                   action:nil];
         }
         else {
-            self.settingsButton = [[UIBarButtonItem alloc] initWithTitle:@"设置"
+            self.settingsButton = [[UIBarButtonItem alloc] initWithTitle:MainFrameLocalized(@"settings.title")
                                                                    style:UIBarButtonItemStylePlain
                                                                   target:nil
                                                                   action:nil];
@@ -201,7 +203,7 @@ static NSMutableSet* hostList;
                                                                action:nil];
         }
         else {
-            self.aboutButton = [[UIBarButtonItem alloc] initWithTitle:@"关于"
+            self.aboutButton = [[UIBarButtonItem alloc] initWithTitle:MainFrameLocalized(@"about.title")
                                                                 style:UIBarButtonItemStylePlain
                                                                target:nil
                                                                action:nil];
@@ -272,7 +274,7 @@ static NSMutableSet* hostList;
             self.upButton.image = [[UIImage systemImageNamed:@"desktopcomputer"] imageByApplyingSymbolConfiguration:symbolConfig];
         }
         else {
-            [self.upButton setTitle:@"设备列表"];
+            [self.upButton setTitle:MainFrameLocalized(@"home.device_list")];
         }
         [self.upButton setAction:@selector(showHostSelectionView)];
         if (@available(iOS 26.0, *)) {
@@ -312,15 +314,15 @@ static NSMutableSet* hostList;
     switch (host.state) {
         case StateOnline:
             if (host.pairState == PairStateUnpaired) {
-                return @"在线，未配对";
+                return MainFrameLocalized(@"home.host_status.online_unpaired");
             }
-            return @"在线";
+            return MainFrameLocalized(@"home.host_status.online");
 
         case StateOffline:
-            return @"离线";
+            return MainFrameLocalized(@"home.host_status.offline");
 
         case StateUnknown:
-            return @"正在连接";
+            return MainFrameLocalized(@"home.host_status.connecting");
     }
 }
 
@@ -345,8 +347,8 @@ static NSMutableSet* hostList;
 
     for (TemporaryHost *host in _sortedHostSelectionList) {
         MainFrameHostListItemSnapshot *snapshot = [[MainFrameHostListItemSnapshot alloc] init];
-        snapshot.title = host.name ?: @"PC";
-        snapshot.subtitle = host.activeAddress ?: host.localAddress ?: host.address ?: @"等待地址";
+        snapshot.title = host.name ?: MainFrameLocalized(@"home.host.default_name");
+        snapshot.subtitle = host.activeAddress ?: host.localAddress ?: host.address ?: MainFrameLocalized(@"home.host.waiting_address");
         snapshot.statusText = [self statusTextForHost:host];
         snapshot.statusStyle = [self statusStyleForHost:host];
         snapshot.showsActivity = (host.state == StateUnknown);
@@ -504,10 +506,10 @@ static NSMutableSet* hostList;
     // Needs to be synchronous to ensure the alert is shown before any potential
     // failure callback could be invoked.
     dispatch_sync(dispatch_get_main_queue(), ^{
-        self->_pairAlert = [UIAlertController alertControllerWithTitle:@"配对中"
-                                                               message:[NSString stringWithFormat:@"在主机上输入以下 PIN 码：%@\n\n如果您的主机 PC 运行的是 Sunshine，请导航至 Sunshine Web UI 输入 PIN 码。", PIN]
+        self->_pairAlert = [UIAlertController alertControllerWithTitle:MainFrameLocalized(@"home.pairing.title")
+                                                               message:[NSString stringWithFormat:MainFrameLocalized(@"home.pairing.message"), PIN]
                                                         preferredStyle:UIAlertControllerStyleAlert];
-        [self->_pairAlert addAction:[UIAlertAction actionWithTitle:@"确认" style:UIAlertActionStyleDestructive handler:^(UIAlertAction* action) {
+        [self->_pairAlert addAction:[UIAlertAction actionWithTitle:MainFrameLocalized(@"common.ok") style:UIAlertActionStyleDestructive handler:^(UIAlertAction* action) {
             self->_pairAlert = nil;
             [self->_discMan startDiscovery];
             [self hideLoadingFrame: ^{
@@ -519,11 +521,11 @@ static NSMutableSet* hostList;
 }
 
 - (void)displayPairingFailureDialog:(NSString *)message {
-    UIAlertController* failedDialog = [UIAlertController alertControllerWithTitle:@"配对失败"
+    UIAlertController* failedDialog = [UIAlertController alertControllerWithTitle:MainFrameLocalized(@"home.pairing.failed_title")
                                                                           message:message
                                                                    preferredStyle:UIAlertControllerStyleAlert];
     [Utils addHelpOptionToDialog:failedDialog];
-    [failedDialog addAction:[UIAlertAction actionWithTitle:@"确认" style:UIAlertActionStyleDefault handler:nil]];
+    [failedDialog addAction:[UIAlertAction actionWithTitle:MainFrameLocalized(@"common.ok") style:UIAlertActionStyleDefault handler:nil]];
     
     [_discMan startDiscovery];
     
@@ -765,11 +767,11 @@ static NSMutableSet* hostList;
 }
 
 - (void)displayDnsFailedDialog {
-    UIAlertController* alert = [UIAlertController alertControllerWithTitle:@"网络错误"
-                                                                   message:@"主机名解析失败。"
+    UIAlertController* alert = [UIAlertController alertControllerWithTitle:MainFrameLocalized(@"home.network_error.title")
+                                                                   message:MainFrameLocalized(@"home.network_error.dns_failed")
                                                             preferredStyle:UIAlertControllerStyleAlert];
     [Utils addHelpOptionToDialog:alert];
-    [alert addAction:[UIAlertAction actionWithTitle:@"确认" style:UIAlertActionStyleDefault handler:nil]];
+    [alert addAction:[UIAlertAction actionWithTitle:MainFrameLocalized(@"common.ok") style:UIAlertActionStyleDefault handler:nil]];
     [[self activeViewController] presentViewController:alert animated:YES completion:nil];
 }
 
@@ -838,11 +840,11 @@ static NSMutableSet* hostList;
                         return;
                     }
                     
-                    UIAlertController* applistAlert = [UIAlertController alertControllerWithTitle:@"连接失败"
+                    UIAlertController* applistAlert = [UIAlertController alertControllerWithTitle:MainFrameLocalized(@"home.connection_failed.title")
                                                                             message:serverInfoResp.statusMessage
                                                                                    preferredStyle:UIAlertControllerStyleAlert];
                     [Utils addHelpOptionToDialog:applistAlert];
-                    [applistAlert addAction:[UIAlertAction actionWithTitle:@"确认" style:UIAlertActionStyleDefault handler:nil]];
+                    [applistAlert addAction:[UIAlertAction actionWithTitle:MainFrameLocalized(@"common.ok") style:UIAlertActionStyleDefault handler:nil]];
                     
                     // Only display an alert if this was the result of a real
                     // user action, not just passively entering the foreground again
@@ -901,48 +903,48 @@ static NSMutableSet* hostList;
     if (host.state != StateOnline) {
         MainFrameHostActionSheetItem *wakeItem = [[MainFrameHostActionSheetItem alloc] init];
         wakeItem.identifier = @"wake";
-        wakeItem.title = @"Wake PC";
-        wakeItem.subtitle = @"发送 Wake-on-LAN 唤醒请求";
+        wakeItem.title = MainFrameLocalized(@"home.host_action.wake.title");
+        wakeItem.subtitle = MainFrameLocalized(@"home.host_action.wake.subtitle");
         [items addObject:wakeItem];
 
         MainFrameHostActionSheetItem *eosItem = [[MainFrameHostActionSheetItem alloc] init];
         eosItem.identifier = @"nvidia_eos";
-        eosItem.title = @"NVIDIA GameStream End-of-Service";
-        eosItem.subtitle = @"查看 GameStream 停服说明";
+        eosItem.title = MainFrameLocalized(@"home.host_action.eos.title");
+        eosItem.subtitle = MainFrameLocalized(@"home.host_action.eos.subtitle");
         [items addObject:eosItem];
 
         MainFrameHostActionSheetItem *helpItem = [[MainFrameHostActionSheetItem alloc] init];
         helpItem.identifier = @"connection_help";
-        helpItem.title = @"Connection Help";
-        helpItem.subtitle = @"打开连接排查文档";
+        helpItem.title = MainFrameLocalized(@"home.host_action.help.title");
+        helpItem.subtitle = MainFrameLocalized(@"home.host_action.help.subtitle");
         [items addObject:helpItem];
     }
     else if (host.pairState == PairStatePaired) {
         MainFrameHostActionSheetItem *appsItem = [[MainFrameHostActionSheetItem alloc] init];
         appsItem.identifier = @"view_all_apps";
-        appsItem.title = @"View All Apps";
-        appsItem.subtitle = @"显示隐藏应用并进入应用列表";
+        appsItem.title = MainFrameLocalized(@"home.host_action.view_all_apps.title");
+        appsItem.subtitle = MainFrameLocalized(@"home.host_action.view_all_apps.subtitle");
         [items addObject:appsItem];
 
         if (host.isNvidiaServerSoftware) {
             MainFrameHostActionSheetItem *eosItem = [[MainFrameHostActionSheetItem alloc] init];
             eosItem.identifier = @"nvidia_eos";
-            eosItem.title = @"NVIDIA GameStream End-of-Service";
-            eosItem.subtitle = @"查看 GameStream 停服说明";
+            eosItem.title = MainFrameLocalized(@"home.host_action.eos.title");
+            eosItem.subtitle = MainFrameLocalized(@"home.host_action.eos.subtitle");
             [items addObject:eosItem];
         }
     }
 
     MainFrameHostActionSheetItem *networkItem = [[MainFrameHostActionSheetItem alloc] init];
     networkItem.identifier = @"test_network";
-    networkItem.title = @"Test Network";
-    networkItem.subtitle = @"检测当前网络是否被屏蔽";
+    networkItem.title = MainFrameLocalized(@"home.host_action.test_network.title");
+    networkItem.subtitle = MainFrameLocalized(@"home.host_action.test_network.subtitle");
     [items addObject:networkItem];
 
     MainFrameHostActionSheetItem *removeItem = [[MainFrameHostActionSheetItem alloc] init];
     removeItem.identifier = @"remove_host";
-    removeItem.title = @"Remove Host";
-    removeItem.subtitle = @"从设备列表中移除此设备";
+    removeItem.title = MainFrameLocalized(@"home.host_action.remove.title");
+    removeItem.subtitle = MainFrameLocalized(@"home.host_action.remove.subtitle");
     removeItem.destructive = YES;
     [items addObject:removeItem];
 
@@ -962,10 +964,10 @@ static NSMutableSet* hostList;
             return @"Offline";
 
         case StateOnline:
-            return host.pairState == PairStatePaired ? @"Online - Paired" : @"Online - Not Paired";
+            return host.pairState == PairStatePaired ? MainFrameLocalized(@"home.host_status.online_paired") : MainFrameLocalized(@"home.host_status.online_not_paired");
 
         case StateUnknown:
-            return @"Connecting";
+            return MainFrameLocalized(@"home.host_status.connecting");
     }
 }
 
@@ -996,15 +998,15 @@ static NSMutableSet* hostList;
 }
 
 - (void)presentWakeHostAlertForHost:(TemporaryHost *)host {
-    UIAlertController* wolAlert = [UIAlertController alertControllerWithTitle:@"网络唤醒" message:@"" preferredStyle:UIAlertControllerStyleAlert];
-    [wolAlert addAction:[UIAlertAction actionWithTitle:@"确认" style:UIAlertActionStyleDefault handler:nil]];
+    UIAlertController* wolAlert = [UIAlertController alertControllerWithTitle:MainFrameLocalized(@"home.wol.title") message:@"" preferredStyle:UIAlertControllerStyleAlert];
+    [wolAlert addAction:[UIAlertAction actionWithTitle:MainFrameLocalized(@"common.ok") style:UIAlertActionStyleDefault handler:nil]];
     if (host.mac == nil || [host.mac isEqualToString:@"00:00:00:00:00:00"]) {
-        wolAlert.message = @"主机MAC地址未知，无法发送WOL数据包";
+        wolAlert.message = MainFrameLocalized(@"home.wol.unknown_mac");
     } else {
         dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
             [WakeOnLanManager wakeHost:host];
         });
-        wolAlert.message = @"唤醒请求已成功发送。电脑可能需要一些时间才能唤醒。如果电脑始终无法唤醒，请确保已正确配置网络唤醒 (Wake-on-LAN) 功能。";
+        wolAlert.message = MainFrameLocalized(@"home.wol.sent");
     }
     [[self activeViewController] presentViewController:wolAlert animated:YES completion:nil];
 }
@@ -1018,19 +1020,19 @@ static NSMutableSet* hostList;
                     NSString* message;
 
                     if (portTestResult == 0) {
-                        message = @"此网络似乎并未阻止连接此应用。如果仍然无法连接，请检查您电脑的防火墙设置。";
+                        message = MainFrameLocalized(@"home.network_test.passed");
                     }
                     else if (portTestResult == ML_TEST_RESULT_INCONCLUSIVE) {
-                        message = @"暂时无法执行网络测试。请检查您的互联网连接或稍后重试。";
+                        message = MainFrameLocalized(@"home.network_test.inconclusive");
                     }
                     else {
                         char blockedPorts[512];
                         LiStringifyPortFlags(portTestResult, "\n", blockedPorts, sizeof(blockedPorts));
-                        message = [NSString stringWithFormat:@"您当前的网络连接似乎被限制了，无法进行串流。\n\n以下网络端口已被阻止：\n%s", blockedPorts];
+                        message = [NSString stringWithFormat:MainFrameLocalized(@"home.network_test.blocked"), blockedPorts];
                     }
 
-                    UIAlertController* netTestAlert = [UIAlertController alertControllerWithTitle:@"网络测试完成" message:message preferredStyle:UIAlertControllerStyleAlert];
-                    [netTestAlert addAction:[UIAlertAction actionWithTitle:@"确认" style:UIAlertActionStyleDefault handler:nil]];
+                    UIAlertController* netTestAlert = [UIAlertController alertControllerWithTitle:MainFrameLocalized(@"home.network_test.title") message:message preferredStyle:UIAlertControllerStyleAlert];
+                    [netTestAlert addAction:[UIAlertAction actionWithTitle:MainFrameLocalized(@"common.ok") style:UIAlertActionStyleDefault handler:nil]];
                     [[self activeViewController] presentViewController:netTestAlert animated:YES completion:nil];
                 }];
             });
@@ -1050,12 +1052,12 @@ static NSMutableSet* hostList;
 
 - (void) addHostClicked {
     Log(LOG_D, @"Clicked add host");
-    UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"手动添加"
-                                                                   message:@"温馨提示：\n1、PC端设备开启N卡GeForce Shield 服务或者安装 Sunshine 并启用串流服务\n2、默认端口 [47989] 无需输入，自定义端口需要自行拼接\n3、支持 IPv4 和 IPv6 地址\nIPv4：192.168.1.123\nIPv6：[fd00:6868:6868:0:fd6:e0ea:84d9:70ea]:47989"
+    UIAlertController *alert = [UIAlertController alertControllerWithTitle:MainFrameLocalized(@"home.manual_add.title")
+                                                                   message:MainFrameLocalized(@"home.manual_add.message")
                                                             preferredStyle:UIAlertControllerStyleAlert];
     __weak typeof(self) weakSelf = self;
     [alert addTextFieldWithConfigurationHandler:^(UITextField * _Nonnull textField) {
-        textField.placeholder = @"输入 IPv4 / IPv6 / 主机地址";
+        textField.placeholder = MainFrameLocalized(@"home.manual_add.placeholder");
         textField.clearButtonMode = UITextFieldViewModeWhileEditing;
         textField.keyboardType = UIKeyboardTypeURL;
         textField.autocapitalizationType = UITextAutocapitalizationTypeNone;
@@ -1063,11 +1065,11 @@ static NSMutableSet* hostList;
         textField.returnKeyType = UIReturnKeyDone;
     }];
 
-    [alert addAction:[UIAlertAction actionWithTitle:@"取消"
+    [alert addAction:[UIAlertAction actionWithTitle:MainFrameLocalized(@"common.cancel")
                                               style:UIAlertActionStyleCancel
                                             handler:nil]];
 
-    [alert addAction:[UIAlertAction actionWithTitle:@"添加"
+    [alert addAction:[UIAlertAction actionWithTitle:MainFrameLocalized(@"home.manual_add.add")
                                               style:UIAlertActionStyleDefault
                                             handler:^(__unused UIAlertAction * _Nonnull action) {
         UITextField *textField = alert.textFields.firstObject;
@@ -1098,12 +1100,12 @@ static NSMutableSet* hostList;
                     unsigned int portTestResults = LiTestClientConnectivity(CONN_TEST_SERVER, 443,
                                                                             ML_PORT_FLAG_TCP_47984 | ML_PORT_FLAG_TCP_47989);
                     if (portTestResults != ML_TEST_RESULT_INCONCLUSIVE && portTestResults != 0) {
-                        error = [error stringByAppendingString:@"\n\n您的设备网络连接受限，可能无法进行串流。"];
+                        error = [error stringByAppendingString:MainFrameLocalized(@"home.host_add.restricted_network_suffix")];
                     }
 
-                    UIAlertController* hostNotFoundAlert = [UIAlertController alertControllerWithTitle:@"提示" message:error preferredStyle:UIAlertControllerStyleAlert];
+                    UIAlertController* hostNotFoundAlert = [UIAlertController alertControllerWithTitle:MainFrameLocalized(@"home.notice.title") message:error preferredStyle:UIAlertControllerStyleAlert];
                     [Utils addHelpOptionToDialog:hostNotFoundAlert];
-                    [hostNotFoundAlert addAction:[UIAlertAction actionWithTitle:@"确认" style:UIAlertActionStyleDefault handler:nil]];
+                    [hostNotFoundAlert addAction:[UIAlertAction actionWithTitle:MainFrameLocalized(@"common.ok") style:UIAlertActionStyleDefault handler:nil]];
                     dispatch_async(dispatch_get_main_queue(), ^{
                         [self hideLoadingFrame:^{
                             [[self activeViewController] presentViewController:hostNotFoundAlert animated:YES completion:nil];
@@ -1228,25 +1230,25 @@ static NSMutableSet* hostList;
 
     NSString *message;
     if (currentApp == nil || [app.id isEqualToString:currentApp.id]) {
-        message = app.hidden ? @"Hidden" : @"";
+        message = app.hidden ? MainFrameLocalized(@"home.app.hidden") : @"";
     }
     else {
-        message = [NSString stringWithFormat:@"%@ is currently running", currentApp.name];
+        message = [NSString stringWithFormat:MainFrameLocalized(@"home.app.currently_running"), currentApp.name];
     }
 
     NSMutableArray<MainFrameHostActionSheetItem *> *items = [NSMutableArray array];
 
     MainFrameHostActionSheetItem *primaryItem = [[MainFrameHostActionSheetItem alloc] init];
     primaryItem.identifier = @"launch_or_resume";
-    primaryItem.title = currentApp == nil ? @"Launch App" : ([app.id isEqualToString:currentApp.id] ? @"Resume App" : @"Resume Running App");
-    primaryItem.subtitle = currentApp == nil ? @"启动这个应用" : ([app.id isEqualToString:currentApp.id] ? @"恢复当前应用会话" : @"恢复当前正在运行的应用");
+    primaryItem.title = currentApp == nil ? MainFrameLocalized(@"home.app_action.launch.title") : ([app.id isEqualToString:currentApp.id] ? MainFrameLocalized(@"home.app_action.resume.title") : MainFrameLocalized(@"home.app_action.resume_running.title"));
+    primaryItem.subtitle = currentApp == nil ? MainFrameLocalized(@"home.app_action.launch.subtitle") : ([app.id isEqualToString:currentApp.id] ? MainFrameLocalized(@"home.app_action.resume.subtitle") : MainFrameLocalized(@"home.app_action.resume_running.subtitle"));
     [items addObject:primaryItem];
 
     if (currentApp != nil) {
         MainFrameHostActionSheetItem *quitItem = [[MainFrameHostActionSheetItem alloc] init];
         quitItem.identifier = @"quit";
-        quitItem.title = [app.id isEqualToString:currentApp.id] ? @"Quit App" : @"Quit Running App and Start";
-        quitItem.subtitle = [app.id isEqualToString:currentApp.id] ? @"退出当前应用" : @"退出当前应用后启动所选应用";
+        quitItem.title = [app.id isEqualToString:currentApp.id] ? MainFrameLocalized(@"home.app_action.quit.title") : MainFrameLocalized(@"home.app_action.quit_and_start.title");
+        quitItem.subtitle = [app.id isEqualToString:currentApp.id] ? MainFrameLocalized(@"home.app_action.quit.subtitle") : MainFrameLocalized(@"home.app_action.quit_and_start.subtitle");
         quitItem.destructive = YES;
         [items addObject:quitItem];
     }
@@ -1254,15 +1256,15 @@ static NSMutableSet* hostList;
     if (currentApp == nil || ![app.id isEqualToString:currentApp.id] || app.hidden) {
         MainFrameHostActionSheetItem *visibilityItem = [[MainFrameHostActionSheetItem alloc] init];
         visibilityItem.identifier = @"toggle_visibility";
-        visibilityItem.title = app.hidden ? @"Show App" : @"Hide App";
-        visibilityItem.subtitle = app.hidden ? @"重新在列表中显示该应用" : @"在列表中隐藏该应用";
+        visibilityItem.title = app.hidden ? MainFrameLocalized(@"home.app_action.show.title") : MainFrameLocalized(@"home.app_action.hide.title");
+        visibilityItem.subtitle = app.hidden ? MainFrameLocalized(@"home.app_action.show.subtitle") : MainFrameLocalized(@"home.app_action.hide.subtitle");
         visibilityItem.destructive = !app.hidden;
         [items addObject:visibilityItem];
     }
 
     MainFrameHostActionSheetHostingViewController *controller = [[MainFrameHostActionSheetHostingViewController alloc] init];
     controller.delegate = (id<MainFrameHostActionSheetHostingViewControllerDelegate>)self;
-    [controller configureWithTitle:app.name ?: @"App" subtitle:message ?: @"" items:items];
+    [controller configureWithTitle:app.name ?: MainFrameLocalized(@"home.app.default_name") subtitle:message ?: @"" items:items];
     controller.modalPresentationStyle = UIModalPresentationOverFullScreen;
 
     _appActionSheetApp = app;
@@ -1336,10 +1338,10 @@ static NSMutableSet* hostList;
                 [self->_discMan resumeDiscoveryForHost:app.host];
 
                 if (quitResponse.statusCode != 200) {
-                    UIAlertController* alert = [UIAlertController alertControllerWithTitle:@"Quitting App Failed"
-                                                                                   message:@"Failed to quit app. If this app was started by another device, you'll need to quit from that device."
+                    UIAlertController* alert = [UIAlertController alertControllerWithTitle:MainFrameLocalized(@"stream.quit_app.failed_title")
+                                                                                   message:MainFrameLocalized(@"stream.quit_app.failed_message")
                                                                             preferredStyle:UIAlertControllerStyleAlert];
-                    [alert addAction:[UIAlertAction actionWithTitle:@"OK" style:UIAlertActionStyleDefault handler:nil]];
+                    [alert addAction:[UIAlertAction actionWithTitle:MainFrameLocalized(@"common.ok") style:UIAlertActionStyleDefault handler:nil]];
                     dispatch_async(dispatch_get_main_queue(), ^{
                         [self updateAppsForHost:app.host];
                         [self hideLoadingFrame:^{

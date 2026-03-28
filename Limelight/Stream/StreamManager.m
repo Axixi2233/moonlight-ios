@@ -19,6 +19,8 @@
 
 #include <Limelight.h>
 
+#define StreamManagerLocalized(key) NSLocalizedString((key), nil)
+
 @implementation StreamManager {
     StreamConfiguration* _config;
 
@@ -55,13 +57,13 @@
         return;
     }
     else if (pairStatus == NULL || appversion == NULL || serverState == NULL) {
-        [_callbacks launchFailed:@"Failed to connect to PC"];
+        [_callbacks launchFailed:StreamManagerLocalized(@"stream.launch.failed_connect_pc")];
         return;
     }
     
     if (![pairStatus isEqualToString:@"1"]) {
         // Not paired
-        [_callbacks launchFailed:@"Device not paired to PC"];
+        [_callbacks launchFailed:StreamManagerLocalized(@"stream.launch.not_paired")];
         return;
     }
     
@@ -71,7 +73,7 @@
         // We can't directly identify Pascal, but we can look for HEVC Main10 which was added in the same generation.
         NSString* codecSupport = [serverInfoResp getStringTag:@"ServerCodecModeSupport"];
         if (codecSupport == nil || !([codecSupport intValue] & 0x200)) {
-            [_callbacks launchFailed:@"Your host PC's GPU doesn't support streaming video resolutions over 4K."];
+            [_callbacks launchFailed:StreamManagerLocalized(@"stream.launch.gpu_no_4k")];
             return;
         }
     }
@@ -120,7 +122,7 @@
         Log(LOG_E, @"Failed Launch Response: %@", launchResp.statusMessage);
         return FALSE;
     } else if (gameSession == NULL || [gameSession isEqualToString:@"0"]) {
-        [_callbacks launchFailed:@"Failed to launch app"];
+        [_callbacks launchFailed:StreamManagerLocalized(@"stream.launch.failed_launch_app")];
         Log(LOG_E, @"Failed to parse game session");
         return FALSE;
     }
@@ -138,7 +140,7 @@
         Log(LOG_E, @"Failed Resume Response: %@", resumeResp.statusMessage);
         return FALSE;
     } else if (resume == NULL || [resume isEqualToString:@"0"]) {
-        [_callbacks launchFailed:@"Failed to resume app"];
+        [_callbacks launchFailed:StreamManagerLocalized(@"stream.launch.failed_resume_app")];
         Log(LOG_E, @"Failed to parse resume response");
         return FALSE;
     }
@@ -167,7 +169,7 @@
     NSString* latencyStringLite;
     if (LiGetEstimatedRttInfo(&rtt, &variance)) {
         latencyString = [NSString stringWithFormat:@"%u ms (variance: %u ms)", rtt, variance];
-        latencyStringLite= [NSString stringWithFormat:@"延迟：%u ms (抖动%u ms)", rtt, variance];
+        latencyStringLite= [NSString stringWithFormat:StreamManagerLocalized(@"stream.stats.latency"), rtt, variance];
     }
     else {
         latencyString = @"N/A";
@@ -176,7 +178,7 @@
     
     NSString* hostProcessingStringLite;
     if (showsExtendedMetrics && stats.framesWithHostProcessingLatency != 0) {
-        hostProcessingStringLite = [NSString stringWithFormat:@" 编码：%.1f ms",
+        hostProcessingStringLite = [NSString stringWithFormat:StreamManagerLocalized(@"stream.stats.encoding"),
                                     (float)stats.totalHostProcessingLatency / stats.framesWithHostProcessingLatency / 10.f];
     }
     else {
@@ -185,7 +187,7 @@
 
     NSString* clientLatencyStringLite;
     if (showsExtendedMetrics && stats.framesWithClientQueueLatency != 0) {
-        clientLatencyStringLite = [NSString stringWithFormat:@" 客户端：%.1f ms",
+        clientLatencyStringLite = [NSString stringWithFormat:StreamManagerLocalized(@"stream.stats.client"),
                                    (double)stats.totalClientQueueLatency / (double)stats.framesWithClientQueueLatency];
     }
     else {
@@ -196,14 +198,14 @@
 
     NSString* droppedFramesStringLite;
     if (showsExtendedMetrics) {
-        droppedFramesStringLite = [NSString stringWithFormat:@" 丢帧：%.2f%%",
+        droppedFramesStringLite = [NSString stringWithFormat:StreamManagerLocalized(@"stream.stats.dropped"),
                                    stats.networkDroppedFrames / interval];
     }
     else {
         droppedFramesStringLite = @"";
     }
     
-    return [NSString stringWithFormat:@"%dx%d %@ %@%@%@%@ FPS：%.2f",
+    return [NSString stringWithFormat:StreamManagerLocalized(@"stream.stats.overlay"),
             _config.width,
             _config.height,
             [_connection getActiveCodecNameLite],

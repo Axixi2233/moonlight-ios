@@ -2,6 +2,10 @@ import UIKit
 #if canImport(SwiftUI)
 import SwiftUI
 
+private func MainFrameHostActionLocalized(_ key: String) -> String {
+    NSLocalizedString(key, comment: "")
+}
+
 @objcMembers
 final class MainFrameHostActionSheetItem: NSObject {
     var identifier: String = ""
@@ -94,7 +98,7 @@ private struct MainFrameHostActionSheetRootView: View {
                     .frame(maxHeight: min(proxy.size.height * 0.55, 360))
 
                     Button(action: onCancel) {
-                        Text("取消")
+                        Text(MainFrameHostActionLocalized("common.cancel"))
                             .font(.system(size: 17, weight: .semibold))
                             .foregroundColor(.primary)
                             .frame(maxWidth: .infinity)

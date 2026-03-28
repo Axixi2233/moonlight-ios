@@ -73,7 +73,7 @@ NSString *const deviceName = @"roth";
 + (void) addHelpOptionToDialog:(UIAlertController*)dialog {
 #if !TARGET_OS_TV
     // tvOS doesn't have a browser
-    [dialog addAction:[UIAlertAction actionWithTitle:@"Help" style:UIAlertActionStyleDefault handler:^(UIAlertAction* action){
+    [dialog addAction:[UIAlertAction actionWithTitle:NSLocalizedString(@"common.help", nil) style:UIAlertActionStyleDefault handler:^(UIAlertAction* action){
         [Utils launchUrl:@"https://github.com/moonlight-stream/moonlight-docs/wiki/Troubleshooting"];
     }]];
 #endif

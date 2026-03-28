@@ -15,6 +15,7 @@
 #import <AVFoundation/AVFoundation.h>
 
 static NSString * const MainFrameSettingsDidCloseNotification = @"MainFrameSettingsDidCloseNotification";
+#define SettingsLocalized(key) NSLocalizedString((key), nil)
 
 @implementation SettingsViewController {
     SettingsHostingViewController *_settingsHostingViewController;
@@ -117,7 +118,7 @@ static NSInteger ChannelCountFromAudioConfigSelection(NSInteger selection) {
 
     self.overrideUserInterfaceStyle = UIUserInterfaceStyleLight;
     self.view.backgroundColor = [UIColor clearColor];
-    self.title = @"设置";
+    self.title = SettingsLocalized(@"settings.title");
     UIImage *backImage = nil;
     if (@available(iOS 13.0, *)) {
         UIImageSymbolConfiguration *symbolConfig = [UIImageSymbolConfiguration configurationWithPointSize:18 weight:UIImageSymbolWeightSemibold];
@@ -131,7 +132,7 @@ static NSInteger ChannelCountFromAudioConfigSelection(NSInteger selection) {
                                                                                  action:@selector(closeSettings:)];
     }
     else {
-        self.navigationItem.leftBarButtonItem = [[UIBarButtonItem alloc] initWithTitle:@"返回"
+        self.navigationItem.leftBarButtonItem = [[UIBarButtonItem alloc] initWithTitle:SettingsLocalized(@"common.back")
                                                                                   style:UIBarButtonItemStylePlain
                                                                                  target:self
                                                                                  action:@selector(closeSettings:)];
@@ -147,12 +148,12 @@ static NSInteger ChannelCountFromAudioConfigSelection(NSInteger selection) {
                                                                              style:UIBarButtonItemStylePlain
                                                                             target:self
                                                                             action:@selector(promptResetToDefaults:)];
-        resetButtonItem.accessibilityLabel = @"恢复初始化设置";
-        resetButtonItem.accessibilityHint = @"重置当前设置项";
+        resetButtonItem.accessibilityLabel = SettingsLocalized(@"settings.reset.title");
+        resetButtonItem.accessibilityHint = SettingsLocalized(@"settings.reset.hint");
         self.navigationItem.rightBarButtonItem = resetButtonItem;
     }
     else {
-        self.navigationItem.rightBarButtonItem = [[UIBarButtonItem alloc] initWithTitle:@"重置"
+        self.navigationItem.rightBarButtonItem = [[UIBarButtonItem alloc] initWithTitle:SettingsLocalized(@"settings.reset.button")
                                                                                    style:UIBarButtonItemStylePlain
                                                                                   target:self
                                                                                   action:@selector(promptResetToDefaults:)];
@@ -221,23 +222,23 @@ static NSInteger ChannelCountFromAudioConfigSelection(NSInteger selection) {
 }
 
 - (void)promptResetToDefaults:(id)sender {
-    UIAlertController *alertController = [UIAlertController alertControllerWithTitle:@"恢复初始化设置"
-                                                                             message:@"这会重置当前设置项，但不会删除已配对的设备列表信息。\n\n默认不会清空虚拟按键、虚拟手柄和快捷键数据。"
+    UIAlertController *alertController = [UIAlertController alertControllerWithTitle:SettingsLocalized(@"settings.reset.title")
+                                                                             message:SettingsLocalized(@"settings.reset.message")
                                                                       preferredStyle:UIAlertControllerStyleAlert];
 
-    [alertController addAction:[UIAlertAction actionWithTitle:@"仅重置设置"
+    [alertController addAction:[UIAlertAction actionWithTitle:SettingsLocalized(@"settings.reset.settings_only")
                                                         style:UIAlertActionStyleDefault
                                                       handler:^(UIAlertAction *action) {
         [self resetSettingsToDefaultsClearingCustomData:NO];
     }]];
 
-    [alertController addAction:[UIAlertAction actionWithTitle:@"重置并清空自定义数据"
+    [alertController addAction:[UIAlertAction actionWithTitle:SettingsLocalized(@"settings.reset.clear_custom_data")
                                                         style:UIAlertActionStyleDestructive
                                                       handler:^(UIAlertAction *action) {
         [self resetSettingsToDefaultsClearingCustomData:YES];
     }]];
 
-    [alertController addAction:[UIAlertAction actionWithTitle:@"取消"
+    [alertController addAction:[UIAlertAction actionWithTitle:SettingsLocalized(@"common.cancel")
                                                         style:UIAlertActionStyleCancel
                                                       handler:nil]];
 
@@ -333,13 +334,23 @@ static NSInteger ChannelCountFromAudioConfigSelection(NSInteger selection) {
         snapshot.framerate = 60;
     }
 
-    snapshot.resolutionTitles = @[ @"360p", @"720p", @"1080p", @"2K", @"2K 16:10", @"4K", @"Safe Area", @"全屏", @"自定义" ];
+    snapshot.resolutionTitles = @[
+        @"360p",
+        @"720p",
+        @"1080p",
+        @"2K",
+        @"2K 16:10",
+        @"4K",
+        SettingsLocalized(@"settings.resolution.safe_area"),
+        SettingsLocalized(@"settings.resolution.full_screen"),
+        SettingsLocalized(@"settings.resolution.custom")
+    ];
     NSMutableArray<NSString *> *resolutionDetailTitles = [[NSMutableArray alloc] init];
     for (int i = 0; i < RESOLUTION_TABLE_SIZE; i++) {
         NSInteger width = (NSInteger)resolutionTable[i].width;
         NSInteger height = (NSInteger)resolutionTable[i].height;
         if (i == RESOLUTION_TABLE_CUSTOM_INDEX && (width == 0 || height == 0)) {
-            [resolutionDetailTitles addObject:@"未设置"];
+            [resolutionDetailTitles addObject:SettingsLocalized(@"common.not_set")];
         }
         else {
             [resolutionDetailTitles addObject:[NSString stringWithFormat:@"%ld x %ld", (long)width, (long)height]];
@@ -375,7 +386,7 @@ static NSInteger ChannelCountFromAudioConfigSelection(NSInteger selection) {
         [codecValues addObject:@(CODEC_PREF_AV1)];
     }
 #endif
-    [codecTitles addObject:@"自动"];
+    [codecTitles addObject:SettingsLocalized(@"common.auto")];
     [codecValues addObject:@(CODEC_PREF_AUTO)];
     snapshot.codecTitles = codecTitles;
     snapshot.codecValues = codecValues;
@@ -488,10 +499,10 @@ performanceOverlayPositionSelection:snapshot.performanceOverlayPositionSelection
 }
 
 - (void)settingsHostingViewControllerDidRequestCustomResolution:(SettingsHostingViewController *)controller {
-    UIAlertController *alertController = [UIAlertController alertControllerWithTitle:@"Enter Custom Resolution" message:nil preferredStyle:UIAlertControllerStyleAlert];
+    UIAlertController *alertController = [UIAlertController alertControllerWithTitle:SettingsLocalized(@"settings.custom_resolution.alert_title") message:nil preferredStyle:UIAlertControllerStyleAlert];
 
     [alertController addTextFieldWithConfigurationHandler:^(UITextField *textField) {
-        textField.placeholder = @"Video Width";
+        textField.placeholder = SettingsLocalized(@"settings.custom_resolution.width_placeholder");
         textField.clearButtonMode = UITextFieldViewModeAlways;
         textField.borderStyle = UITextBorderStyleRoundedRect;
         textField.keyboardType = UIKeyboardTypeNumberPad;
@@ -499,14 +510,14 @@ performanceOverlayPositionSelection:snapshot.performanceOverlayPositionSelection
     }];
 
     [alertController addTextFieldWithConfigurationHandler:^(UITextField *textField) {
-        textField.placeholder = @"Video Height";
+        textField.placeholder = SettingsLocalized(@"settings.custom_resolution.height_placeholder");
         textField.clearButtonMode = UITextFieldViewModeAlways;
         textField.borderStyle = UITextBorderStyleRoundedRect;
         textField.keyboardType = UIKeyboardTypeNumberPad;
         textField.text = resolutionTable[RESOLUTION_TABLE_CUSTOM_INDEX].height == 0 ? @"" : [NSString stringWithFormat:@"%d", (int)resolutionTable[RESOLUTION_TABLE_CUSTOM_INDEX].height];
     }];
 
-    [alertController addAction:[UIAlertAction actionWithTitle:@"OK" style:UIAlertActionStyleDefault handler:^(UIAlertAction *action) {
+    [alertController addAction:[UIAlertAction actionWithTitle:SettingsLocalized(@"common.ok") style:UIAlertActionStyleDefault handler:^(UIAlertAction *action) {
         NSArray *textfields = alertController.textFields;
         UITextField *widthField = textfields[0];
         UITextField *heightField = textfields[1];
@@ -535,7 +546,7 @@ performanceOverlayPositionSelection:snapshot.performanceOverlayPositionSelection
         UIAlertController *infoAlert = [UIAlertController alertControllerWithTitle:@"Custom Resolution Selected"
                                                                            message:@"Custom resolutions are not officially supported by GeForce Experience, so it will not set your host display resolution. You will need to set it manually while in game.\n\nResolutions that are not supported by your client or host PC may cause streaming errors."
                                                                     preferredStyle:UIAlertControllerStyleAlert];
-        [infoAlert addAction:[UIAlertAction actionWithTitle:@"OK" style:UIAlertActionStyleDefault handler:nil]];
+        [infoAlert addAction:[UIAlertAction actionWithTitle:SettingsLocalized(@"common.ok") style:UIAlertActionStyleDefault handler:nil]];
         [self presentViewController:infoAlert animated:YES completion:nil];
     }]];
 

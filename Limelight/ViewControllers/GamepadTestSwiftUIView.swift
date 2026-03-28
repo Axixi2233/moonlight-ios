@@ -6,6 +6,15 @@ import CoreHaptics
 import CoreMotion
 import QuartzCore
 import AudioToolbox
+import Darwin
+
+private func GamepadLocalized(_ key: String) -> String {
+    NSLocalizedString(key, comment: "")
+}
+
+private func GamepadLocalizedFormat(_ key: String, _ args: CVarArg...) -> String {
+    String(format: GamepadLocalized(key), locale: Locale.current, arguments: args)
+}
 
 @available(iOS 13.0, *)
 private struct GamepadTrailPoint: Identifiable {
@@ -39,9 +48,9 @@ private struct GamepadPollingAnomalyDetail: Identifiable {
         var title: String {
             switch self {
             case .tooFast:
-                return "偏快"
+                return GamepadLocalized("gamepad.polling.anomaly.fast")
             case .tooSlow:
-                return "偏慢"
+                return GamepadLocalized("gamepad.polling.anomaly.slow")
             }
         }
     }
@@ -49,19 +58,21 @@ private struct GamepadPollingAnomalyDetail: Identifiable {
 
 @available(iOS 13.0, *)
 private final class GamepadTestViewModel: NSObject, ObservableObject {
-    @Published var controllerName: String = "未连接手柄"
-    @Published var connectionDescription: String = "连接手柄后会实时显示按键、摇杆和扳机状态"
+    @Published var controllerName: String = GamepadLocalized("gamepad.status.disconnected")
+    @Published var connectionDescription: String = GamepadLocalized("gamepad.status.connect_hint")
     @Published var profileName: String = "Extended Gamepad"
-    @Published var playerIndexText: String = "未分配"
-    @Published var batteryText: String = "未知"
-    @Published var hapticsText: String = "未检测"
-    @Published var connectionTypeText: String = "未知（系统未公开）"
-    @Published var gyroSupportText: String = "未检测"
-    @Published var inferredControllerTypeText: String = "未识别"
-    @Published var rumbleStatusText: String = "点击开始震动"
+    @Published var playerIndexText: String = GamepadLocalized("gamepad.info.unassigned")
+    @Published var deviceModelText: String = GamepadTestViewModel.currentDeviceModelDescription()
+    @Published var systemVersionText: String = GamepadTestViewModel.currentSystemVersionDescription()
+    @Published var batteryText: String = GamepadLocalized("gamepad.info.unknown")
+    @Published var hapticsText: String = GamepadLocalized("gamepad.info.not_detected")
+    @Published var connectionTypeText: String = GamepadLocalized("gamepad.connection.unknown")
+    @Published var gyroSupportText: String = GamepadLocalized("gamepad.info.not_detected")
+    @Published var inferredControllerTypeText: String = GamepadLocalized("gamepad.info.unrecognized")
+    @Published var rumbleStatusText: String = GamepadLocalized("gamepad.rumble.tap_to_start")
     @Published var isRumbling = false
     @Published var triggerRumbleEnabled = false
-    @Published var pollingStatusText: String = "点击开始，转动左摇杆"
+    @Published var pollingStatusText: String = GamepadLocalized("gamepad.polling.tap_to_start")
     @Published var isPollingTestRunning = false
     @Published var pollingProgressText: String = "0 / 1000"
     @Published var pollingHzText: String = "--"
@@ -74,8 +85,8 @@ private final class GamepadTestViewModel: NSObject, ObservableObject {
     @Published var showStickTrails = false
     @Published var gyroEnabled = false
     @Published var gyroSourceIndex = 0
-    @Published var gyroStatusText: String = "机身体感"
-    @Published var gyroHintText: String = "左右倾斜设备，观察小圆点摆动"
+    @Published var gyroStatusText: String = GamepadLocalized("gamepad.gyro.device")
+    @Published var gyroHintText: String = GamepadLocalized("gamepad.gyro.device_hint")
     @Published var gyroX: Double = 0
     @Published var gyroY: Double = 0
     @Published var gyroZ: Double = 0
@@ -114,6 +125,8 @@ private final class GamepadTestViewModel: NSObject, ObservableObject {
     private var rightHapticEngine: CHHapticEngine?
     private var leftHapticPlayer: CHHapticPatternPlayer?
     private var rightHapticPlayer: CHHapticPatternPlayer?
+    private var leftHapticPlaying = false
+    private var rightHapticPlaying = false
     private var fallbackVibrationTimer: Timer?
     private var stickTrailCleanupTimer: Timer?
     private var leftStickPollingTimestamps: [CFTimeInterval] = []
@@ -186,19 +199,19 @@ private final class GamepadTestViewModel: NSObject, ObservableObject {
             return
         }
 
-        controllerName = controller.vendorName ?? "已连接手柄"
-        connectionDescription = "请按下手柄按键，界面会实时高亮当前输入"
-        profileName = controller.extendedGamepad != nil ? "Extended Gamepad" : "基础手柄"
+        controllerName = controller.vendorName ?? GamepadLocalized("gamepad.status.connected")
+        connectionDescription = GamepadLocalized("gamepad.status.press_buttons_hint")
+        profileName = controller.extendedGamepad != nil ? "Extended Gamepad" : GamepadLocalized("gamepad.info.basic_profile")
         playerIndexText = playerIndexDescription(for: controller.playerIndex)
         batteryText = batteryDescription(for: controller)
         hapticsText = hapticsDescription(for: controller)
         connectionTypeText = inferredConnectionType(for: controller)
         controllerGyroSupported = controllerSupportsGyro(controller)
-        gyroSupportText = controllerGyroSupported ? "支持陀螺仪" : "不支持"
+        gyroSupportText = controllerGyroSupported ? GamepadLocalized("gamepad.info.gyro_supported") : GamepadLocalized("gamepad.info.unsupported")
         inferredControllerTypeText = inferredControllerType(for: controller)
         stopActiveRumble()
         triggerRumbleEnabled = false
-        rumbleStatusText = "点击开始震动"
+        rumbleStatusText = GamepadLocalized("gamepad.rumble.tap_to_start")
         resetPollingTest(resetResult: true)
 
         if let gamepad = controller.extendedGamepad {
@@ -208,23 +221,25 @@ private final class GamepadTestViewModel: NSObject, ObservableObject {
             update(with: gamepad)
         }
         else {
-            connectionDescription = "当前手柄不是扩展手柄类型，部分按键可能无法检测"
+            connectionDescription = GamepadLocalized("gamepad.status.non_extended_warning")
         }
 
         configureGyroMonitoring()
     }
 
     private func resetState() {
-        controllerName = "未连接手柄"
-        connectionDescription = "连接手柄后会实时显示按键、摇杆和扳机状态"
+        controllerName = GamepadLocalized("gamepad.status.disconnected")
+        connectionDescription = GamepadLocalized("gamepad.status.connect_hint")
         profileName = "Extended Gamepad"
-        playerIndexText = "未分配"
-        batteryText = "未知"
-        hapticsText = "未检测"
-        connectionTypeText = "未知（系统未公开）"
-        gyroSupportText = "未检测"
-        inferredControllerTypeText = "未识别"
-        rumbleStatusText = "点击开始震动"
+        playerIndexText = GamepadLocalized("gamepad.info.unassigned")
+        deviceModelText = Self.currentDeviceModelDescription()
+        systemVersionText = Self.currentSystemVersionDescription()
+        batteryText = GamepadLocalized("gamepad.info.unknown")
+        hapticsText = GamepadLocalized("gamepad.info.not_detected")
+        connectionTypeText = GamepadLocalized("gamepad.connection.unknown")
+        gyroSupportText = GamepadLocalized("gamepad.info.not_detected")
+        inferredControllerTypeText = GamepadLocalized("gamepad.info.unrecognized")
+        rumbleStatusText = GamepadLocalized("gamepad.rumble.tap_to_start")
         isRumbling = false
         triggerRumbleEnabled = false
         resetPollingTest(resetResult: true)
@@ -252,12 +267,160 @@ private final class GamepadTestViewModel: NSObject, ObservableObject {
         optionsButton = false
         homeButton = false
         stopActiveRumble()
-        gyroStatusText = gyroSourceIndex == 1 ? "手柄体感" : "机身体感"
-        gyroHintText = "左右倾斜设备，观察小圆点摆动"
+        gyroStatusText = gyroSourceIndex == 1 ? GamepadLocalized("gamepad.gyro.controller") : GamepadLocalized("gamepad.gyro.device")
+        gyroHintText = GamepadLocalized("gamepad.gyro.device_hint")
         gyroX = 0
         gyroY = 0
         gyroZ = 0
         gyroEnabled = false
+    }
+
+    private static func currentDeviceModelDescription() -> String {
+        let machineIdentifier = currentMachineIdentifier()
+        let marketingName = humanReadableDeviceName(for: machineIdentifier)
+
+        guard !machineIdentifier.isEmpty else {
+            return UIDevice.current.model
+        }
+
+        if marketingName == machineIdentifier {
+            return machineIdentifier
+        }
+
+        return "\(marketingName) (\(machineIdentifier))"
+    }
+
+    private static func currentSystemVersionDescription() -> String {
+        let device = UIDevice.current
+        return "\(device.systemName) \(device.systemVersion)"
+    }
+
+    private static func currentMachineIdentifier() -> String {
+        var systemInfo = utsname()
+        uname(&systemInfo)
+        let machine = systemInfo.machine
+
+        let rawIdentifier = withUnsafePointer(to: machine) { pointer in
+            pointer.withMemoryRebound(
+                to: CChar.self,
+                capacity: MemoryLayout.size(ofValue: machine)
+            ) { reboundPointer in
+                String(cString: reboundPointer)
+            }
+        }
+
+        guard rawIdentifier == "i386" || rawIdentifier == "x86_64" || rawIdentifier == "arm64" else {
+            return rawIdentifier
+        }
+
+        return ProcessInfo.processInfo.environment["SIMULATOR_MODEL_IDENTIFIER"] ?? rawIdentifier
+    }
+
+    private static func humanReadableDeviceName(for identifier: String) -> String {
+        switch identifier {
+        case "iPhone10,1", "iPhone10,4":
+            return "iPhone 8"
+        case "iPhone10,2", "iPhone10,5":
+            return "iPhone 8 Plus"
+        case "iPhone10,3", "iPhone10,6":
+            return "iPhone X"
+        case "iPhone11,2":
+            return "iPhone XS"
+        case "iPhone11,4", "iPhone11,6":
+            return "iPhone XS Max"
+        case "iPhone11,8":
+            return "iPhone XR"
+        case "iPhone12,1":
+            return "iPhone 11"
+        case "iPhone12,3":
+            return "iPhone 11 Pro"
+        case "iPhone12,5":
+            return "iPhone 11 Pro Max"
+        case "iPhone12,8":
+            return "iPhone SE (2nd generation)"
+        case "iPhone13,1":
+            return "iPhone 12 mini"
+        case "iPhone13,2":
+            return "iPhone 12"
+        case "iPhone13,3":
+            return "iPhone 12 Pro"
+        case "iPhone13,4":
+            return "iPhone 12 Pro Max"
+        case "iPhone14,4":
+            return "iPhone 13 mini"
+        case "iPhone14,5":
+            return "iPhone 13"
+        case "iPhone14,2":
+            return "iPhone 13 Pro"
+        case "iPhone14,3":
+            return "iPhone 13 Pro Max"
+        case "iPhone14,6":
+            return "iPhone SE (3rd generation)"
+        case "iPhone14,7":
+            return "iPhone 14"
+        case "iPhone14,8":
+            return "iPhone 14 Plus"
+        case "iPhone15,2":
+            return "iPhone 14 Pro"
+        case "iPhone15,3":
+            return "iPhone 14 Pro Max"
+        case "iPhone15,4":
+            return "iPhone 15"
+        case "iPhone15,5":
+            return "iPhone 15 Plus"
+        case "iPhone16,1":
+            return "iPhone 15 Pro"
+        case "iPhone16,2":
+            return "iPhone 15 Pro Max"
+        case "iPhone17,3":
+            return "iPhone 16"
+        case "iPhone17,4":
+            return "iPhone 16 Plus"
+        case "iPhone17,1":
+            return "iPhone 16 Pro"
+        case "iPhone17,2":
+            return "iPhone 16 Pro Max"
+        case "iPad11,6", "iPad11,7":
+            return "iPad (8th generation)"
+        case "iPad12,1", "iPad12,2":
+            return "iPad (9th generation)"
+        case "iPad13,18", "iPad13,19":
+            return "iPad (10th generation)"
+        case "iPad14,8", "iPad14,9":
+            return "iPad Air (11-inch) (M2)"
+        case "iPad14,10", "iPad14,11":
+            return "iPad Air (13-inch) (M2)"
+        case "iPad13,1", "iPad13,2":
+            return "iPad Air (4th generation)"
+        case "iPad13,16", "iPad13,17":
+            return "iPad Air (5th generation)"
+        case "iPad14,1", "iPad14,2":
+            return "iPad mini (6th generation)"
+        case "iPad8,1", "iPad8,2", "iPad8,3", "iPad8,4":
+            return "iPad Pro (11-inch)"
+        case "iPad8,9", "iPad8,10":
+            return "iPad Pro (11-inch) (2nd generation)"
+        case "iPad13,4", "iPad13,5", "iPad13,6", "iPad13,7":
+            return "iPad Pro (11-inch) (3rd generation)"
+        case "iPad14,3", "iPad14,4":
+            return "iPad Pro (11-inch) (4th generation)"
+        case "iPad16,3", "iPad16,4":
+            return "iPad Pro (11-inch) (M4)"
+        case "iPad8,5", "iPad8,6", "iPad8,7", "iPad8,8":
+            return "iPad Pro (12.9-inch) (3rd generation)"
+        case "iPad8,11", "iPad8,12":
+            return "iPad Pro (12.9-inch) (4th generation)"
+        case "iPad13,8", "iPad13,9", "iPad13,10", "iPad13,11":
+            return "iPad Pro (12.9-inch) (5th generation)"
+        case "iPad14,5", "iPad14,6":
+            return "iPad Pro (12.9-inch) (6th generation)"
+        case "iPad16,5", "iPad16,6":
+            return "iPad Pro (13-inch) (M4)"
+        case "iPod9,1":
+            return "iPod touch (7th generation)"
+        default:
+            return identifier
+        }
     }
 
     private func controllerSupportsGyro(_ controller: GCController?) -> Bool {
@@ -281,8 +444,8 @@ private final class GamepadTestViewModel: NSObject, ObservableObject {
     private func configureGyroMonitoring() {
         stopGyroMonitoring()
         guard gyroEnabled else {
-            gyroStatusText = gyroSourceIndex == 1 ? "手柄体感" : "机身体感"
-            gyroHintText = "开启体感测试后显示实时数据"
+            gyroStatusText = gyroSourceIndex == 1 ? GamepadLocalized("gamepad.gyro.controller") : GamepadLocalized("gamepad.gyro.device")
+            gyroHintText = GamepadLocalized("gamepad.gyro.enable_hint")
             gyroX = 0
             gyroY = 0
             gyroZ = 0
@@ -378,17 +541,17 @@ private final class GamepadTestViewModel: NSObject, ObservableObject {
     }
 
     private func startDeviceGyroMonitoring() {
-        gyroStatusText = "机身体感"
+        gyroStatusText = GamepadLocalized("gamepad.gyro.device")
 
         guard deviceMotionManager.isGyroAvailable else {
-            gyroHintText = "当前设备不支持机身陀螺仪"
+            gyroHintText = GamepadLocalized("gamepad.gyro.device_unsupported")
             gyroX = 0
             gyroY = 0
             gyroZ = 0
             return
         }
 
-        gyroHintText = "左右倾斜设备，观察小圆点摆动"
+        gyroHintText = GamepadLocalized("gamepad.gyro.device_hint")
         deviceMotionManager.gyroUpdateInterval = 1.0 / 60.0
         deviceMotionManager.startGyroUpdates(to: .main) { [weak self] data, _ in
             guard let self, let rotationRate = data?.rotationRate else { return }
@@ -399,17 +562,17 @@ private final class GamepadTestViewModel: NSObject, ObservableObject {
     }
 
     private func startControllerGyroMonitoring() {
-        gyroStatusText = "手柄体感"
+        gyroStatusText = GamepadLocalized("gamepad.gyro.controller")
 
         guard let motion = currentController?.motion, controllerSupportsGyro(currentController) else {
-            gyroHintText = "当前手柄不支持陀螺仪"
+            gyroHintText = GamepadLocalized("gamepad.gyro.controller_unsupported")
             gyroX = 0
             gyroY = 0
             gyroZ = 0
             return
         }
 
-        gyroHintText = "转动手柄，观察小圆点摆动"
+        gyroHintText = GamepadLocalized("gamepad.gyro.controller_hint")
 
         if #available(iOS 14.0, *) {
             if motion.sensorsRequireManualActivation {
@@ -435,7 +598,7 @@ private final class GamepadTestViewModel: NSObject, ObservableObject {
         isPollingTestRunning = false
         leftStickPollingTimestamps.removeAll()
         pollingProgressText = "0 / \(pollingTargetCount)"
-        pollingStatusText = "点击开始，转动左摇杆"
+        pollingStatusText = GamepadLocalized("gamepad.polling.tap_to_start")
         pollingAnomalyDetails = []
         isShowingPollingAnomalySheet = false
         lastPolledLeftStickX = leftStickX
@@ -453,7 +616,7 @@ private final class GamepadTestViewModel: NSObject, ObservableObject {
     private func playerIndexDescription(for playerIndex: GCControllerPlayerIndex) -> String {
         switch playerIndex {
         case .indexUnset:
-            return "未分配"
+            return GamepadLocalized("gamepad.info.unassigned")
         case .index1:
             return "Player 1"
         case .index2:
@@ -463,7 +626,7 @@ private final class GamepadTestViewModel: NSObject, ObservableObject {
         case .index4:
             return "Player 4"
         @unknown default:
-            return "未知"
+            return GamepadLocalized("gamepad.info.unknown")
         }
     }
 
@@ -472,65 +635,65 @@ private final class GamepadTestViewModel: NSObject, ObservableObject {
             let level = Int((battery.batteryLevel * 100).rounded())
             switch battery.batteryState {
             case .charging:
-                return "\(level)% 充电中"
+                return GamepadLocalizedFormat("gamepad.battery.charging", level)
             case .discharging:
                 return "\(level)%"
             case .full:
-                return "100% 已充满"
+                return GamepadLocalized("gamepad.battery.full")
             case .unknown:
-                return "未知"
+                return GamepadLocalized("gamepad.info.unknown")
             @unknown default:
-                return "未知"
+                return GamepadLocalized("gamepad.info.unknown")
             }
         }
 
-        return "不支持"
+        return GamepadLocalized("gamepad.info.unsupported")
     }
 
     private func hapticsDescription(for controller: GCController) -> String {
         if #available(iOS 14.0, *), let haptics = controller.haptics {
             let localities = haptics.supportedLocalities
             if localities.contains(GCHapticsLocality.rightHandle) || localities.contains(GCHapticsLocality.leftHandle) {
-                return "支持手柄震动"
+                return GamepadLocalized("gamepad.haptics.supported")
             }
-            return "支持有限"
+            return GamepadLocalized("gamepad.haptics.limited")
         }
 
-        return "不支持"
+        return GamepadLocalized("gamepad.info.unsupported")
     }
 
     private func inferredControllerType(for controller: GCController) -> String {
         let vendor = (controller.vendorName ?? "").lowercased()
 
         if vendor.contains("xbox") {
-            return "Xbox 类手柄"
+            return GamepadLocalized("gamepad.type.xbox")
         }
-        if vendor.contains("dualsense") || vendor.contains("dualshock") || vendor.contains("playstation") || vendor.contains("ps5") || vendor.contains("ps4") {
-            return "PlayStation 类手柄"
+        if vendor.contains("dualsense") || vendor.contains("wireless controller") || vendor.contains("dualshock") || vendor.contains("playstation") || vendor.contains("ps5") || vendor.contains("ps4") {
+            return GamepadLocalized("gamepad.type.playstation")
         }
         if vendor.contains("switch") || vendor.contains("joy-con") || vendor.contains("pro controller") {
-            return "Switch 类手柄"
+            return GamepadLocalized("gamepad.type.switch")
         }
         if vendor.contains("8bitdo") {
-            return "8BitDo 手柄"
+            return GamepadLocalized("gamepad.type.8bitdo")
         }
         if vendor.contains("gamesir") {
-            return "GameSir 手柄"
+            return GamepadLocalized("gamepad.type.gamesir")
         }
         if vendor.contains("razer") {
-            return "Razer 手柄"
+            return GamepadLocalized("gamepad.type.razer")
         }
         if controller.extendedGamepad != nil {
-            return "通用扩展手柄"
+            return GamepadLocalized("gamepad.type.generic_extended")
         }
-        return "通用手柄"
+        return GamepadLocalized("gamepad.type.generic")
     }
 
     private func inferredConnectionType(for controller: GCController) -> String {
         if controller.isAttachedToDevice {
-            return "贴附/直连设备"
+            return GamepadLocalized("gamepad.connection.attached")
         }
-        return "外接手柄（蓝牙/USB 未公开）"
+        return GamepadLocalized("gamepad.connection.external")
     }
 
     private func stopActiveRumble() {
@@ -542,9 +705,11 @@ private final class GamepadTestViewModel: NSObject, ObservableObject {
         rightHapticEngine?.stop(completionHandler: nil)
         leftHapticEngine = nil
         rightHapticEngine = nil
+        leftHapticPlaying = false
+        rightHapticPlaying = false
         fallbackVibrationTimer?.invalidate()
         fallbackVibrationTimer = nil
-        isRumbling = false
+        refreshRumbleState()
     }
 
     private func startContinuousDeviceVibration() {
@@ -553,48 +718,145 @@ private final class GamepadTestViewModel: NSObject, ObservableObject {
         fallbackVibrationTimer = Timer.scheduledTimer(withTimeInterval: 0.75, repeats: true) { _ in
             AudioServicesPlaySystemSound(kSystemSoundID_Vibrate)
         }
-        isRumbling = true
+        refreshRumbleState()
     }
 
     @available(iOS 14.0, *)
-    private func startContinuousRumble(for localities: [GCHapticsLocality]) -> Bool {
-        if #available(iOS 14.0, *), let controller = currentController, let haptics = controller.haptics {
-            let supportedLocalities = haptics.supportedLocalities
-            var startedAny = false
+    private func stopRumble(for locality: GCHapticsLocality) {
+        if locality == .leftHandle {
+            try? leftHapticPlayer?.stop(atTime: 0)
+            leftHapticPlayer = nil
+            leftHapticEngine?.stop(completionHandler: nil)
+            leftHapticEngine = nil
+            leftHapticPlaying = false
+        }
+        else if locality == .rightHandle {
+            try? rightHapticPlayer?.stop(atTime: 0)
+            rightHapticPlayer = nil
+            rightHapticEngine?.stop(completionHandler: nil)
+            rightHapticEngine = nil
+            rightHapticPlaying = false
+        }
+    }
 
-            for locality in localities where supportedLocalities.contains(locality) {
-                do {
-                    guard let engine = haptics.createEngine(withLocality: locality) else {
-                        continue
+    private func refreshRumbleState() {
+        isRumbling = leftHapticPlayer != nil || rightHapticPlayer != nil || fallbackVibrationTimer != nil
+    }
+
+    @available(iOS 14.0, *)
+    private func normalizedTriggerIntensity(_ value: Double) -> Float {
+        let deadZone = 0.08
+        guard value > deadZone else {
+            return 0
+        }
+
+        let normalized = (value - deadZone) / (1.0 - deadZone)
+        return Float(min(max(normalized, 0), 1))
+    }
+
+    @available(iOS 14.0, *)
+    private func setContinuousRumbleIntensity(_ intensity: Float, for locality: GCHapticsLocality) -> Bool {
+        let clampedIntensity = min(max(intensity, 0), 1)
+
+        guard let controller = currentController, let haptics = controller.haptics else {
+            return false
+        }
+        guard haptics.supportedLocalities.contains(locality) else {
+            return false
+        }
+
+        if clampedIntensity <= 0.001 {
+            stopRumble(for: locality)
+            refreshRumbleState()
+            return true
+        }
+
+        do {
+            let engine: CHHapticEngine
+            let player: CHHapticPatternPlayer
+
+            switch locality {
+            case .leftHandle:
+                if let existingEngine = leftHapticEngine, let existingPlayer = leftHapticPlayer {
+                    engine = existingEngine
+                    player = existingPlayer
+                }
+                else {
+                    guard let newEngine = haptics.createEngine(withLocality: locality) else {
+                        return false
                     }
-                    try engine.start()
-
-                    let intensity = CHHapticEventParameter(parameterID: .hapticIntensity, value: 0.75)
+                    try newEngine.start()
+                    let baseIntensity = CHHapticEventParameter(parameterID: .hapticIntensity, value: 1.0)
                     let sharpness = CHHapticEventParameter(parameterID: .hapticSharpness, value: 0.35)
-                    let event = CHHapticEvent(eventType: .hapticContinuous, parameters: [intensity, sharpness], relativeTime: 0, duration: 60)
+                    let event = CHHapticEvent(eventType: .hapticContinuous, parameters: [baseIntensity, sharpness], relativeTime: 0, duration: 60)
                     let pattern = try CHHapticPattern(events: [event], parameters: [])
-                    let player = try engine.makePlayer(with: pattern)
+                    let newPlayer = try newEngine.makePlayer(with: pattern)
+                    leftHapticEngine = newEngine
+                    leftHapticPlayer = newPlayer
+                    leftHapticPlaying = false
+                    engine = newEngine
+                    player = newPlayer
+                }
+            case .rightHandle:
+                if let existingEngine = rightHapticEngine, let existingPlayer = rightHapticPlayer {
+                    engine = existingEngine
+                    player = existingPlayer
+                }
+                else {
+                    guard let newEngine = haptics.createEngine(withLocality: locality) else {
+                        return false
+                    }
+                    try newEngine.start()
+                    let baseIntensity = CHHapticEventParameter(parameterID: .hapticIntensity, value: 1.0)
+                    let sharpness = CHHapticEventParameter(parameterID: .hapticSharpness, value: 0.35)
+                    let event = CHHapticEvent(eventType: .hapticContinuous, parameters: [baseIntensity, sharpness], relativeTime: 0, duration: 60)
+                    let pattern = try CHHapticPattern(events: [event], parameters: [])
+                    let newPlayer = try newEngine.makePlayer(with: pattern)
+                    rightHapticEngine = newEngine
+                    rightHapticPlayer = newPlayer
+                    rightHapticPlaying = false
+                    engine = newEngine
+                    player = newPlayer
+                }
+            default:
+                return false
+            }
+
+            let dynamicIntensity = CHHapticDynamicParameter(parameterID: .hapticIntensityControl, value: clampedIntensity, relativeTime: 0)
+            try player.sendParameters([dynamicIntensity], atTime: CHHapticTimeImmediate)
+            if locality == .leftHandle {
+                if leftHapticPlaying == false {
                     try player.start(atTime: 0)
-
-                    if locality == .leftHandle {
-                        leftHapticEngine = engine
-                        leftHapticPlayer = player
-                    }
-                    else if locality == .rightHandle {
-                        rightHapticEngine = engine
-                        rightHapticPlayer = player
-                    }
-                    startedAny = true
-                }
-                catch {
-                    continue
+                    leftHapticPlaying = true
                 }
             }
-
-            if startedAny {
-                isRumbling = true
-                return true
+            else if locality == .rightHandle {
+                if rightHapticPlaying == false {
+                    try player.start(atTime: 0)
+                    rightHapticPlaying = true
+                }
             }
+            refreshRumbleState()
+            return true
+        }
+        catch {
+            stopRumble(for: locality)
+            refreshRumbleState()
+            return false
+        }
+    }
+
+    @available(iOS 14.0, *)
+    private func startContinuousRumble(for localities: [GCHapticsLocality], intensity: Float = 0.75) -> Bool {
+        var startedAny = false
+        for locality in localities {
+            if setContinuousRumbleIntensity(intensity, for: locality) {
+                startedAny = true
+            }
+        }
+
+        if startedAny {
+            return true
         }
 
         let impactGenerator = UIImpactFeedbackGenerator(style: .medium)
@@ -606,30 +868,26 @@ private final class GamepadTestViewModel: NSObject, ObservableObject {
     @available(iOS 14.0, *)
     private func syncTriggerDrivenRumble() {
         guard triggerRumbleEnabled else { return }
-        let shouldRumbleLeft = leftTrigger > 0.08
-        let shouldRumbleRight = rightTrigger > 0.08
+        let leftIntensity = normalizedTriggerIntensity(leftTrigger)
+        let rightIntensity = normalizedTriggerIntensity(rightTrigger)
 
-        stopActiveRumble()
-
-        var localities: [GCHapticsLocality] = []
-        if shouldRumbleLeft {
-            localities.append(.leftHandle)
-        }
-        if shouldRumbleRight {
-            localities.append(.rightHandle)
-        }
-
-        if localities.isEmpty {
-            rumbleStatusText = "扳机联动震动已开启"
+        if leftIntensity <= 0.001 && rightIntensity <= 0.001 {
+            stopRumble(for: .leftHandle)
+            stopRumble(for: .rightHandle)
+            refreshRumbleState()
+            rumbleStatusText = GamepadLocalized("gamepad.rumble.trigger_enabled")
             return
         }
 
-        if startContinuousRumble(for: localities) {
-            rumbleStatusText = "扳机按下，震动中"
+        let leftUpdated = setContinuousRumbleIntensity(leftIntensity, for: .leftHandle)
+        let rightUpdated = setContinuousRumbleIntensity(rightIntensity, for: .rightHandle)
+
+        if leftUpdated || rightUpdated {
+            rumbleStatusText = GamepadLocalized("gamepad.rumble.trigger_running")
         }
         else {
             stopActiveRumble()
-            rumbleStatusText = "当前手柄不支持持续震动"
+            rumbleStatusText = GamepadLocalized("gamepad.rumble.continuous_unsupported")
             triggerRumbleEnabled = false
         }
     }
@@ -638,16 +896,16 @@ private final class GamepadTestViewModel: NSObject, ObservableObject {
         triggerRumbleEnabled = false
         if isRumbling {
             stopActiveRumble()
-            rumbleStatusText = "震动已停止"
+            rumbleStatusText = GamepadLocalized("gamepad.rumble.stopped")
             return
         }
 
         if #available(iOS 14.0, *), startContinuousRumble(for: [.leftHandle, .rightHandle]) {
-            rumbleStatusText = "震动进行中"
+            rumbleStatusText = GamepadLocalized("gamepad.rumble.running")
         }
         else {
             startContinuousDeviceVibration()
-            rumbleStatusText = "当前手柄不支持持续震动，已切换为设备震动"
+            rumbleStatusText = GamepadLocalized("gamepad.rumble.fallback_device")
         }
     }
 
@@ -657,26 +915,26 @@ private final class GamepadTestViewModel: NSObject, ObservableObject {
             if isRumbling {
                 stopActiveRumble()
             }
-            rumbleStatusText = "点击开始震动"
+            rumbleStatusText = GamepadLocalized("gamepad.rumble.tap_to_start")
             return
         }
 
         if #available(iOS 14.0, *) {
             syncTriggerDrivenRumble()
             if !isRumbling {
-                rumbleStatusText = "扣动扳机后震动"
+                rumbleStatusText = GamepadLocalized("gamepad.rumble.after_trigger")
             }
         }
         else {
             triggerRumbleEnabled = false
-            rumbleStatusText = "当前系统不支持扳机联动震动"
+            rumbleStatusText = GamepadLocalized("gamepad.rumble.system_unsupported")
         }
     }
 
     func togglePollingTest() {
         if isPollingTestRunning {
             resetPollingTest(resetResult: false)
-            pollingStatusText = "测试已停止"
+            pollingStatusText = GamepadLocalized("gamepad.polling.stopped")
             return
         }
 
@@ -719,10 +977,10 @@ private final class GamepadTestViewModel: NSObject, ObservableObject {
 
     private func pollingRunningStatusText(currentIntervalMs: Double?) -> String {
         guard let currentIntervalMs = currentIntervalMs else {
-            return "测试中，请持续转动左摇杆！当前延迟 -- ms"
+            return GamepadLocalized("gamepad.polling.running_pending")
         }
 
-        return String(format: "测试中，请持续转动左摇杆！当前延迟 %.2f ms", currentIntervalMs)
+        return GamepadLocalizedFormat("gamepad.polling.running", currentIntervalMs)
     }
 
     private func finalizePollingTest() {
@@ -733,7 +991,7 @@ private final class GamepadTestViewModel: NSObject, ObservableObject {
         }.filter { $0 > 0 }
 
         guard !intervals.isEmpty else {
-            pollingStatusText = "数据不足，请重新测试"
+            pollingStatusText = GamepadLocalized("gamepad.polling.insufficient_data")
             pollingHzText = "--"
             pollingMinText = "--"
             pollingMaxText = "--"
@@ -767,7 +1025,7 @@ private final class GamepadTestViewModel: NSObject, ObservableObject {
         }
         let hz = averageInterval > 0 ? 1.0 / averageInterval : 0
 
-        pollingStatusText = "测试完成"
+        pollingStatusText = GamepadLocalized("gamepad.polling.completed")
         pollingHzText = String(format: "%.1f Hz", hz)
         pollingMinText = String(format: "%.2f ms", minimumInterval * 1000)
         pollingMaxText = String(format: "%.2f ms", maximumInterval * 1000)
@@ -789,7 +1047,7 @@ private final class GamepadTestViewModel: NSObject, ObservableObject {
             self.batteryText = self.batteryDescription(for: controller)
             self.hapticsText = self.hapticsDescription(for: controller)
             self.connectionTypeText = self.inferredConnectionType(for: controller)
-            self.gyroSupportText = self.controllerSupportsGyro(controller) ? "支持陀螺仪" : "不支持"
+            self.gyroSupportText = self.controllerSupportsGyro(controller) ? GamepadLocalized("gamepad.info.gyro_supported") : GamepadLocalized("gamepad.info.unsupported")
             self.inferredControllerTypeText = self.inferredControllerType(for: controller)
 
             self.leftStickX = Double(gamepad.leftThumbstick.xAxis.value)
@@ -927,18 +1185,37 @@ private struct GamepadDeviceInfoCard: View {
     var body: some View {
         GamepadCard {
             VStack(alignment: .leading, spacing: 10) {
-                Text("设备信息")
+                Text(GamepadLocalized("gamepad.card.device_info"))
                     .font(.system(size: 16, weight: .bold))
                     .foregroundColor(Color(red: 0.29, green: 0.22, blue: 0.42))
 
-                GamepadInfoRow(title: "设备名称", value: vendor)
-                GamepadInfoRow(title: "手柄配置", value: profile)
-                GamepadInfoRow(title: "玩家编号", value: playerIndex)
-                GamepadInfoRow(title: "连接方式", value: connectionType)
-                GamepadInfoRow(title: "电量", value: battery)
-                GamepadInfoRow(title: "震动支持", value: haptics)
-                GamepadInfoRow(title: "陀螺仪支持", value: gyroSupport)
-                GamepadInfoRow(title: "手柄类型", value: inferredControllerType)
+                GamepadInfoRow(title: GamepadLocalized("gamepad.info.name"), value: vendor)
+                GamepadInfoRow(title: GamepadLocalized("gamepad.info.profile"), value: profile)
+                GamepadInfoRow(title: GamepadLocalized("gamepad.info.player"), value: playerIndex)
+                GamepadInfoRow(title: GamepadLocalized("gamepad.info.connection"), value: connectionType)
+                GamepadInfoRow(title: GamepadLocalized("gamepad.info.battery"), value: battery)
+                GamepadInfoRow(title: GamepadLocalized("gamepad.info.haptics"), value: haptics)
+                GamepadInfoRow(title: GamepadLocalized("gamepad.info.gyro"), value: gyroSupport)
+                GamepadInfoRow(title: GamepadLocalized("gamepad.info.type"), value: inferredControllerType)
+            }
+        }
+    }
+}
+
+@available(iOS 13.0, *)
+private struct GamepadCurrentDeviceCard: View {
+    let deviceModel: String
+    let systemVersion: String
+
+    var body: some View {
+        GamepadCard {
+            VStack(alignment: .leading, spacing: 10) {
+                Text(GamepadLocalized("gamepad.card.current_device"))
+                    .font(.system(size: 16, weight: .bold))
+                    .foregroundColor(Color(red: 0.29, green: 0.22, blue: 0.42))
+
+                GamepadInfoRow(title: GamepadLocalized("gamepad.info.device_model"), value: deviceModel)
+                GamepadInfoRow(title: GamepadLocalized("gamepad.info.system_version"), value: systemVersion)
             }
         }
     }
@@ -955,7 +1232,7 @@ private struct GamepadRumbleTestCard: View {
     var body: some View {
         GamepadCard {
             VStack(alignment: .leading, spacing: 12) {
-                Text("震动测试")
+                Text(GamepadLocalized("gamepad.card.rumble_test"))
                     .font(.system(size: 16, weight: .bold))
                     .foregroundColor(Color(red: 0.29, green: 0.22, blue: 0.42))
 
@@ -967,7 +1244,7 @@ private struct GamepadRumbleTestCard: View {
                     HStack(spacing: 10) {
                         Image(systemName: "wave.3.right.circle.fill")
                             .font(.system(size: 18, weight: .semibold))
-                        Text(isRumbling ? "停止震动" : "开始震动")
+                        Text(isRumbling ? GamepadLocalized("gamepad.rumble.stop") : GamepadLocalized("gamepad.rumble.start"))
                             .font(.system(size: 15, weight: .semibold))
                     }
                     .foregroundColor(.white)
@@ -984,7 +1261,7 @@ private struct GamepadRumbleTestCard: View {
                 }, set: { newValue in
                     onTriggerModeChanged(newValue)
                 })) {
-                    Text("扣动扳机后震动")
+                    Text(GamepadLocalized("gamepad.rumble.after_trigger_toggle"))
                         .font(.system(size: 13, weight: .semibold))
                         .foregroundColor(Color(red: 0.29, green: 0.22, blue: 0.42))
                 }
@@ -1063,7 +1340,7 @@ private struct GamepadGyroTestCard: View {
     var body: some View {
         GamepadCard {
             VStack(alignment: .leading, spacing: 12) {
-                Text("体感测试")
+                Text(GamepadLocalized("gamepad.card.gyro_test"))
                     .font(.system(size: 16, weight: .bold))
                     .foregroundColor(Color(red: 0.29, green: 0.22, blue: 0.42))
 
@@ -1072,7 +1349,7 @@ private struct GamepadGyroTestCard: View {
                 }, set: { newValue in
                     onEnabledChanged(newValue)
                 })) {
-                    Text("启用体感测试")
+                    Text(GamepadLocalized("gamepad.gyro.enable_toggle"))
                         .font(.system(size: 13, weight: .semibold))
                         .foregroundColor(Color(red: 0.29, green: 0.22, blue: 0.42))
                 }
@@ -1082,8 +1359,8 @@ private struct GamepadGyroTestCard: View {
                 }, set: { newValue in
                     onSourceChanged(newValue)
                 })) {
-                    Text("机身体感").tag(0)
-                    Text("手柄体感").tag(1)
+                    Text(GamepadLocalized("gamepad.gyro.device")).tag(0)
+                    Text(GamepadLocalized("gamepad.gyro.controller")).tag(1)
                 }
                 .pickerStyle(SegmentedPickerStyle())
 
@@ -1091,23 +1368,23 @@ private struct GamepadGyroTestCard: View {
                     .font(.system(size: 13, weight: .semibold))
                     .foregroundColor(Color(red: 0.29, green: 0.22, blue: 0.42))
 
-                Text(controllerGyroSupported || selectedSourceIndex == 0 ? hintText : "当前手柄不支持陀螺仪")
+                Text(controllerGyroSupported || selectedSourceIndex == 0 ? hintText : GamepadLocalized("gamepad.gyro.controller_unsupported"))
                     .font(.system(size: 12, weight: .medium))
                     .foregroundColor(Color(red: 0.43, green: 0.35, blue: 0.60))
 
                 if isEnabled {
                     GamepadGyroMeterRow(
-                        title: "X轴角速度",
+                        title: GamepadLocalized("gamepad.gyro.axis_x"),
                         value: x,
                         tint: Color(red: 0.46, green: 0.52, blue: 0.95)
                     )
                     GamepadGyroMeterRow(
-                        title: "Y轴角速度",
+                        title: GamepadLocalized("gamepad.gyro.axis_y"),
                         value: y,
                         tint: Color(red: 0.39, green: 0.78, blue: 0.69)
                     )
                     GamepadGyroMeterRow(
-                        title: "Z轴角速度",
+                        title: GamepadLocalized("gamepad.gyro.axis_z"),
                         value: z,
                         tint: Color(red: 0.93, green: 0.65, blue: 0.24)
                     )
@@ -1172,7 +1449,7 @@ private struct GamepadPollingTestCard: View {
     var body: some View {
         GamepadCard {
             VStack(alignment: .leading, spacing: 12) {
-                Text("摇杆轮询率测试")
+                Text(GamepadLocalized("gamepad.card.polling_test"))
                     .font(.system(size: 16, weight: .bold))
                     .foregroundColor(Color(red: 0.29, green: 0.22, blue: 0.42))
 
@@ -1181,7 +1458,7 @@ private struct GamepadPollingTestCard: View {
                     .foregroundColor(Color(red: 0.43, green: 0.35, blue: 0.60))
 
                 VStack(spacing: 4) {
-                    Text("轮询率")
+                    Text(GamepadLocalized("gamepad.polling.rate"))
                         .font(.system(size: 12, weight: .semibold))
                         .foregroundColor(Color(red: 0.43, green: 0.35, blue: 0.60))
 
@@ -1202,16 +1479,16 @@ private struct GamepadPollingTestCard: View {
                         .stroke(Color.white.opacity(0.80), lineWidth: 1)
                 )
 
-                GamepadPollingStatRow(title: "采样进度", value: progressText)
-                GamepadPollingStatRow(title: "最小值", value: minText)
-                GamepadPollingStatRow(title: "最大值", value: maxText)
-                GamepadPollingStatRow(title: "平均值", value: avgText)
-                GamepadPollingStatRow(title: "异常值数量",
+                GamepadPollingStatRow(title: GamepadLocalized("gamepad.polling.progress"), value: progressText)
+                GamepadPollingStatRow(title: GamepadLocalized("gamepad.polling.min"), value: minText)
+                GamepadPollingStatRow(title: GamepadLocalized("gamepad.polling.max"), value: maxText)
+                GamepadPollingStatRow(title: GamepadLocalized("gamepad.polling.avg"), value: avgText)
+                GamepadPollingStatRow(title: GamepadLocalized("gamepad.polling.anomaly_count"),
                                       value: anomalyCountText,
                                       isInteractive: hasAnomalyDetails,
                                       action: hasAnomalyDetails ? onShowAnomalies : nil)
 
-                Text("异常值按当前平均间隔统计：大于 2.5 倍平均值或小于 0.4 倍平均值。蓝牙抖动、系统调度和快速变向都可能让数量偏多。")
+                Text(GamepadLocalized("gamepad.polling.anomaly_hint"))
                     .font(.system(size: 11, weight: .medium))
                     .foregroundColor(Color(red: 0.43, green: 0.35, blue: 0.60))
                     .fixedSize(horizontal: false, vertical: true)
@@ -1220,7 +1497,7 @@ private struct GamepadPollingTestCard: View {
                     HStack(spacing: 10) {
                         Image(systemName: "waveform.path.ecg.rectangle")
                             .font(.system(size: 18, weight: .semibold))
-                        Text(isRunning ? "停止测试" : "开始测试")
+                        Text(isRunning ? GamepadLocalized("gamepad.polling.stop") : GamepadLocalized("gamepad.polling.start"))
                             .font(.system(size: 15, weight: .semibold))
                     }
                     .foregroundColor(.white)
@@ -1249,7 +1526,7 @@ private struct GamepadPollingAnomalySheet: View {
                         Image(systemName: "checkmark.circle")
                             .font(.system(size: 28, weight: .semibold))
                             .foregroundColor(Color(red: 0.39, green: 0.78, blue: 0.69))
-                        Text("当前没有异常值")
+                        Text(GamepadLocalized("gamepad.polling.no_anomalies"))
                             .font(.system(size: 16, weight: .semibold))
                             .foregroundColor(Color(red: 0.29, green: 0.22, blue: 0.42))
                     }
@@ -1259,7 +1536,7 @@ private struct GamepadPollingAnomalySheet: View {
                     List(anomalyDetails) { detail in
                         VStack(alignment: .leading, spacing: 6) {
                             HStack(spacing: 8) {
-                                Text("样本 #\(detail.sampleIndex)")
+                                Text(GamepadLocalizedFormat("gamepad.polling.sample", detail.sampleIndex))
                                     .font(.system(size: 14, weight: .semibold))
                                     .foregroundColor(Color(red: 0.29, green: 0.22, blue: 0.42))
 
@@ -1274,7 +1551,7 @@ private struct GamepadPollingAnomalySheet: View {
                                     )
                             }
 
-                            Text(String(format: "间隔 %.2f ms，平均 %.2f ms", detail.intervalMs, detail.averageMs))
+                            Text(GamepadLocalizedFormat("gamepad.polling.interval_average", detail.intervalMs, detail.averageMs))
                                 .font(.system(size: 12, weight: .medium))
                                 .foregroundColor(Color(red: 0.43, green: 0.35, blue: 0.60))
                         }
@@ -1283,8 +1560,8 @@ private struct GamepadPollingAnomalySheet: View {
                     .listStyle(GroupedListStyle())
                 }
             }
-            .navigationBarTitle("异常值详情", displayMode: .inline)
-            .navigationBarItems(trailing: Button("完成") {
+            .navigationBarTitle(Text(GamepadLocalized("gamepad.polling.details_title")), displayMode: .inline)
+            .navigationBarItems(trailing: Button(GamepadLocalized("common.done")) {
                 presentationMode.wrappedValue.dismiss()
             })
         }
@@ -1497,7 +1774,7 @@ private struct GamepadVisualizationCard: View {
     var body: some View {
         GamepadCard {
             VStack(alignment: .leading, spacing: 12) {
-                Text("手柄 UI可视化")
+                Text(GamepadLocalized("gamepad.card.visualization"))
                     .font(.system(size: 16, weight: .bold))
                     .foregroundColor(Color(red: 0.29, green: 0.22, blue: 0.42))
 
@@ -1506,7 +1783,7 @@ private struct GamepadVisualizationCard: View {
                 }, set: { newValue in
                     onShowStickTrailsChanged(newValue)
                 })) {
-                    Text("显示摇杆轨迹")
+                    Text(GamepadLocalized("gamepad.visualization.show_trails"))
                         .font(.system(size: 13, weight: .semibold))
                         .foregroundColor(Color(red: 0.29, green: 0.22, blue: 0.42))
                 }
@@ -1641,7 +1918,7 @@ private struct GamepadControllerLayoutCard: View {
 
                 HStack(alignment: .top, spacing: compact ? 8 : 14) {
                     GamepadStickView(
-                        title: "左摇杆",
+                        title: GamepadLocalized("gamepad.stick.left"),
                         x: model.leftStickX,
                         y: model.leftStickY,
                         isPressed: model.leftThumbstickButton,
@@ -1650,7 +1927,7 @@ private struct GamepadControllerLayoutCard: View {
                     )
 
                     GamepadStickView(
-                        title: "右摇杆",
+                        title: GamepadLocalized("gamepad.stick.right"),
                         x: model.rightStickX,
                         y: model.rightStickY,
                         isPressed: model.rightThumbstickButton,
@@ -1674,6 +1951,11 @@ private struct GamepadTestRootView: View {
             ScrollView(showsIndicators: false) {
                 VStack(spacing: 16) {
                     GamepadStatusCard(title: model.controllerName, subtitle: model.connectionDescription)
+
+                    GamepadCurrentDeviceCard(
+                        deviceModel: model.deviceModelText,
+                        systemVersion: model.systemVersionText
+                    )
 
                     GamepadDeviceInfoCard(
                         vendor: model.controllerName,
@@ -1766,7 +2048,7 @@ final class GamepadTestHostingViewController: UIViewController {
     override func viewDidLoad() {
         super.viewDidLoad()
         view.backgroundColor = .clear
-        title = "手柄测试"
+        title = GamepadLocalized("gamepad.title")
         installHostingControllerIfNeeded()
         applyNavigationBarAppearance()
     }

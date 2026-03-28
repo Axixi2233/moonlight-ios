@@ -2,6 +2,10 @@ import UIKit
 #if canImport(SwiftUI)
 import SwiftUI
 
+private func MainFrameAppCellLocalized(_ key: String) -> String {
+    NSLocalizedString(key, comment: "")
+}
+
 @available(iOS 13.0, *)
 private struct MainFrameAppCardView: View {
     let title: String
@@ -52,7 +56,7 @@ private struct MainFrameAppCardView: View {
                         HStack(spacing: 6) {
                             Image(systemName: "play.fill")
                                 .font(.system(size: 10, weight: .bold))
-                            Text("运行中")
+                            Text(MainFrameAppCellLocalized("home.app.running"))
                                 .font(.system(size: 11, weight: .semibold))
                         }
                         .foregroundColor(.white)
@@ -65,7 +69,7 @@ private struct MainFrameAppCardView: View {
                     Spacer(minLength: 0)
 
                     MainFrameMarqueeText(
-                        text: title.isEmpty ? "未命名应用" : title,
+                        text: title.isEmpty ? MainFrameAppCellLocalized("home.app.untitled") : title,
                         font: UIFont.systemFont(ofSize: 13, weight: .semibold)
                     )
                 }

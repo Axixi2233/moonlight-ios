@@ -1,6 +1,14 @@
 import SwiftUI
 import UIKit
 
+private func StreamMenuLocalized(_ key: String) -> String {
+    NSLocalizedString(key, comment: "")
+}
+
+private func StreamMenuLocalizedFormat(_ key: String, _ args: CVarArg...) -> String {
+    String(format: StreamMenuLocalized(key), locale: Locale.current, arguments: args)
+}
+
 private final class EdgeIgnoringHostingController<Content: View>: UIHostingController<Content> {
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -370,14 +378,14 @@ private struct StreamActionSheetPanelView: View {
 
     private var touchModeSection: some View {
         let items: [(icon: String, title: String)] = [
-            ("hand.draw", "触控板"),
-            ("cursorarrow.motionlines", "普通鼠标"),
-            ("hand.point.up.left.and.text", "多点触控"),
-            ("hand.raised.slash", "禁止触控")
+            ("hand.draw", StreamMenuLocalized("stream.touch_mode.trackpad")),
+            ("cursorarrow.motionlines", StreamMenuLocalized("stream.touch_mode.mouse")),
+            ("hand.point.up.left.and.text", StreamMenuLocalized("stream.touch_mode.multitouch")),
+            ("hand.raised.slash", StreamMenuLocalized("stream.touch_mode.disabled"))
         ]
 
         return VStack(alignment: .leading, spacing: 10) {
-            Text("触控模式")
+            Text(StreamMenuLocalized("stream.touch_mode.title"))
                 .font(.system(size: 13, weight: .medium))
                 .foregroundColor(Color.white.opacity(0.72))
 
@@ -401,9 +409,9 @@ private struct StreamActionSheetPanelView: View {
             viewModel.touchModeSelection = index
             onTouchModeChange(index)
         }) {
-            VStack(spacing: 8) {
+            VStack(spacing: 7) {
                 Image(systemName: icon)
-                    .font(.system(size: 18, weight: .semibold))
+                    .font(.system(size: 17, weight: .semibold))
                     .foregroundColor(.white)
                     .frame(width: 34, height: 34)
                     .background(
@@ -412,13 +420,13 @@ private struct StreamActionSheetPanelView: View {
                     )
 
                 Text(title)
-                    .font(.system(size: 13, weight: .semibold))
+                    .font(.system(size: 12, weight: .semibold))
                     .foregroundColor(.white)
                     .lineLimit(1)
-                    .minimumScaleFactor(0.86)
+                    .minimumScaleFactor(0.72)
             }
             .frame(maxWidth: .infinity)
-            .frame(height: 76)
+            .frame(height: 74)
             .background(
                 RoundedRectangle(cornerRadius: 14, style: .continuous)
                     .fill(isSelected ?
@@ -435,11 +443,15 @@ private struct StreamActionSheetPanelView: View {
 
     private var videoAlignmentSection: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text("画面位置")
+            Text(StreamMenuLocalized("stream.video_alignment.title"))
                 .font(.system(size: 13, weight: .medium))
                 .foregroundColor(Color.white.opacity(0.72))
 
-            SegmentedOptionsControl(items: ["居中", "顶部居中", "底部居中"],
+            SegmentedOptionsControl(items: [
+                StreamMenuLocalized("settings.video_alignment.center"),
+                StreamMenuLocalized("settings.video_alignment.top"),
+                StreamMenuLocalized("settings.video_alignment.bottom")
+            ],
                                     selection: viewModel.videoAlignmentSelection) { newValue in
                 guard viewModel.videoAlignmentSelection != newValue else {
                     return
@@ -454,7 +466,7 @@ private struct StreamActionSheetPanelView: View {
 
     private var videoAlignmentMarginSection: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text("画面位置边距 \(Int(viewModel.videoAlignmentMargin))")
+            Text(StreamMenuLocalizedFormat("stream.video_alignment_margin.label", Int(viewModel.videoAlignmentMargin)))
                 .font(.system(size: 13, weight: .medium))
                 .foregroundColor(Color.white.opacity(0.72))
 
@@ -475,7 +487,7 @@ private struct StreamActionSheetPanelView: View {
 
     private var extendedPerformanceMetricsSection: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text("性能信息")
+            Text(StreamMenuLocalized("stream.performance.title"))
                 .font(.system(size: 13, weight: .medium))
                 .foregroundColor(Color.white.opacity(0.72))
 
@@ -488,7 +500,7 @@ private struct StreamActionSheetPanelView: View {
                 viewModel.extendedPerformanceMetricsEnabled = newValue
                 onExtendedPerformanceMetricsChange(newValue)
             })) {
-                Text("显示编码/客户端延迟/丢帧率")
+                Text(StreamMenuLocalized("stream.performance.extended_metrics.toggle"))
                     .font(.system(size: 14, weight: .semibold))
                     .foregroundColor(.white)
             }
@@ -499,12 +511,20 @@ private struct StreamActionSheetPanelView: View {
 
     private var performanceOverlayPositionSection: some View {
         let items = [
-            ["顶部居中", "顶部居左", "顶部居右"],
-            ["底部居中", "底部居左", "底部居右"]
+            [
+                StreamMenuLocalized("settings.performance_overlay_position.top_center"),
+                StreamMenuLocalized("settings.performance_overlay_position.top_left"),
+                StreamMenuLocalized("settings.performance_overlay_position.top_right")
+            ],
+            [
+                StreamMenuLocalized("settings.performance_overlay_position.bottom_center"),
+                StreamMenuLocalized("settings.performance_overlay_position.bottom_left"),
+                StreamMenuLocalized("settings.performance_overlay_position.bottom_right")
+            ]
         ]
 
         return VStack(alignment: .leading, spacing: 10) {
-            Text("性能信息位置")
+            Text(StreamMenuLocalized("settings.performance_overlay_position.title"))
                 .font(.system(size: 13, weight: .medium))
                 .foregroundColor(Color.white.opacity(0.72))
 
@@ -553,7 +573,7 @@ private struct StreamActionSheetPanelView: View {
 
     private var performanceOverlayMarginSection: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text("性能信息边距 \(Int(viewModel.performanceOverlayMargin))")
+            Text(StreamMenuLocalizedFormat("settings.performance_overlay_margin.label", Int(viewModel.performanceOverlayMargin)))
                 .font(.system(size: 13, weight: .medium))
                 .foregroundColor(Color.white.opacity(0.72))
 
@@ -664,7 +684,7 @@ private struct StreamShortcutPanelView: View {
 
     private var header: some View {
         HStack(spacing: 12) {
-            Text(viewModel.isAddingItem ? "添加快捷键" : viewModel.title)
+            Text(viewModel.isAddingItem ? StreamMenuLocalized("stream.shortcuts.add_title") : viewModel.title)
                 .font(.system(size: 24, weight: .bold))
                 .foregroundColor(.white)
                 .lineLimit(1)
@@ -739,7 +759,8 @@ private struct StreamShortcutPanelView: View {
     }
 
     private var compactShortcutListSelector: some View {
-        SegmentedOptionsControl(items: ["内置", "自定义"],
+        SegmentedOptionsControl(items: [StreamMenuLocalized("stream.shortcuts.segment.builtin"),
+                                        StreamMenuLocalized("stream.shortcuts.segment.custom")],
                                 selection: viewModel.listSelection,
                                 fontSize: 12) { selection in
             viewModel.listSelection = selection
@@ -753,11 +774,11 @@ private struct StreamShortcutPanelView: View {
                 .font(.system(size: 26, weight: .semibold))
                 .foregroundColor(Color.white.opacity(0.78))
 
-            Text(viewModel.listSelection == 0 ? "还没有内置快捷键" : "还没有自定义快捷键")
+            Text(viewModel.listSelection == 0 ? StreamMenuLocalized("stream.shortcuts.empty_builtin_title") : StreamMenuLocalized("stream.shortcuts.empty_custom_title"))
                 .font(.system(size: 16, weight: .semibold))
                 .foregroundColor(.white)
 
-            Text(viewModel.listSelection == 0 ? "当前没有可显示的内置快捷键。" : "点击右上角加号，先添加一个自己的快捷键。")
+            Text(viewModel.listSelection == 0 ? StreamMenuLocalized("stream.shortcuts.empty_builtin_message") : StreamMenuLocalized("stream.shortcuts.empty_custom_message"))
                 .font(.system(size: 13, weight: .medium))
                 .foregroundColor(Color.white.opacity(0.68))
         }
@@ -769,11 +790,11 @@ private struct StreamShortcutPanelView: View {
         ScrollView(.vertical, showsIndicators: false) {
             VStack(alignment: .leading, spacing: 16) {
                 VStack(alignment: .leading, spacing: 10) {
-                    Text("快捷键名称")
+                    Text(StreamMenuLocalized("stream.shortcuts.name"))
                         .font(.system(size: 13, weight: .medium))
                         .foregroundColor(Color.white.opacity(0.72))
 
-                    TextField("例如：Alt+Tab", text: Binding(get: {
+                    TextField(StreamMenuLocalized("stream.shortcuts.name_placeholder"), text: Binding(get: {
                         viewModel.draftTitle
                     }, set: { newValue in
                         viewModel.draftTitle = String(newValue.prefix(18))
@@ -793,12 +814,12 @@ private struct StreamShortcutPanelView: View {
                 }
 
                 VStack(alignment: .leading, spacing: 10) {
-                    Text("已选按键 \(viewModel.selectedKeyCodes.count)/\(maxSelectedKeys)")
+                    Text(StreamMenuLocalizedFormat("stream.shortcuts.selected_keys", viewModel.selectedKeyCodes.count, maxSelectedKeys))
                         .font(.system(size: 13, weight: .medium))
                         .foregroundColor(Color.white.opacity(0.72))
 
                     if viewModel.selectedKeyLabels.isEmpty {
-                        Text("点击下方键帽添加组合键，最多支持 5 个。")
+                        Text(StreamMenuLocalized("stream.shortcuts.selected_keys_hint"))
                             .font(.system(size: 13, weight: .medium))
                             .foregroundColor(Color.white.opacity(0.62))
                             .padding(.vertical, 4)
@@ -808,12 +829,12 @@ private struct StreamShortcutPanelView: View {
                 }
 
                 VStack(alignment: .leading, spacing: 10) {
-                    Text("选择按键")
+                    Text(StreamMenuLocalized("stream.shortcuts.choose_keys"))
                         .font(.system(size: 13, weight: .medium))
                         .foregroundColor(Color.white.opacity(0.72))
 
                     HStack(spacing: 10) {
-                        modeChip(title: "Fn 模式",
+                        modeChip(title: StreamMenuLocalized("stream.shortcuts.fn_mode"),
                                  isActive: viewModel.fnModeEnabled,
                                  activeColor: Color(red: 0.33, green: 0.68, blue: 0.24)) {
                             viewModel.fnModeEnabled.toggle()
@@ -827,7 +848,7 @@ private struct StreamShortcutPanelView: View {
 
                 HStack(spacing: 12) {
                     Button(action: cancelAdding) {
-                        Text("取消")
+                        Text(StreamMenuLocalized("common.cancel"))
                             .font(.system(size: 15, weight: .semibold))
                             .foregroundColor(.white)
                             .frame(maxWidth: .infinity)
@@ -840,7 +861,7 @@ private struct StreamShortcutPanelView: View {
                     .buttonStyle(PlainButtonStyle())
 
                     Button(action: submitDraft) {
-                        Text("保存")
+                        Text(StreamMenuLocalized("stream.virtual_buttons.save"))
                             .font(.system(size: 15, weight: .semibold))
                             .foregroundColor(.white)
                             .frame(maxWidth: .infinity)
@@ -1185,17 +1206,17 @@ private struct StreamShortcutCardView: View {
 
                     VStack(spacing: 3) {
                         Text(item.title)
-                            .font(.system(size: 14, weight: .semibold))
+                            .font(.system(size: 13, weight: .semibold))
                             .foregroundColor(.white)
                             .lineLimit(1)
-                            .minimumScaleFactor(0.8)
+                            .minimumScaleFactor(0.72)
 
                         if !item.subtitle.isEmpty {
                             Text(item.subtitle)
-                                .font(.system(size: 11, weight: .medium))
+                                .font(.system(size: 10, weight: .medium))
                                 .foregroundColor(Color.white.opacity(0.72))
                                 .lineLimit(1)
-                                .minimumScaleFactor(0.75)
+                                .minimumScaleFactor(0.7)
                         }
                     }
                     .padding(.top, 9)
@@ -1315,7 +1336,7 @@ private struct StreamVirtualButtonsPanelView: View {
 
     private var header: some View {
         HStack(spacing: 12) {
-            Text(viewModel.isAddingItem ? "添加虚拟按键" : viewModel.title)
+            Text(viewModel.isAddingItem ? StreamMenuLocalized("stream.virtual_buttons.add_title") : viewModel.title)
                 .font(.system(size: 24, weight: .bold))
                 .foregroundColor(.white)
                 .lineLimit(1)
@@ -1327,7 +1348,7 @@ private struct StreamVirtualButtonsPanelView: View {
                     viewModel.isEditingEnabled.toggle()
                     onToggleEditing(viewModel.isEditingEnabled)
                 }) {
-                    Text(viewModel.isEditingEnabled ? "完成编辑" : "编辑模式")
+                    Text(viewModel.isEditingEnabled ? StreamMenuLocalized("stream.virtual_buttons.finish_editing") : StreamMenuLocalized("stream.virtual_buttons.edit_mode"))
                         .font(.system(size: 12, weight: .semibold))
                         .foregroundColor(.white)
                         .padding(.horizontal, 12)
@@ -1377,7 +1398,7 @@ private struct StreamVirtualButtonsPanelView: View {
             VStack(spacing: 14) {
                 VStack(alignment: .leading, spacing: 8) {
                     HStack {
-                        Text("虚拟按钮透明度")
+                        Text(StreamMenuLocalized("stream.virtual_buttons.opacity"))
                             .font(.system(size: 13, weight: .medium))
                             .foregroundColor(Color.white.opacity(0.78))
 
@@ -1413,7 +1434,7 @@ private struct StreamVirtualButtonsPanelView: View {
                             .font(.system(size: 15, weight: .semibold))
                             .foregroundColor(Color.white.opacity(0.84))
 
-                        Text("拖拽串流画面上的虚拟按键即可调整位置。")
+                        Text(StreamMenuLocalized("stream.virtual_buttons.drag_hint"))
                             .font(.system(size: 13, weight: .medium))
                             .foregroundColor(Color.white.opacity(0.72))
                             .frame(maxWidth: .infinity, alignment: .leading)
@@ -1436,11 +1457,11 @@ private struct StreamVirtualButtonsPanelView: View {
                             .font(.system(size: 26, weight: .semibold))
                             .foregroundColor(Color.white.opacity(0.78))
 
-                        Text("还没有虚拟按键")
+                        Text(StreamMenuLocalized("stream.virtual_buttons.empty_title"))
                             .font(.system(size: 16, weight: .semibold))
                             .foregroundColor(.white)
 
-                        Text("点击右上角加号，先添加一组自定义按键。")
+                        Text(StreamMenuLocalized("stream.virtual_buttons.empty_message"))
                             .font(.system(size: 13, weight: .medium))
                             .foregroundColor(Color.white.opacity(0.68))
                     }
@@ -1477,11 +1498,11 @@ private struct StreamVirtualButtonsPanelView: View {
         return ScrollView(.vertical, showsIndicators: false) {
             VStack(alignment: .leading, spacing: 16) {
                 VStack(alignment: .leading, spacing: 10) {
-                    Text("按键名称")
+                    Text(StreamMenuLocalized("stream.virtual_buttons.name"))
                         .font(.system(size: 13, weight: .medium))
                         .foregroundColor(Color.white.opacity(0.72))
 
-                    TextField("例如：Alt+Tab", text: Binding(get: {
+                    TextField(StreamMenuLocalized("stream.virtual_buttons.name_placeholder"), text: Binding(get: {
                         viewModel.draftTitle
                     }, set: { newValue in
                         viewModel.draftTitle = String(newValue.prefix(18))
@@ -1501,12 +1522,12 @@ private struct StreamVirtualButtonsPanelView: View {
                 }
 
                 VStack(alignment: .leading, spacing: 10) {
-                    Text("已选按键 \(viewModel.selectedKeyCodes.count)/\(maxSelectedKeys)")
+                    Text(StreamMenuLocalizedFormat("stream.shortcuts.selected_keys", viewModel.selectedKeyCodes.count, maxSelectedKeys))
                         .font(.system(size: 13, weight: .medium))
                         .foregroundColor(Color.white.opacity(0.72))
 
                     if viewModel.selectedKeyLabels.isEmpty {
-                        Text("点击下方键帽添加组合键，最多支持 5 个。")
+                        Text(StreamMenuLocalized("stream.shortcuts.selected_keys_hint"))
                             .font(.system(size: 13, weight: .medium))
                             .foregroundColor(Color.white.opacity(0.62))
                             .padding(.vertical, 4)
@@ -1516,13 +1537,13 @@ private struct StreamVirtualButtonsPanelView: View {
                 }
 
                 VStack(alignment: .leading, spacing: 10) {
-                    Text("选择按键")
+                    Text(StreamMenuLocalized("stream.shortcuts.choose_keys"))
                         .font(.system(size: 13, weight: .medium))
                         .foregroundColor(Color.white.opacity(0.72))
 
                     ScrollView(.horizontal, showsIndicators: false) {
                         HStack(spacing: 10) {
-                            modeChip(title: "Fn 模式",
+                            modeChip(title: StreamMenuLocalized("stream.shortcuts.fn_mode"),
                                      isActive: viewModel.fnModeEnabled,
                                      activeColor: Color(red: 0.33, green: 0.68, blue: 0.24)) {
                                 viewModel.fnModeEnabled.toggle()
@@ -1533,7 +1554,7 @@ private struct StreamVirtualButtonsPanelView: View {
                             }) {
                                 HStack(spacing: 6) {
                                     mousePickerIcon(for: selectableMouseItems[0], size: 13)
-                                    Text("鼠标按钮")
+                                    Text(StreamMenuLocalized("stream.virtual_buttons.mouse_buttons"))
                                         .font(.system(size: 12, weight: .semibold))
                                 }
                                 .foregroundColor(.white)
@@ -1556,7 +1577,7 @@ private struct StreamVirtualButtonsPanelView: View {
                                 HStack(spacing: 6) {
                                     Image(systemName: "rectangle.roundedtop")
                                         .font(.system(size: 13, weight: .semibold))
-                                    Text("触控板按键")
+                                    Text(StreamMenuLocalized("stream.virtual_buttons.touchpad_buttons"))
                                         .font(.system(size: 12, weight: .semibold))
                                 }
                                 .foregroundColor(.white)
@@ -1579,7 +1600,7 @@ private struct StreamVirtualButtonsPanelView: View {
                                 HStack(spacing: 6) {
                                     Image(systemName: "circle.grid.cross")
                                         .font(.system(size: 13, weight: .semibold))
-                                    Text("摇杆 / DPad")
+                                    Text(StreamMenuLocalized("stream.virtual_buttons.directional_controls"))
                                         .font(.system(size: 12, weight: .semibold))
                                 }
                                 .foregroundColor(.white)
@@ -1603,7 +1624,7 @@ private struct StreamVirtualButtonsPanelView: View {
 
                 HStack(spacing: 12) {
                     Button(action: cancelAdding) {
-                        Text("取消")
+                        Text(StreamMenuLocalized("common.cancel"))
                             .font(.system(size: 15, weight: .semibold))
                             .foregroundColor(.white)
                             .frame(maxWidth: .infinity)
@@ -1616,7 +1637,7 @@ private struct StreamVirtualButtonsPanelView: View {
                     .buttonStyle(PlainButtonStyle())
 
                     Button(action: submitDraft) {
-                        Text("保存")
+                        Text(StreamMenuLocalized("stream.virtual_buttons.save"))
                             .font(.system(size: 15, weight: .semibold))
                             .foregroundColor(.white)
                             .frame(maxWidth: .infinity)
@@ -1869,31 +1890,32 @@ private struct StreamVirtualButtonsPanelView: View {
 
     private var selectableMouseItems: [StreamVirtualMouseSelectableItem] {
         [
-            .init(id: "mouse_left", title: "鼠标左键", subtitle: "左键点击", assetName: "ic_mouse_left", symbol: "cursorarrow.click"),
-            .init(id: "mouse_left_lock", title: "鼠标左键锁定", subtitle: "点击锁定左键", assetName: "ic_mouse_left_p", symbol: "cursorarrow.click"),
-            .init(id: "mouse_right", title: "鼠标右键", subtitle: "右键点击", assetName: "ic_mouse_right", symbol: "cursorarrow.rays"),
-            .init(id: "mouse_right_lock", title: "鼠标右键锁定", subtitle: "点击锁定右键", assetName: "ic_mouse_right_p", symbol: "cursorarrow.rays"),
-            .init(id: "mouse_middle", title: "鼠标中键", subtitle: "中键点击", assetName: "ic_mouse_middle", symbol: "circle.grid.2x1"),
-            .init(id: "mouse_scroll_up", title: "上滚轮", subtitle: "向上滚动", assetName: "ic_mouse_scroll_up", symbol: "arrow.up.to.line"),
-            .init(id: "mouse_scroll_down", title: "下滚轮", subtitle: "向下滚动", assetName: "ic_mouse_scroll_down", symbol: "arrow.down.to.line")
+            .init(id: "mouse_left", title: StreamMenuLocalized("stream.virtual_buttons.mouse.left"), subtitle: StreamMenuLocalized("stream.virtual_buttons.mouse.left_subtitle"), assetName: "ic_mouse_left", symbol: "cursorarrow.click"),
+            .init(id: "mouse_left", title: StreamMenuLocalized("stream.virtual_buttons.mouse.left"), subtitle: StreamMenuLocalized("stream.virtual_buttons.mouse.left_subtitle"), assetName: "ic_mouse_left", symbol: "cursorarrow.click"),
+            .init(id: "mouse_left_lock", title: StreamMenuLocalized("stream.virtual_buttons.mouse.left_lock"), subtitle: StreamMenuLocalized("stream.virtual_buttons.mouse.left_lock_subtitle"), assetName: "ic_mouse_left_p", symbol: "cursorarrow.click"),
+            .init(id: "mouse_right", title: StreamMenuLocalized("stream.virtual_buttons.mouse.right"), subtitle: StreamMenuLocalized("stream.virtual_buttons.mouse.right_subtitle"), assetName: "ic_mouse_right", symbol: "cursorarrow.rays"),
+            .init(id: "mouse_right_lock", title: StreamMenuLocalized("stream.virtual_buttons.mouse.right_lock"), subtitle: StreamMenuLocalized("stream.virtual_buttons.mouse.right_lock_subtitle"), assetName: "ic_mouse_right_p", symbol: "cursorarrow.rays"),
+            .init(id: "mouse_middle", title: StreamMenuLocalized("stream.virtual_buttons.mouse.middle"), subtitle: StreamMenuLocalized("stream.virtual_buttons.mouse.middle_subtitle"), assetName: "ic_mouse_middle", symbol: "circle.grid.2x1"),
+            .init(id: "mouse_scroll_up", title: StreamMenuLocalized("stream.virtual_buttons.mouse.scroll_up"), subtitle: StreamMenuLocalized("stream.virtual_buttons.mouse.scroll_up_subtitle"), assetName: "ic_mouse_scroll_up", symbol: "arrow.up.to.line"),
+            .init(id: "mouse_scroll_down", title: StreamMenuLocalized("stream.virtual_buttons.mouse.scroll_down"), subtitle: StreamMenuLocalized("stream.virtual_buttons.mouse.scroll_down_subtitle"), assetName: "ic_mouse_scroll_down", symbol: "arrow.down.to.line")
         ]
     }
 
     private var selectableTouchpadItems: [StreamVirtualMouseSelectableItem] {
         [
-            .init(id: "touchpad_move", title: "触控板1", subtitle: "仅鼠标移动生效，用于转视野", assetName: "", symbol: "hand.draw"),
-            .init(id: "touchpad_left_drag", title: "触控板2", subtitle: "移动时按住鼠标左键", assetName: "", symbol: "hand.tap"),
-            .init(id: "touchpad_right_drag", title: "触控板3", subtitle: "移动时按住鼠标右键,用于右键转视野", assetName: "", symbol: "hand.point.up.left"),
-            .init(id: "touchpad_tap_left", title: "触控板4", subtitle: "拖动移动，点击触发鼠标左键", assetName: "", symbol: "hand.tap.fill")
+            .init(id: "touchpad_move", title: StreamMenuLocalized("stream.virtual_buttons.touchpad.one"), subtitle: StreamMenuLocalized("stream.virtual_buttons.touchpad.one_subtitle"), assetName: "", symbol: "hand.draw"),
+            .init(id: "touchpad_left_drag", title: StreamMenuLocalized("stream.virtual_buttons.touchpad.two"), subtitle: StreamMenuLocalized("stream.virtual_buttons.touchpad.two_subtitle"), assetName: "", symbol: "hand.tap"),
+            .init(id: "touchpad_right_drag", title: StreamMenuLocalized("stream.virtual_buttons.touchpad.three"), subtitle: StreamMenuLocalized("stream.virtual_buttons.touchpad.three_subtitle"), assetName: "", symbol: "hand.point.up.left"),
+            .init(id: "touchpad_tap_left", title: StreamMenuLocalized("stream.virtual_buttons.touchpad.four"), subtitle: StreamMenuLocalized("stream.virtual_buttons.touchpad.four_subtitle"), assetName: "", symbol: "hand.tap.fill")
         ]
     }
 
     private var selectableDirectionalItems: [StreamVirtualDirectionalSelectableItem] {
         [
-            .init(id: "joystick_wasd", title: "摇杆·WASD", subtitle: "摇杆样式，发送 W / A / S / D", symbol: "circle.circle"),
-            .init(id: "joystick_arrows", title: "摇杆·上下左右", subtitle: "摇杆样式，发送方向键", symbol: "circle.circle.fill"),
-            .init(id: "dpad_wasd", title: "DPad·WASD", subtitle: "DPad样式，发送 W / A / S / D", symbol: "plus.square"),
-            .init(id: "dpad_arrows", title: "DPad·上下左右", subtitle: "DPad样式，发送方向键", symbol: "plus.square.fill")
+            .init(id: "joystick_wasd", title: StreamMenuLocalized("stream.virtual_buttons.directional.joystick_wasd"), subtitle: StreamMenuLocalized("stream.virtual_buttons.directional.joystick_wasd_subtitle"), symbol: "circle.circle"),
+            .init(id: "joystick_arrows", title: StreamMenuLocalized("stream.virtual_buttons.directional.joystick_arrows"), subtitle: StreamMenuLocalized("stream.virtual_buttons.directional.joystick_arrows_subtitle"), symbol: "circle.circle.fill"),
+            .init(id: "dpad_wasd", title: StreamMenuLocalized("stream.virtual_buttons.directional.dpad_wasd"), subtitle: StreamMenuLocalized("stream.virtual_buttons.directional.dpad_wasd_subtitle"), symbol: "plus.square"),
+            .init(id: "dpad_arrows", title: StreamMenuLocalized("stream.virtual_buttons.directional.dpad_arrows"), subtitle: StreamMenuLocalized("stream.virtual_buttons.directional.dpad_arrows_subtitle"), symbol: "plus.square.fill")
         ]
     }
 
@@ -1915,7 +1937,7 @@ private struct StreamVirtualButtonsPanelView: View {
     private func mouseButtonPickerOverlay(maxWidth: CGFloat) -> some View {
         VStack(alignment: .leading, spacing: 14) {
             HStack {
-                Text("添加鼠标按钮")
+                Text(StreamMenuLocalized("stream.virtual_buttons.add_mouse_title"))
                     .font(.system(size: 18, weight: .bold))
                     .foregroundColor(.white)
 
@@ -1934,7 +1956,7 @@ private struct StreamVirtualButtonsPanelView: View {
                 .buttonStyle(PlainButtonStyle())
             }
 
-            Text("选择一个鼠标按钮类型，保存后会作为单独的虚拟按钮添加到串流画面。")
+            Text(StreamMenuLocalized("stream.virtual_buttons.add_mouse_message"))
                 .font(.system(size: 13, weight: .medium))
                 .foregroundColor(Color.white.opacity(0.68))
 
@@ -1996,7 +2018,7 @@ private struct StreamVirtualButtonsPanelView: View {
     private func touchpadButtonPickerOverlay(maxWidth: CGFloat) -> some View {
         VStack(alignment: .leading, spacing: 14) {
             HStack {
-                Text("添加触控板按键")
+                Text(StreamMenuLocalized("stream.virtual_buttons.add_touchpad_title"))
                     .font(.system(size: 18, weight: .bold))
                     .foregroundColor(.white)
 
@@ -2015,7 +2037,7 @@ private struct StreamVirtualButtonsPanelView: View {
                 .buttonStyle(PlainButtonStyle())
             }
 
-            Text("选择一个触控板按键类型，保存后会作为虚拟按键添加到串流画面。")
+            Text(StreamMenuLocalized("stream.virtual_buttons.add_touchpad_message"))
                 .font(.system(size: 13, weight: .medium))
                 .foregroundColor(Color.white.opacity(0.68))
 
@@ -2077,7 +2099,7 @@ private struct StreamVirtualButtonsPanelView: View {
     private func directionalControlPickerOverlay(maxWidth: CGFloat) -> some View {
         VStack(alignment: .leading, spacing: 14) {
             HStack {
-                Text("添加摇杆 / DPad")
+                Text(StreamMenuLocalized("stream.virtual_buttons.add_directional_title"))
                     .font(.system(size: 18, weight: .bold))
                     .foregroundColor(.white)
 
@@ -2096,7 +2118,7 @@ private struct StreamVirtualButtonsPanelView: View {
                 .buttonStyle(PlainButtonStyle())
             }
 
-            Text("选择一个新的方向控件样式，保存后会作为独立控件添加到串流画面。")
+            Text(StreamMenuLocalized("stream.virtual_buttons.add_directional_message"))
                 .font(.system(size: 13, weight: .medium))
                 .foregroundColor(Color.white.opacity(0.68))
 
@@ -2425,7 +2447,7 @@ private struct StreamVirtualKeyboardPanelView: View {
 
     private var controlsRow: some View {
         HStack(spacing: 10) {
-            modeChip(title: "组合键模式",
+            modeChip(title: StreamMenuLocalized("stream.virtual_keyboard.combination_mode"),
                      isActive: viewModel.combinationModeEnabled,
                      activeColor: Color(red: 0.36, green: 0.36, blue: 0.68)) {
                 viewModel.combinationModeEnabled.toggle()
@@ -2434,13 +2456,13 @@ private struct StreamVirtualKeyboardPanelView: View {
                 }
             }
 
-            modeChip(title: "Fn 模式",
+            modeChip(title: StreamMenuLocalized("stream.shortcuts.fn_mode"),
                      isActive: viewModel.fnModeEnabled,
                      activeColor: Color(red: 0.33, green: 0.68, blue: 0.24)) {
                 viewModel.fnModeEnabled.toggle()
             }
 
-            modeChip(title: "手机输入法",
+            modeChip(title: StreamMenuLocalized("stream.virtual_keyboard.system_keyboard"),
                      isActive: false,
                      activeColor: Color(red: 0.38, green: 0.58, blue: 0.94)) {
                 onShowSystemKeyboard()
@@ -2911,18 +2933,18 @@ final class StreamActionSheetHostingViewController: UIViewController {
     private func touchModeTitle(for selection: Int) -> String {
         switch selection {
         case 1:
-            return "鼠标"
+            return StreamMenuLocalized("stream.touch_mode.mouse")
         case 2:
-            return "多点触控"
+            return StreamMenuLocalized("stream.touch_mode.multitouch")
         case 3:
-            return "禁止触控"
+            return StreamMenuLocalized("stream.touch_mode.disabled")
         default:
-            return "触控板"
+            return StreamMenuLocalized("stream.touch_mode.trackpad")
         }
     }
 
     private func showTouchModeToast(for selection: Int) {
-        showToastWithText("触控模式: \(touchModeTitle(for: selection))")
+        showToastWithText(StreamMenuLocalizedFormat("stream.touch_mode.toast", touchModeTitle(for: selection)))
     }
 
     private static let weekdayFormatter: DateFormatter = {

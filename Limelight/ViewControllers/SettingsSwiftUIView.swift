@@ -2,6 +2,14 @@ import UIKit
 #if canImport(SwiftUI)
 import SwiftUI
 
+private func SettingsLocalized(_ key: String) -> String {
+    NSLocalizedString(key, comment: "")
+}
+
+private func SettingsLocalizedFormat(_ key: String, _ args: CVarArg...) -> String {
+    String(format: SettingsLocalized(key), locale: Locale.current, arguments: args)
+}
+
 @objcMembers
 final class SettingsFormSnapshot: NSObject {
     var bitrateValues: [NSNumber] = []
@@ -226,28 +234,28 @@ private final class SettingsFormViewModel: ObservableObject {
     }
 
     var bitrateLabel: String {
-        String(format: "码率: %.1f Mbps", Double(bitrateKbps) / 1000.0)
+        SettingsLocalizedFormat("settings.bitrate.label", Double(bitrateKbps) / 1000.0)
     }
 
     var touchSensitivityLabel: String {
-        String(format: "触控灵敏度(百分比): %.1f", touchSensitivity)
+        SettingsLocalizedFormat("settings.touch_sensitivity.label", touchSensitivity)
     }
 
     var relativeMouseSensitivityLabel: String {
-        String(format: "相对鼠标灵敏度: %.0f%%", relativeMouseSensitivity)
+        SettingsLocalizedFormat("settings.relative_mouse_sensitivity.label", relativeMouseSensitivity)
     }
 
     var customResolutionLabel: String {
         if customResolutionWidth > 0, customResolutionHeight > 0 {
             return "\(customResolutionWidth) x \(customResolutionHeight)"
         }
-        return "未设置"
+        return SettingsLocalized("common.not_set")
     }
 
     var selectedResolutionTitle: String {
         let clampedIndex = min(max(selectedResolutionIndex, 0), max(resolutionTitles.count - 1, 0))
         guard resolutionTitles.indices.contains(clampedIndex) else {
-            return "未选择"
+            return SettingsLocalized("common.not_selected")
         }
         let title = resolutionTitles[clampedIndex]
         let detail = resolutionDetailTitle(for: clampedIndex)
@@ -389,7 +397,7 @@ private struct ChoiceSelectionSheet: View {
                 }
             }
             .navigationBarTitle(Text(title), displayMode: .inline)
-            .navigationBarItems(trailing: Button("完成") {
+            .navigationBarItems(trailing: Button(SettingsLocalized("common.done")) {
                 presentationMode.wrappedValue.dismiss()
             })
         }
@@ -456,9 +464,9 @@ private struct SettingsRootView: View {
             SettingsPurpleBackground()
 
             Form {
-                Section(header: Text("视频与画质")) {
+                Section(header: Text(SettingsLocalized("settings.section.video"))) {
                     choiceSection(
-                        title: "分辨率",
+                        title: SettingsLocalized("settings.resolution.title"),
                         subtitle: model.selectedResolutionTitle,
                         options: Array(model.resolutionTitles.enumerated()),
                         selectedIndex: model.selectedResolutionIndex
@@ -475,9 +483,9 @@ private struct SettingsRootView: View {
                     Button(action: {
                         requestCustomResolution()
                     }) {
-                        Text("设置自定义分辨率: \(model.customResolutionLabel)")
+                        Text(SettingsLocalizedFormat("settings.custom_resolution.button", model.customResolutionLabel))
                     }
-                    segmentedSection(title: "帧率", selection: bindingForFramerate(), labels: model.framerateOptions.map { "\($0) FPS" })
+                    segmentedSection(title: SettingsLocalized("settings.framerate.title"), selection: bindingForFramerate(), labels: model.framerateOptions.map { "\($0) FPS" })
 
                     VStack(alignment: .leading, spacing: 8) {
                         Text(model.bitrateLabel)
@@ -487,33 +495,33 @@ private struct SettingsRootView: View {
                         }
                     }
 
-                    segmentedSection(title: "解码器", selection: codecSelection(), labels: model.codecTitles)
+                    segmentedSection(title: SettingsLocalized("settings.codec.title"), selection: codecSelection(), labels: model.codecTitles)
 
                     if model.hdrSupported {
                         Toggle("HDR (Beta)", isOn: $model.enableHdr).font(.headline)
                     } else {
-                        Text("HDR 当前设备不支持")
+                        Text(SettingsLocalized("settings.hdr.unsupported"))
                             .foregroundColor(.secondary)
                     }
 
-                    segmentedSection(title: "帧同步", selection: boolSelection($model.useFramePacing), labels: ["低延迟", "最流畅的视频"])
+                    segmentedSection(title: SettingsLocalized("settings.frame_pacing.title"), selection: boolSelection($model.useFramePacing), labels: [SettingsLocalized("settings.frame_pacing.low_latency"), SettingsLocalized("settings.frame_pacing.smooth_video")])
 
-                    segmentedSection(title: "画面位置", selection: $model.videoAlignmentSelection, labels: model.videoAlignmentTitles)
+                    segmentedSection(title: SettingsLocalized("settings.video_alignment.title"), selection: $model.videoAlignmentSelection, labels: model.videoAlignmentTitles)
 
                     VStack(alignment: .leading, spacing: 8) {
-                        Text("画面位置边距 \(Int(model.videoAlignmentMargin))")
+                        Text(SettingsLocalizedFormat("settings.video_alignment_margin.label", Int(model.videoAlignmentMargin)))
                             .font(.headline)
                         Slider(value: $model.videoAlignmentMargin, in: 0...150, step: 1)
                     }
 
                 }
 
-                Section(header: Text("输入选项")) {
-                    segmentedSection(title: "触控模式", selection: touchModeSelection(), labels: model.touchModeTitles)
-                    segmentedSection(title: "体感", selection: $model.motionMode, labels: ["自动", "设备", "手柄"])
-                    segmentedSection(title: "触觉反馈", selection: $model.rumbleModeSelection, labels: model.rumbleModeTitles)
-                    Toggle("触控灵敏度", isOn: $model.enableTouchSensitivity).font(.headline)
-                    Toggle("触控灵敏度全局生效", isOn: $model.touchSensitivityGlobal).font(.headline)
+                Section(header: Text(SettingsLocalized("settings.section.input"))) {
+                    segmentedSection(title: SettingsLocalized("settings.touch_mode.title"), selection: touchModeSelection(), labels: model.touchModeTitles)
+                    segmentedSection(title: SettingsLocalized("settings.motion_mode.title"), selection: $model.motionMode, labels: [SettingsLocalized("common.auto"), SettingsLocalized("common.device"), SettingsLocalized("common.controller")])
+                    segmentedSection(title: SettingsLocalized("settings.rumble_mode.title"), selection: $model.rumbleModeSelection, labels: model.rumbleModeTitles)
+                    Toggle(SettingsLocalized("settings.touch_sensitivity.toggle"), isOn: $model.enableTouchSensitivity).font(.headline)
+                    Toggle(SettingsLocalized("settings.touch_sensitivity_global.toggle"), isOn: $model.touchSensitivityGlobal).font(.headline)
                     if model.enableTouchSensitivity {
                         VStack(alignment: .leading, spacing: 8) {
                             Text(model.touchSensitivityLabel)
@@ -521,11 +529,11 @@ private struct SettingsRootView: View {
                             Slider(value: $model.touchSensitivity, in: 10...300, step: 1)
                         }
                     }
-                    Toggle("多控制器模式", isOn: $model.multiController).font(.headline)
-                    Toggle("交换 A/B 和 X/Y 按钮", isOn: $model.swapABXYButtons).font(.headline)
-                    Toggle("Citrix X1 鼠标支持", isOn: $model.btMouseSupport).font(.headline)
-                    Toggle("本地物理鼠标", isOn: $model.captureMouseCursor).font(.headline)
-                    Toggle("远程鼠标", isOn: $model.remoteMouseMode).font(.headline)
+                    Toggle(SettingsLocalized("settings.multi_controller.toggle"), isOn: $model.multiController).font(.headline)
+                    Toggle(SettingsLocalized("settings.swap_abxy.toggle"), isOn: $model.swapABXYButtons).font(.headline)
+                    Toggle(SettingsLocalized("settings.bt_mouse_support.toggle"), isOn: $model.btMouseSupport).font(.headline)
+                    Toggle(SettingsLocalized("settings.capture_mouse_cursor.toggle"), isOn: $model.captureMouseCursor).font(.headline)
+                    Toggle(SettingsLocalized("settings.remote_mouse_mode.toggle"), isOn: $model.remoteMouseMode).font(.headline)
                     if !model.remoteMouseMode {
                         VStack(alignment: .leading, spacing: 8) {
                             Text(model.relativeMouseSensitivityLabel)
@@ -535,27 +543,27 @@ private struct SettingsRootView: View {
                     }
                 }
 
-                Section(header: Text("高级设置")) {
+                Section(header: Text(SettingsLocalized("settings.section.advanced"))) {
                     choiceSection(
-                        title: "声道输出",
+                        title: SettingsLocalized("settings.audio_config.title"),
                         subtitle: model.audioConfigTitle,
                         options: Array(model.audioConfigTitles.enumerated()),
                         selectedIndex: model.audioConfigSelection
                     ) { index in
                         model.audioConfigSelection = index
                     } isDisabled: { _ in false }
-                    Toggle("本设备和PC同时发声", isOn: $model.playAudioOnPC).font(.headline)
-                    Toggle("优化游戏设置", isOn: $model.optimizeGames).font(.headline)
-                    Toggle("启用悬浮球", isOn: $model.floatingMenuEnabled).font(.headline)
-                    Toggle("外接显示器模式", isOn: $model.externalMonitor).font(.headline)
-                    Toggle("虚拟显示器", isOn: virtualDisplayToggle()).font(.headline)
+                    Toggle(SettingsLocalized("settings.play_audio_on_pc.toggle"), isOn: $model.playAudioOnPC).font(.headline)
+                    Toggle(SettingsLocalized("settings.optimize_games.toggle"), isOn: $model.optimizeGames).font(.headline)
+                    Toggle(SettingsLocalized("settings.floating_menu.toggle"), isOn: $model.floatingMenuEnabled).font(.headline)
+                    Toggle(SettingsLocalized("settings.external_monitor.toggle"), isOn: $model.externalMonitor).font(.headline)
+                    Toggle(SettingsLocalized("settings.virtual_display.toggle"), isOn: virtualDisplayToggle()).font(.headline)
                 }
 
-                Section(header: Text("虚拟控件")) {
-                    Toggle("启用虚拟按键", isOn: $model.virtualButtonsEnabled).font(.headline)
-                    Toggle("启用虚拟手柄", isOn: $model.virtualGamepadEnabled).font(.headline)
+                Section(header: Text(SettingsLocalized("settings.section.virtual_controls"))) {
+                    Toggle(SettingsLocalized("settings.virtual_buttons_enabled.toggle"), isOn: $model.virtualButtonsEnabled).font(.headline)
+                    Toggle(SettingsLocalized("settings.virtual_gamepad_enabled.toggle"), isOn: $model.virtualGamepadEnabled).font(.headline)
                     choiceSection(
-                        title: "虚拟按键方案",
+                        title: SettingsLocalized("settings.virtual_button_scheme.title"),
                         subtitle: model.virtualButtonSchemeTitle,
                         options: Array(model.virtualButtonSchemeTitles.enumerated()),
                         selectedIndex: model.virtualButtonSchemeSelection
@@ -563,7 +571,7 @@ private struct SettingsRootView: View {
                         model.virtualButtonSchemeSelection = index
                     } isDisabled: { _ in false }
                     choiceSection(
-                        title: "虚拟手柄方案",
+                        title: SettingsLocalized("settings.virtual_gamepad_scheme.title"),
                         subtitle: model.virtualGamepadSchemeTitle,
                         options: Array(model.virtualGamepadSchemeTitles.enumerated()),
                         selectedIndex: model.virtualGamepadSchemeSelection
@@ -571,16 +579,16 @@ private struct SettingsRootView: View {
                         model.virtualGamepadSchemeSelection = index
                     } isDisabled: { _ in false }
                     VStack(alignment: .leading, spacing: 8) {
-                        Text("虚拟手柄透明度 \(Int(model.virtualGamepadOpacity))%")
+                        Text(SettingsLocalizedFormat("settings.virtual_gamepad_opacity.label", Int(model.virtualGamepadOpacity)))
                             .font(.headline)
                         Slider(value: $model.virtualGamepadOpacity, in: 5...100, step: 1)
                     }
                 }
 
-                Section(header: Text("性能信息")) {
-                    Toggle("启用性能信息", isOn: $model.statsOverlay).font(.headline)
+                Section(header: Text(SettingsLocalized("settings.section.performance_overlay"))) {
+                    Toggle(SettingsLocalized("settings.stats_overlay.toggle"), isOn: $model.statsOverlay).font(.headline)
                     choiceSection(
-                        title: "性能信息位置",
+                        title: SettingsLocalized("settings.performance_overlay_position.title"),
                         subtitle: model.performanceOverlayPositionTitle,
                         options: Array(model.performanceOverlayPositionTitles.enumerated()),
                         selectedIndex: model.performanceOverlayPositionSelection
@@ -588,7 +596,7 @@ private struct SettingsRootView: View {
                         model.performanceOverlayPositionSelection = index
                     } isDisabled: { _ in false }
                     VStack(alignment: .leading, spacing: 8) {
-                        Text("性能信息边距 \(Int(model.performanceOverlayMargin))")
+                        Text(SettingsLocalizedFormat("settings.performance_overlay_margin.label", Int(model.performanceOverlayMargin)))
                             .font(.headline)
                         Slider(value: $model.performanceOverlayMargin, in: 0...150, step: 1)
                     }
@@ -685,11 +693,16 @@ private struct SettingsRootView: View {
 @available(iOS 13.0, *)
 private extension SettingsFormViewModel {
     var rumbleModeTitles: [String] {
-        ["手柄", "设备", "关闭"]
+        [SettingsLocalized("common.controller"), SettingsLocalized("common.device"), SettingsLocalized("common.off")]
     }
 
     var touchModeTitles: [String] {
-        ["触控板", "普通鼠标", "多点触控", "禁止触控"]
+        [
+            SettingsLocalized("stream.touch_mode.trackpad"),
+            SettingsLocalized("stream.touch_mode.mouse"),
+            SettingsLocalized("stream.touch_mode.multitouch"),
+            SettingsLocalized("stream.touch_mode.disabled")
+        ]
     }
 
     var touchModeSelectionIndex: Int {
@@ -698,7 +711,7 @@ private extension SettingsFormViewModel {
 
     var touchModeTitle: String {
         guard touchModeTitles.indices.contains(touchModeSelectionIndex) else {
-            return "触控板"
+            return SettingsLocalized("stream.touch_mode.trackpad")
         }
         return touchModeTitles[touchModeSelectionIndex]
     }
@@ -709,7 +722,7 @@ private extension SettingsFormViewModel {
 
     var codecDisplayTitle: String {
         guard let index = codecValues.firstIndex(of: preferredCodecValue), codecTitles.indices.contains(index) else {
-            return "自动"
+            return SettingsLocalized("common.auto")
         }
         return codecTitles[index]
     }
@@ -719,49 +732,64 @@ private extension SettingsFormViewModel {
     }
 
     var videoAlignmentTitles: [String] {
-        ["居中", "顶部居中", "底部居中"]
+        [
+            SettingsLocalized("settings.video_alignment.center"),
+            SettingsLocalized("settings.video_alignment.top"),
+            SettingsLocalized("settings.video_alignment.bottom")
+        ]
     }
 
     var audioConfigTitles: [String] {
-        ["立体声", "5.1", "7.1"]
+        [
+            SettingsLocalized("settings.audio_config.stereo"),
+            SettingsLocalized("settings.audio_config.surround_5_1"),
+            SettingsLocalized("settings.audio_config.surround_7_1")
+        ]
     }
 
     var audioConfigTitle: String {
         guard audioConfigTitles.indices.contains(audioConfigSelection) else {
-            return "立体声"
+            return SettingsLocalized("settings.audio_config.stereo")
         }
         return audioConfigTitles[audioConfigSelection]
     }
 
     var performanceOverlayPositionTitles: [String] {
-        ["顶部居中", "顶部居左", "顶部居右", "底部居中", "底部居左", "底部居右"]
+        [
+            SettingsLocalized("settings.performance_overlay_position.top_center"),
+            SettingsLocalized("settings.performance_overlay_position.top_left"),
+            SettingsLocalized("settings.performance_overlay_position.top_right"),
+            SettingsLocalized("settings.performance_overlay_position.bottom_center"),
+            SettingsLocalized("settings.performance_overlay_position.bottom_left"),
+            SettingsLocalized("settings.performance_overlay_position.bottom_right")
+        ]
     }
 
     var performanceOverlayPositionTitle: String {
         guard performanceOverlayPositionTitles.indices.contains(performanceOverlayPositionSelection) else {
-            return "顶部居中"
+            return SettingsLocalized("settings.performance_overlay_position.top_center")
         }
         return performanceOverlayPositionTitles[performanceOverlayPositionSelection]
     }
 
     var virtualButtonSchemeTitles: [String] {
-        ["方案 1", "方案 2", "方案 3", "方案 4", "方案 5"]
+        (1...5).map { SettingsLocalizedFormat("settings.scheme.title", $0) }
     }
 
     var virtualButtonSchemeTitle: String {
         guard virtualButtonSchemeTitles.indices.contains(virtualButtonSchemeSelection) else {
-            return "方案 1"
+            return SettingsLocalizedFormat("settings.scheme.title", 1)
         }
         return virtualButtonSchemeTitles[virtualButtonSchemeSelection]
     }
 
     var virtualGamepadSchemeTitles: [String] {
-        ["方案 1", "方案 2", "方案 3", "方案 4", "方案 5"]
+        (1...5).map { SettingsLocalizedFormat("settings.scheme.title", $0) }
     }
 
     var virtualGamepadSchemeTitle: String {
         guard virtualGamepadSchemeTitles.indices.contains(virtualGamepadSchemeSelection) else {
-            return "方案 1"
+            return SettingsLocalizedFormat("settings.scheme.title", 1)
         }
         return virtualGamepadSchemeTitles[virtualGamepadSchemeSelection]
     }

@@ -1,0 +1,6 @@
+/* Localized versions of Info.plist keys */
+
+"CFBundleDisplayName" = "星光·阿西西";
+"NSBluetoothAlwaysUsageDescription" = "対応する周辺機器に接続するために Bluetooth を使用します。";
+"NSBluetoothPeripheralUsageDescription" = "対応する周辺機器に接続するために Bluetooth を使用します。";
+"NSLocalNetworkUsageDescription" = "ゲーム用 PC に接続してストリーミングするためにローカルネットワークを使用します。";

@@ -21,6 +21,8 @@
 #include <net/if.h>
 #include <Limelight.h>
 
+#define StreamMenuLocalized(key) NSLocalizedString((key), nil)
+
 #if TARGET_OS_TV
 #import <AVFoundation/AVDisplayCriteria.h>
 #import <AVKit/AVDisplayManager.h>
@@ -399,7 +401,7 @@ static const CGFloat kStreamFloatingMenuExpandedAlpha = 0.96f;
         return;
     }
 
-    [self showActionSheetWithTitle:@"游戏菜单" options:nil];
+    [self showActionSheetWithTitle:StreamMenuLocalized(@"stream.menu.title") options:nil];
     [self scheduleFloatingMenuAutoCollapse];
 }
 
@@ -759,7 +761,7 @@ static const CGFloat kStreamFloatingMenuExpandedAlpha = 0.96f;
 #if TARGET_OS_TV
     [_tipLabel setText:@"Tip: Tap the Play/Pause button on the Apple TV Remote to disconnect from your PC"];
 #else
-    [_tipLabel setText:@"提示：从左侧边缘向内滑动即可打开游戏菜单。"];
+    [_tipLabel setText:StreamMenuLocalized(@"stream.menu.edge_swipe_hint")];
 #endif
     
     _tipLabel.textColor = [UIColor whiteColor];
@@ -1118,7 +1120,7 @@ static const CGFloat kStreamFloatingMenuExpandedAlpha = 0.96f;
 
 - (void)edgeSwiped {
     Log(LOG_I, @"User swiped to end stream");
-    [self showActionSheetWithTitle:@"游戏菜单" options:nil];
+    [self showActionSheetWithTitle:StreamMenuLocalized(@"stream.menu.title") options:nil];
 }
 
 
@@ -1128,78 +1130,78 @@ static const CGFloat kStreamFloatingMenuExpandedAlpha = 0.96f;
 
         StreamActionSheetItem *disconnectItem = [[StreamActionSheetItem alloc] init];
         disconnectItem.identifier = @"disconnect";
-        disconnectItem.title = @"断开串流";
-        disconnectItem.subtitle = @"结束当前串流并返回应用列表";
+        disconnectItem.title = StreamMenuLocalized(@"stream.menu.disconnect.title");
+        disconnectItem.subtitle = StreamMenuLocalized(@"stream.menu.disconnect.subtitle");
         disconnectItem.symbolName = @"xmark.circle";
         disconnectItem.destructive = YES;
         [items addObject:disconnectItem];
 
         StreamActionSheetItem *quitStreamItem = [[StreamActionSheetItem alloc] init];
         quitStreamItem.identifier = @"quit_app";
-        quitStreamItem.title = @"退出串流";
-        quitStreamItem.subtitle = @"退出当前应用并返回应用列表";
+        quitStreamItem.title = StreamMenuLocalized(@"stream.menu.quit_stream.title");
+        quitStreamItem.subtitle = StreamMenuLocalized(@"stream.menu.quit_stream.subtitle");
         quitStreamItem.symbolName = @"rectangle.portrait.and.arrow.right";
         quitStreamItem.destructive = YES;
         [items addObject:quitStreamItem];
 
         StreamActionSheetItem *statsItem = [[StreamActionSheetItem alloc] init];
         statsItem.identifier = @"toggle_stats";
-        statsItem.title = @"性能信息";
-        statsItem.subtitle = @"切换当前帧率和网络状态浮层";
+        statsItem.title = StreamMenuLocalized(@"stream.menu.stats.title");
+        statsItem.subtitle = StreamMenuLocalized(@"stream.menu.stats.subtitle");
         statsItem.symbolName = @"chart.bar.xaxis";
         [items addObject:statsItem];
 
         StreamActionSheetItem *keyboardItem = [[StreamActionSheetItem alloc] init];
         keyboardItem.identifier = @"keyboard";
-        keyboardItem.title = @"手机键盘";
-        keyboardItem.subtitle = @"打开顶部功能键和系统输入法";
+        keyboardItem.title = StreamMenuLocalized(@"stream.menu.phone_keyboard.title");
+        keyboardItem.subtitle = StreamMenuLocalized(@"stream.menu.phone_keyboard.subtitle");
         keyboardItem.symbolName = @"keyboard";
         [items addObject:keyboardItem];
 
         StreamActionSheetItem *virtualGamepadItem = [[StreamActionSheetItem alloc] init];
         virtualGamepadItem.identifier = @"virtual_gamepad";
-        virtualGamepadItem.title = @"虚拟手柄";
-        virtualGamepadItem.subtitle = @"临时显示或隐藏屏幕虚拟手柄";
+        virtualGamepadItem.title = StreamMenuLocalized(@"stream.menu.virtual_gamepad.title");
+        virtualGamepadItem.subtitle = StreamMenuLocalized(@"stream.menu.virtual_gamepad.subtitle");
         virtualGamepadItem.symbolName = @"gamecontroller";
         [items addObject:virtualGamepadItem];
 
         StreamActionSheetItem *manageVirtualGamepadItem = [[StreamActionSheetItem alloc] init];
         manageVirtualGamepadItem.identifier = @"manage_virtual_gamepad";
-        manageVirtualGamepadItem.title = @"编辑虚拟手柄";
-        manageVirtualGamepadItem.subtitle = @"调整位置和大小";
+        manageVirtualGamepadItem.title = StreamMenuLocalized(@"stream.menu.manage_virtual_gamepad.title");
+        manageVirtualGamepadItem.subtitle = StreamMenuLocalized(@"stream.menu.manage_virtual_gamepad.subtitle");
         manageVirtualGamepadItem.symbolName = @"gamecontroller.fill";
 
         StreamActionSheetItem *virtualButtonsItem = [[StreamActionSheetItem alloc] init];
         virtualButtonsItem.identifier = @"virtual_buttons";
-        virtualButtonsItem.title = @"虚拟按键";
-        virtualButtonsItem.subtitle = @"显示或隐藏测试虚拟按键";
+        virtualButtonsItem.title = StreamMenuLocalized(@"stream.menu.virtual_buttons.title");
+        virtualButtonsItem.subtitle = StreamMenuLocalized(@"stream.menu.virtual_buttons.subtitle");
         virtualButtonsItem.symbolName = @"square.grid.2x2";
         [items addObject:virtualButtonsItem];
 
         StreamActionSheetItem *manageVirtualButtonsItem = [[StreamActionSheetItem alloc] init];
         manageVirtualButtonsItem.identifier = @"manage_virtual_buttons";
-        manageVirtualButtonsItem.title = @"编辑虚拟按键";
-        manageVirtualButtonsItem.subtitle = @"添加或删除当前串流会话的虚拟按键";
+        manageVirtualButtonsItem.title = StreamMenuLocalized(@"stream.menu.manage_virtual_buttons.title");
+        manageVirtualButtonsItem.subtitle = StreamMenuLocalized(@"stream.menu.manage_virtual_buttons.subtitle");
         manageVirtualButtonsItem.symbolName = @"square.and.pencil";
 
         StreamActionSheetItem *shortcutItem = [[StreamActionSheetItem alloc] init];
         shortcutItem.identifier = @"shortcuts";
-        shortcutItem.title = @"快捷键";
-        shortcutItem.subtitle = @"打开快捷键面板";
+        shortcutItem.title = StreamMenuLocalized(@"stream.menu.shortcuts.title");
+        shortcutItem.subtitle = StreamMenuLocalized(@"stream.menu.shortcuts.subtitle");
         shortcutItem.symbolName = @"command.square";
         [items addObject:shortcutItem];
 
         StreamActionSheetItem *fullKeyboardItem = [[StreamActionSheetItem alloc] init];
         fullKeyboardItem.identifier = @"full_keyboard";
-        fullKeyboardItem.title = @"全键盘";
-        fullKeyboardItem.subtitle = @"打开自定义完整键盘布局";
+        fullKeyboardItem.title = StreamMenuLocalized(@"stream.menu.full_keyboard.title");
+        fullKeyboardItem.subtitle = StreamMenuLocalized(@"stream.menu.full_keyboard.subtitle");
         fullKeyboardItem.symbolName = @"keyboard";
         [items addObject:fullKeyboardItem];
 
         StreamActionSheetItem *viewOnlyItem = [[StreamActionSheetItem alloc] init];
         viewOnlyItem.identifier = @"view_only";
-        viewOnlyItem.title = @"仅查看";
-        viewOnlyItem.subtitle = @"禁用控制，仅允许缩放和平移画面";
+        viewOnlyItem.title = StreamMenuLocalized(@"stream.menu.view_only.title");
+        viewOnlyItem.subtitle = StreamMenuLocalized(@"stream.menu.view_only.subtitle");
         viewOnlyItem.symbolName = @"eye";
         [items addObject:viewOnlyItem];
         [items addObject:manageVirtualGamepadItem];
@@ -1213,7 +1215,7 @@ static const CGFloat kStreamFloatingMenuExpandedAlpha = 0.96f;
         controller.extendedPerformanceMetricsEnabled = _extendedPerformanceMetricsEnabled;
         controller.performanceOverlayPositionSelection = @(_currentSessionPerformanceOverlayPositionSelection);
         controller.performanceOverlayMargin = @(_currentSessionPerformanceOverlayMargin);
-        [controller configureWithTitle:title subtitle:@"游戏内快捷操作" items:items];
+        [controller configureWithTitle:title subtitle:StreamMenuLocalized(@"stream.menu.subtitle") items:items];
         controller.modalPresentationStyle = UIModalPresentationOverFullScreen;
 
         _streamActionSheetHostingViewController = controller;
@@ -1224,22 +1226,22 @@ static const CGFloat kStreamFloatingMenuExpandedAlpha = 0.96f;
     UIAlertController *alertController = [UIAlertController alertControllerWithTitle:title
                                                                              message:nil
                                                                       preferredStyle:UIAlertControllerStyleActionSheet];
-    [alertController addAction:[UIAlertAction actionWithTitle:@"断开连接"
+    [alertController addAction:[UIAlertAction actionWithTitle:StreamMenuLocalized(@"stream.menu.disconnect_fallback")
                                                         style:UIAlertActionStyleDestructive
                                                       handler:^(__unused UIAlertAction * _Nonnull action) {
         [self returnToMainFrame];
     }]];
-    [alertController addAction:[UIAlertAction actionWithTitle:@"切换性能信息"
+    [alertController addAction:[UIAlertAction actionWithTitle:StreamMenuLocalized(@"stream.menu.toggle_stats_fallback")
                                                         style:UIAlertActionStyleDefault
                                                       handler:^(__unused UIAlertAction * _Nonnull action) {
         [self handleStreamMenuActionWithIdentifier:@"toggle_stats"];
     }]];
-    [alertController addAction:[UIAlertAction actionWithTitle:@"弹出软键盘"
+    [alertController addAction:[UIAlertAction actionWithTitle:StreamMenuLocalized(@"stream.menu.open_keyboard_fallback")
                                                         style:UIAlertActionStyleDefault
                                                       handler:^(__unused UIAlertAction * _Nonnull action) {
         [self handleStreamMenuActionWithIdentifier:@"keyboard"];
     }]];
-    [alertController addAction:[UIAlertAction actionWithTitle:@"取消"
+    [alertController addAction:[UIAlertAction actionWithTitle:StreamMenuLocalized(@"common.cancel")
                                                         style:UIAlertActionStyleCancel
                                                       handler:nil]];
     [self presentViewController:alertController animated:YES completion:nil];
@@ -1368,19 +1370,19 @@ static const CGFloat kStreamFloatingMenuExpandedAlpha = 0.96f;
 - (NSString *)touchModeTitleForSelection:(NSInteger)selection {
     switch (selection) {
         case 1:
-            return @"普通鼠标";
+            return StreamMenuLocalized(@"stream.touch_mode.mouse");
         case 2:
-            return @"多点触控";
+            return StreamMenuLocalized(@"stream.touch_mode.multitouch");
         case 3:
-            return @"禁止触控";
+            return StreamMenuLocalized(@"stream.touch_mode.disabled");
         default:
-            return @"触控板";
+            return StreamMenuLocalized(@"stream.touch_mode.trackpad");
     }
 }
 
 - (void)showTemporaryTouchModeOverlayForSelection:(NSInteger)selection {
     NSString *title = [self touchModeTitleForSelection:selection];
-    [self showTemporaryTipText:[NSString stringWithFormat:@"触控模式: %@", title]];
+    [self showTemporaryTipText:[NSString stringWithFormat:StreamMenuLocalized(@"stream.touch_mode.toast"), title]];
 }
 
 - (void)showTemporaryTipText:(NSString *)text {
@@ -1439,7 +1441,7 @@ static const CGFloat kStreamFloatingMenuExpandedAlpha = 0.96f;
             [_scrollView setZoomScale:MAX(_viewOnlyRestoreZoomScale, 1.0f) animated:NO];
             [_scrollView setContentOffset:_viewOnlyRestoreContentOffset animated:NO];
         }
-        [self showTemporaryTipText:@"仅查看已开启"];
+        [self showTemporaryTipText:StreamMenuLocalized(@"stream.menu.view_only.enabled")];
         return;
     }
 
@@ -1456,7 +1458,7 @@ static const CGFloat kStreamFloatingMenuExpandedAlpha = 0.96f;
             [_scrollView setContentOffset:CGPointZero animated:NO];
         }
     }
-    [self showTemporaryTipText:@"仅查看已关闭"];
+    [self showTemporaryTipText:StreamMenuLocalized(@"stream.menu.view_only.disabled")];
 }
 
 - (void)toggleViewOnlyMode {
@@ -1470,7 +1472,7 @@ static const CGFloat kStreamFloatingMenuExpandedAlpha = 0.96f;
         @{@"id": @"virtual_button_enter", @"title": @"Enter", @"subtitle": @"Enter", @"primary": @[@0x0D], @"secondary": @[], @"shape": @"roundedRect", @"scale": @1.0, @"widthScale": @1.0, @"heightScale": @1.0},
         @{@"id": @"virtual_button_win", @"title": @"Win", @"subtitle": @"Win", @"primary": @[@0x5B], @"secondary": @[], @"shape": @"roundedRect", @"scale": @1.0, @"widthScale": @1.0, @"heightScale": @1.0},
         @{@"id": @"virtual_button_alt_tab", @"title": @"Alt+Tab", @"subtitle": @"Alt + Tab", @"primary": @[@0x12, @0x09], @"secondary": @[], @"shape": @"roundedRect", @"scale": @1.0, @"widthScale": @1.0, @"heightScale": @1.0},
-        @{@"id": @"virtual_button_ctrl_shift_esc", @"title": @"任务管理器", @"subtitle": @"Ctrl + Shift + ESC", @"primary": @[@0x11, @0x10, @0x1B], @"secondary": @[], @"shape": @"roundedRect", @"scale": @1.0, @"widthScale": @1.0, @"heightScale": @1.0}
+        @{@"id": @"virtual_button_ctrl_shift_esc", @"title": StreamMenuLocalized(@"stream.shortcuts.default.task_manager"), @"subtitle": @"Ctrl + Shift + ESC", @"primary": @[@0x11, @0x10, @0x1B], @"secondary": @[], @"shape": @"roundedRect", @"scale": @1.0, @"widthScale": @1.0, @"heightScale": @1.0}
     ];
 }
 
@@ -1730,13 +1732,13 @@ static const CGFloat kStreamFloatingMenuExpandedAlpha = 0.96f;
     _virtualButtonEditorTitleLabel.font = [UIFont systemFontOfSize:15.0f weight:UIFontWeightSemibold];
     [_virtualButtonEditorView addSubview:_virtualButtonEditorTitleLabel];
 
-    _virtualButtonEditorShapeControl = [[UISegmentedControl alloc] initWithItems:@[@"圆角矩形", @"圆形"]];
+    _virtualButtonEditorShapeControl = [[UISegmentedControl alloc] initWithItems:@[StreamMenuLocalized(@"stream.virtual_button_editor.shape.rounded_rect"), StreamMenuLocalized(@"stream.virtual_button_editor.shape.circle")]];
     [_virtualButtonEditorShapeControl addTarget:self action:@selector(handleVirtualButtonEditorShapeChanged:) forControlEvents:UIControlEventValueChanged];
     [_virtualButtonEditorView addSubview:_virtualButtonEditorShapeControl];
 
     UILabel *scaleLabel = [[UILabel alloc] initWithFrame:CGRectZero];
     scaleLabel.tag = 9101;
-    scaleLabel.text = @"尺寸";
+    scaleLabel.text = StreamMenuLocalized(@"stream.virtual_button_editor.scale");
     scaleLabel.textColor = [[UIColor whiteColor] colorWithAlphaComponent:0.74];
     scaleLabel.font = [UIFont systemFontOfSize:12.0f weight:UIFontWeightMedium];
     [_virtualButtonEditorView addSubview:scaleLabel];
@@ -1755,7 +1757,7 @@ static const CGFloat kStreamFloatingMenuExpandedAlpha = 0.96f;
 
     UILabel *widthLabel = [[UILabel alloc] initWithFrame:CGRectZero];
     widthLabel.tag = 9102;
-    widthLabel.text = @"宽度";
+    widthLabel.text = StreamMenuLocalized(@"stream.virtual_button_editor.width");
     widthLabel.textColor = [[UIColor whiteColor] colorWithAlphaComponent:0.74];
     widthLabel.font = [UIFont systemFontOfSize:12.0f weight:UIFontWeightMedium];
     [_virtualButtonEditorView addSubview:widthLabel];
@@ -1774,7 +1776,7 @@ static const CGFloat kStreamFloatingMenuExpandedAlpha = 0.96f;
 
     UILabel *heightLabel = [[UILabel alloc] initWithFrame:CGRectZero];
     heightLabel.tag = 9103;
-    heightLabel.text = @"高度";
+    heightLabel.text = StreamMenuLocalized(@"stream.virtual_button_editor.height");
     heightLabel.textColor = [[UIColor whiteColor] colorWithAlphaComponent:0.74];
     heightLabel.font = [UIFont systemFontOfSize:12.0f weight:UIFontWeightMedium];
     [_virtualButtonEditorView addSubview:heightLabel];
@@ -1793,7 +1795,7 @@ static const CGFloat kStreamFloatingMenuExpandedAlpha = 0.96f;
 
     UILabel *touchSensitivityXLabel = [[UILabel alloc] initWithFrame:CGRectZero];
     touchSensitivityXLabel.tag = 9104;
-    touchSensitivityXLabel.text = @"X轴灵敏度";
+    touchSensitivityXLabel.text = StreamMenuLocalized(@"stream.virtual_button_editor.sensitivity_x");
     touchSensitivityXLabel.textColor = [[UIColor whiteColor] colorWithAlphaComponent:0.74];
     touchSensitivityXLabel.font = [UIFont systemFontOfSize:12.0f weight:UIFontWeightMedium];
     [_virtualButtonEditorView addSubview:touchSensitivityXLabel];
@@ -1812,7 +1814,7 @@ static const CGFloat kStreamFloatingMenuExpandedAlpha = 0.96f;
 
     UILabel *touchSensitivityYLabel = [[UILabel alloc] initWithFrame:CGRectZero];
     touchSensitivityYLabel.tag = 9105;
-    touchSensitivityYLabel.text = @"Y轴灵敏度";
+    touchSensitivityYLabel.text = StreamMenuLocalized(@"stream.virtual_button_editor.sensitivity_y");
     touchSensitivityYLabel.textColor = [[UIColor whiteColor] colorWithAlphaComponent:0.74];
     touchSensitivityYLabel.font = [UIFont systemFontOfSize:12.0f weight:UIFontWeightMedium];
     [_virtualButtonEditorView addSubview:touchSensitivityYLabel];
@@ -1830,7 +1832,7 @@ static const CGFloat kStreamFloatingMenuExpandedAlpha = 0.96f;
     [_virtualButtonEditorView addSubview:_virtualButtonEditorTouchSensitivityYSlider];
 
     _virtualButtonEditorSaveButton = [UIButton buttonWithType:UIButtonTypeSystem];
-    [_virtualButtonEditorSaveButton setTitle:@"保存" forState:UIControlStateNormal];
+    [_virtualButtonEditorSaveButton setTitle:StreamMenuLocalized(@"stream.virtual_buttons.save") forState:UIControlStateNormal];
     _virtualButtonEditorSaveButton.titleLabel.font = [UIFont systemFontOfSize:13.0f weight:UIFontWeightSemibold];
     [_virtualButtonEditorSaveButton setTitleColor:[UIColor whiteColor] forState:UIControlStateNormal];
     _virtualButtonEditorSaveButton.backgroundColor = [[UIColor colorWithRed:0.50f green:0.45f blue:0.94f alpha:1.0f] colorWithAlphaComponent:0.92f];
@@ -1839,7 +1841,7 @@ static const CGFloat kStreamFloatingMenuExpandedAlpha = 0.96f;
     [_virtualButtonEditorView addSubview:_virtualButtonEditorSaveButton];
 
     _virtualButtonEditorCloseButton = [UIButton buttonWithType:UIButtonTypeSystem];
-    [_virtualButtonEditorCloseButton setTitle:@"关闭" forState:UIControlStateNormal];
+    [_virtualButtonEditorCloseButton setTitle:StreamMenuLocalized(@"stream.virtual_button_editor.close") forState:UIControlStateNormal];
     _virtualButtonEditorCloseButton.titleLabel.font = [UIFont systemFontOfSize:13.0f weight:UIFontWeightSemibold];
     [_virtualButtonEditorCloseButton setTitleColor:[UIColor whiteColor] forState:UIControlStateNormal];
     _virtualButtonEditorCloseButton.backgroundColor = [[UIColor whiteColor] colorWithAlphaComponent:0.10f];
@@ -1850,7 +1852,7 @@ static const CGFloat kStreamFloatingMenuExpandedAlpha = 0.96f;
     [_virtualButtonEditorView addSubview:_virtualButtonEditorCloseButton];
 
     _virtualButtonEditorDeleteButton = [UIButton buttonWithType:UIButtonTypeSystem];
-    [_virtualButtonEditorDeleteButton setTitle:@"删除" forState:UIControlStateNormal];
+    [_virtualButtonEditorDeleteButton setTitle:StreamMenuLocalized(@"stream.virtual_button_editor.delete") forState:UIControlStateNormal];
     _virtualButtonEditorDeleteButton.titleLabel.font = [UIFont systemFontOfSize:13.0f weight:UIFontWeightSemibold];
     [_virtualButtonEditorDeleteButton setTitleColor:[UIColor whiteColor] forState:UIControlStateNormal];
     _virtualButtonEditorDeleteButton.backgroundColor = [[UIColor colorWithRed:0.86f green:0.34f blue:0.36f alpha:1.0f] colorWithAlphaComponent:0.92f];
@@ -1986,7 +1988,7 @@ static const CGFloat kStreamFloatingMenuExpandedAlpha = 0.96f;
          [controlAction isEqualToString:@"gamepad_face_buttons"])) ||
         isTouchpadButton;
     _virtualButtonEditorShapeControl.hidden = shapeLocked;
-    _virtualButtonEditorTitleLabel.text = definition[@"title"] ?: (editingVirtualGamepad ? @"虚拟手柄" : @"虚拟按键");
+    _virtualButtonEditorTitleLabel.text = definition[@"title"] ?: (editingVirtualGamepad ? StreamMenuLocalized(@"stream.menu.virtual_gamepad.title") : StreamMenuLocalized(@"stream.virtual_buttons.panel_title"));
     _virtualButtonEditorShapeControl.selectedSegmentIndex = [definition[@"shape"] isEqualToString:@"circle"] ? 1 : 0;
     _virtualButtonEditorScaleSlider.value = MAX(0.5f, MIN([definition[@"scale"] floatValue], 2.0f));
     _virtualButtonEditorWidthSlider.maximumValue = isTouchpadButton ? 5.0f : 2.0f;
@@ -2108,7 +2110,7 @@ static const CGFloat kStreamFloatingMenuExpandedAlpha = 0.96f;
     (void)sender;
     BOOL editingVirtualGamepad = [_streamView isTemporaryVirtualGamepadEditingEnabled];
     [self applyVirtualButtonEditorValuesToSelectedItem];
-    [self showTemporaryTipText:(editingVirtualGamepad ? @"虚拟手柄已保存" : @"虚拟按键已保存")];
+    [self showTemporaryTipText:(editingVirtualGamepad ? StreamMenuLocalized(@"stream.virtual_button_editor.saved_virtual_gamepad") : StreamMenuLocalized(@"stream.virtual_button_editor.saved_virtual_button"))];
 }
 
 - (void)handleVirtualButtonEditorCloseTapped:(UIButton *)sender {
@@ -2144,12 +2146,12 @@ static const CGFloat kStreamFloatingMenuExpandedAlpha = 0.96f;
         [self applyVirtualButtonDefinitionsToStreamView];
         [self refreshVirtualButtonsPanelIfNeeded];
         [self persistCurrentVirtualButtonScheme];
-        [self showTemporaryTipText:@"虚拟按键已删除"];
+        [self showTemporaryTipText:StreamMenuLocalized(@"stream.virtual_button_editor.deleted_virtual_button")];
     }
     else {
         [self applyVirtualGamepadDefinitionsToStreamView];
         [self persistCurrentVirtualGamepadScheme];
-        [self showTemporaryTipText:@"虚拟手柄控件已删除"];
+        [self showTemporaryTipText:StreamMenuLocalized(@"stream.virtual_button_editor.deleted_virtual_gamepad")];
     }
 }
 
@@ -2157,7 +2159,7 @@ static const CGFloat kStreamFloatingMenuExpandedAlpha = 0.96f;
     if (@available(iOS 13.0, *)) {
         StreamVirtualButtonsPanelHostingViewController *controller = [[StreamVirtualButtonsPanelHostingViewController alloc] init];
         controller.delegate = (id<StreamVirtualButtonsPanelHostingViewControllerDelegate>)self;
-        [controller configureWithTitle:@"虚拟按键"
+        [controller configureWithTitle:StreamMenuLocalized(@"stream.virtual_buttons.panel_title")
                                  items:[self virtualButtonPanelItems]
                       isEditingEnabled:[_streamView isTemporaryVirtualButtonsEditingEnabled]
                           buttonOpacity:[self currentVirtualButtonOpacity]];
@@ -2172,7 +2174,7 @@ static const CGFloat kStreamFloatingMenuExpandedAlpha = 0.96f;
         return;
     }
 
-    [_streamVirtualButtonsPanelHostingViewController configureWithTitle:@"虚拟按键"
+    [_streamVirtualButtonsPanelHostingViewController configureWithTitle:StreamMenuLocalized(@"stream.virtual_buttons.panel_title")
                                                                  items:[self virtualButtonPanelItems]
                                                       isEditingEnabled:[_streamView isTemporaryVirtualButtonsEditingEnabled]
                                                           buttonOpacity:[self currentVirtualButtonOpacity]];
@@ -2180,35 +2182,35 @@ static const CGFloat kStreamFloatingMenuExpandedAlpha = 0.96f;
 
 - (NSArray<NSDictionary *> *)defaultShortcutDefinitions {
     return @[
-        @{@"id": @"shortcut_escape", @"title": @"返回/关闭页面", @"subtitle": @"ESC", @"symbol": @"escape", @"primary": @[@0x1B], @"secondary": @[]},
-        @{@"id": @"shortcut_f11", @"title": @"网页全屏切换", @"subtitle": @"F11", @"symbol": @"macwindow.on.rectangle", @"primary": @[@0x7A], @"secondary": @[]},
-        @{@"id": @"shortcut_alt_f4", @"title": @"关闭应用", @"subtitle": @"Alt+F4", @"symbol": @"xmark.circle", @"primary": @[@0xA4, @0x73], @"secondary": @[]},
-        @{@"id": @"shortcut_alt_enter", @"title": @"窗口大小", @"subtitle": @"Alt+Enter", @"symbol": @"arrow.up.left.and.arrow.down.right", @"primary": @[@0xA4, @0x0D], @"secondary": @[]},
+        @{@"id": @"shortcut_escape", @"title": StreamMenuLocalized(@"stream.shortcuts.default.back"), @"subtitle": @"ESC", @"symbol": @"escape", @"primary": @[@0x1B], @"secondary": @[]},
+        @{@"id": @"shortcut_f11", @"title": StreamMenuLocalized(@"stream.shortcuts.default.browser_fullscreen"), @"subtitle": @"F11", @"symbol": @"macwindow.on.rectangle", @"primary": @[@0x7A], @"secondary": @[]},
+        @{@"id": @"shortcut_alt_f4", @"title": StreamMenuLocalized(@"stream.shortcuts.default.close_app"), @"subtitle": @"Alt+F4", @"symbol": @"xmark.circle", @"primary": @[@0xA4, @0x73], @"secondary": @[]},
+        @{@"id": @"shortcut_alt_enter", @"title": StreamMenuLocalized(@"stream.shortcuts.default.window_size"), @"subtitle": @"Alt+Enter", @"symbol": @"arrow.up.left.and.arrow.down.right", @"primary": @[@0xA4, @0x0D], @"secondary": @[]},
         @{@"id": @"shortcut_shift_tab", @"title": @"Steam OverLay", @"subtitle": @"Shift+Tab", @"symbol": @"rectangle.on.rectangle", @"primary": @[@0xA0, @0x09], @"secondary": @[]},
 
-        @{@"id": @"shortcut_cursor_toggle", @"title": @"鼠标光标", @"subtitle": @"Ctrl+Alt+Shift+N", @"symbol": @"cursorarrow.motionlines", @"primary": @[@0xA2, @0xA4, @0xA0, @0x4E], @"secondary": @[]},
-        @{@"id": @"shortcut_shutdown", @"title": @"关机", @"subtitle": @"Win+X~U-U", @"symbol": @"power", @"primary": @[@0x5B, @0x58], @"secondary": @[@0x55, @0x55]},
-        @{@"id": @"shortcut_restart", @"title": @"重启", @"subtitle": @"Win+X~U-R", @"symbol": @"arrow.clockwise", @"primary": @[@0x5B, @0x58], @"secondary": @[@0x55, @0x52]},
-        @{@"id": @"shortcut_sleep", @"title": @"睡眠", @"subtitle": @"Win+X~U-S", @"symbol": @"moon.zzz", @"primary": @[@0x5B, @0x58], @"secondary": @[@0x55, @0x53]},
-        @{@"id": @"shortcut_logout", @"title": @"注销", @"subtitle": @"Win+X~U-I", @"symbol": @"person.crop.circle.badge.xmark", @"primary": @[@0x5B, @0x58], @"secondary": @[@0x55, @0x49]},
+        @{@"id": @"shortcut_cursor_toggle", @"title": StreamMenuLocalized(@"stream.shortcuts.default.cursor"), @"subtitle": @"Ctrl+Alt+Shift+N", @"symbol": @"cursorarrow.motionlines", @"primary": @[@0xA2, @0xA4, @0xA0, @0x4E], @"secondary": @[]},
+        @{@"id": @"shortcut_shutdown", @"title": StreamMenuLocalized(@"stream.shortcuts.default.shutdown"), @"subtitle": @"Win+X~U-U", @"symbol": @"power", @"primary": @[@0x5B, @0x58], @"secondary": @[@0x55, @0x55]},
+        @{@"id": @"shortcut_restart", @"title": StreamMenuLocalized(@"stream.shortcuts.default.restart"), @"subtitle": @"Win+X~U-R", @"symbol": @"arrow.clockwise", @"primary": @[@0x5B, @0x58], @"secondary": @[@0x55, @0x52]},
+        @{@"id": @"shortcut_sleep", @"title": StreamMenuLocalized(@"stream.shortcuts.default.sleep"), @"subtitle": @"Win+X~U-S", @"symbol": @"moon.zzz", @"primary": @[@0x5B, @0x58], @"secondary": @[@0x55, @0x53]},
+        @{@"id": @"shortcut_logout", @"title": StreamMenuLocalized(@"stream.shortcuts.default.logout"), @"subtitle": @"Win+X~U-I", @"symbol": @"person.crop.circle.badge.xmark", @"primary": @[@0x5B, @0x58], @"secondary": @[@0x55, @0x49]},
 
-        @{@"id": @"shortcut_copy", @"title": @"复制", @"subtitle": @"Ctrl+C", @"symbol": @"doc.on.doc", @"primary": @[@0xA2, @0x43], @"secondary": @[]},
-        @{@"id": @"shortcut_paste", @"title": @"粘贴", @"subtitle": @"Ctrl+V", @"symbol": @"doc.on.clipboard", @"primary": @[@0xA2, @0x56], @"secondary": @[]},
-        @{@"id": @"shortcut_cut", @"title": @"剪切", @"subtitle": @"Ctrl+X", @"symbol": @"scissors", @"primary": @[@0xA2, @0x58], @"secondary": @[]},
-        @{@"id": @"shortcut_monitor_1", @"title": @"切换显示器1", @"subtitle": @"Ctrl+Alt+Shift+F1", @"symbol": @"display.2", @"primary": @[@0xA2, @0xA4, @0xA0, @0x70], @"secondary": @[]},
-        @{@"id": @"shortcut_monitor_2", @"title": @"切换显示器2", @"subtitle": @"Ctrl+Alt+Shift+F12", @"symbol": @"display", @"primary": @[@0xA2, @0xA4, @0xA0, @0x7B], @"secondary": @[]},
+        @{@"id": @"shortcut_copy", @"title": StreamMenuLocalized(@"stream.shortcuts.default.copy"), @"subtitle": @"Ctrl+C", @"symbol": @"doc.on.doc", @"primary": @[@0xA2, @0x43], @"secondary": @[]},
+        @{@"id": @"shortcut_paste", @"title": StreamMenuLocalized(@"stream.shortcuts.default.paste"), @"subtitle": @"Ctrl+V", @"symbol": @"doc.on.clipboard", @"primary": @[@0xA2, @0x56], @"secondary": @[]},
+        @{@"id": @"shortcut_cut", @"title": StreamMenuLocalized(@"stream.shortcuts.default.cut"), @"subtitle": @"Ctrl+X", @"symbol": @"scissors", @"primary": @[@0xA2, @0x58], @"secondary": @[]},
+        @{@"id": @"shortcut_monitor_1", @"title": StreamMenuLocalized(@"stream.shortcuts.default.monitor_1"), @"subtitle": @"Ctrl+Alt+Shift+F1", @"symbol": @"display.2", @"primary": @[@0xA2, @0xA4, @0xA0, @0x70], @"secondary": @[]},
+        @{@"id": @"shortcut_monitor_2", @"title": StreamMenuLocalized(@"stream.shortcuts.default.monitor_2"), @"subtitle": @"Ctrl+Alt+Shift+F12", @"symbol": @"display", @"primary": @[@0xA2, @0xA4, @0xA0, @0x7B], @"secondary": @[]},
 
-        @{@"id": @"shortcut_win", @"title": @"开始菜单", @"subtitle": @"Win", @"symbol": @"command", @"primary": @[@0x5B], @"secondary": @[]},
-        @{@"id": @"shortcut_hdr", @"title": @"HDR开关", @"subtitle": @"Win+Alt+B", @"symbol": @"sun.max", @"primary": @[@0x5B, @0xA4, @0x42], @"secondary": @[]},
-        @{@"id": @"shortcut_task_manager", @"title": @"任务管理器", @"subtitle": @"Ctrl+Shift+ESC", @"symbol": @"list.bullet.rectangle", @"primary": @[@0xA2, @0xA0, @0x1B], @"secondary": @[]},
-        @{@"id": @"shortcut_desktop", @"title": @"返回桌面", @"subtitle": @"Win+D", @"symbol": @"desktopcomputer", @"primary": @[@0x5B, @0x44], @"secondary": @[]},
-        @{@"id": @"shortcut_display_mode", @"title": @"显示器模式", @"subtitle": @"Win+P", @"symbol": @"rectangle.3.group", @"primary": @[@0x5B, @0x50], @"secondary": @[]},
+        @{@"id": @"shortcut_win", @"title": StreamMenuLocalized(@"stream.shortcuts.default.start_menu"), @"subtitle": @"Win", @"symbol": @"command", @"primary": @[@0x5B], @"secondary": @[]},
+        @{@"id": @"shortcut_hdr", @"title": StreamMenuLocalized(@"stream.shortcuts.default.hdr"), @"subtitle": @"Win+Alt+B", @"symbol": @"sun.max", @"primary": @[@0x5B, @0xA4, @0x42], @"secondary": @[]},
+        @{@"id": @"shortcut_task_manager", @"title": StreamMenuLocalized(@"stream.shortcuts.default.task_manager"), @"subtitle": @"Ctrl+Shift+ESC", @"symbol": @"list.bullet.rectangle", @"primary": @[@0xA2, @0xA0, @0x1B], @"secondary": @[]},
+        @{@"id": @"shortcut_desktop", @"title": StreamMenuLocalized(@"stream.shortcuts.default.desktop"), @"subtitle": @"Win+D", @"symbol": @"desktopcomputer", @"primary": @[@0x5B, @0x44], @"secondary": @[]},
+        @{@"id": @"shortcut_display_mode", @"title": StreamMenuLocalized(@"stream.shortcuts.default.display_mode"), @"subtitle": @"Win+P", @"symbol": @"rectangle.3.group", @"primary": @[@0x5B, @0x50], @"secondary": @[]},
 
-        @{@"id": @"shortcut_settings", @"title": @"Windows设置", @"subtitle": @"Win+I", @"symbol": @"gearshape", @"primary": @[@0x5B, @0x49], @"secondary": @[]},
-        @{@"id": @"shortcut_explorer", @"title": @"我的电脑", @"subtitle": @"Win+E", @"symbol": @"folder", @"primary": @[@0x5B, @0x45], @"secondary": @[]},
-        @{@"id": @"shortcut_mobility", @"title": @"移动中心", @"subtitle": @"Win+X", @"symbol": @"bolt.horizontal.circle", @"primary": @[@0x5B, @0x58], @"secondary": @[]},
-        @{@"id": @"shortcut_desktop_left", @"title": @"切换桌面左", @"subtitle": @"Win+Shift+Left", @"symbol": @"arrow.left.circle", @"primary": @[@0x5B, @0xA0, @0x25], @"secondary": @[]},
-        @{@"id": @"shortcut_desktop_right", @"title": @"切换桌面右", @"subtitle": @"Win+Shift+Right", @"symbol": @"arrow.right.circle", @"primary": @[@0x5B, @0xA0, @0x27], @"secondary": @[]}
+        @{@"id": @"shortcut_settings", @"title": StreamMenuLocalized(@"stream.shortcuts.default.windows_settings"), @"subtitle": @"Win+I", @"symbol": @"gearshape", @"primary": @[@0x5B, @0x49], @"secondary": @[]},
+        @{@"id": @"shortcut_explorer", @"title": StreamMenuLocalized(@"stream.shortcuts.default.explorer"), @"subtitle": @"Win+E", @"symbol": @"folder", @"primary": @[@0x5B, @0x45], @"secondary": @[]},
+        @{@"id": @"shortcut_mobility", @"title": StreamMenuLocalized(@"stream.shortcuts.default.mobility_center"), @"subtitle": @"Win+X", @"symbol": @"bolt.horizontal.circle", @"primary": @[@0x5B, @0x58], @"secondary": @[]},
+        @{@"id": @"shortcut_desktop_left", @"title": StreamMenuLocalized(@"stream.shortcuts.default.desktop_left"), @"subtitle": @"Win+Shift+Left", @"symbol": @"arrow.left.circle", @"primary": @[@0x5B, @0xA0, @0x25], @"secondary": @[]},
+        @{@"id": @"shortcut_desktop_right", @"title": StreamMenuLocalized(@"stream.shortcuts.default.desktop_right"), @"subtitle": @"Win+Shift+Right", @"symbol": @"arrow.right.circle", @"primary": @[@0x5B, @0xA0, @0x27], @"secondary": @[]}
     ];
 }
 
@@ -2269,7 +2271,7 @@ static const CGFloat kStreamFloatingMenuExpandedAlpha = 0.96f;
     if (@available(iOS 13.0, *)) {
         StreamShortcutPanelHostingViewController *controller = [[StreamShortcutPanelHostingViewController alloc] init];
         controller.delegate = (id<StreamShortcutPanelHostingViewControllerDelegate>)self;
-        [controller configureWithTitle:@"快捷键"
+        [controller configureWithTitle:StreamMenuLocalized(@"stream.shortcuts.panel_title")
                           builtInItems:[self defaultShortcutItems]
                            customItems:[self customShortcutItems]];
         controller.modalPresentationStyle = UIModalPresentationOverFullScreen;
@@ -2283,7 +2285,7 @@ static const CGFloat kStreamFloatingMenuExpandedAlpha = 0.96f;
         return;
     }
 
-    [_streamShortcutPanelHostingViewController configureWithTitle:@"快捷键"
+    [_streamShortcutPanelHostingViewController configureWithTitle:StreamMenuLocalized(@"stream.shortcuts.panel_title")
                                                      builtInItems:[self defaultShortcutItems]
                                                       customItems:[self customShortcutItems]];
 }
@@ -2292,7 +2294,7 @@ static const CGFloat kStreamFloatingMenuExpandedAlpha = 0.96f;
     if (@available(iOS 13.0, *)) {
         StreamVirtualKeyboardPanelHostingViewController *controller = [[StreamVirtualKeyboardPanelHostingViewController alloc] init];
         controller.delegate = (id<StreamVirtualKeyboardPanelHostingViewControllerDelegate>)self;
-        [controller configureWithTitle:@"全键盘"];
+        [controller configureWithTitle:StreamMenuLocalized(@"stream.menu.full_keyboard.title")];
         controller.modalPresentationStyle = UIModalPresentationOverFullScreen;
         _streamVirtualKeyboardPanelHostingViewController = controller;
         [self presentViewController:controller animated:YES completion:nil];
@@ -2302,7 +2304,7 @@ static const CGFloat kStreamFloatingMenuExpandedAlpha = 0.96f;
 - (void)quitCurrentAppAndReturnToMainFrame {
     [self->_spinner startAnimating];
     self->_spinner.hidden = NO;
-    self->_stageLabel.text = @"正在退出应用...";
+    self->_stageLabel.text = StreamMenuLocalized(@"stream.menu.quit_stream.progress");
     [self->_stageLabel sizeToFit];
     self->_stageLabel.hidden = NO;
     [self layoutStreamingSubviewsForCurrentBounds];
@@ -2328,10 +2330,10 @@ static const CGFloat kStreamFloatingMenuExpandedAlpha = 0.96f;
                 return;
             }
 
-            UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"退出应用失败"
-                                                                           message:@"当前应用未能成功退出。如果这个应用是从其他设备启动的，可能需要在那台设备上退出。"
+            UIAlertController *alert = [UIAlertController alertControllerWithTitle:StreamMenuLocalized(@"stream.quit_app.failed_title")
+                                                                           message:StreamMenuLocalized(@"stream.quit_app.failed_message")
                                                                     preferredStyle:UIAlertControllerStyleAlert];
-            [alert addAction:[UIAlertAction actionWithTitle:@"知道了" style:UIAlertActionStyleDefault handler:nil]];
+            [alert addAction:[UIAlertAction actionWithTitle:StreamMenuLocalized(@"stream.quit_app.dismiss") style:UIAlertActionStyleDefault handler:nil]];
             [self presentViewController:alert animated:YES completion:nil];
         });
     });
@@ -2383,7 +2385,7 @@ static const CGFloat kStreamFloatingMenuExpandedAlpha = 0.96f;
         [self->_streamView setTemporaryVirtualGamepadEditingEnabled:![self->_streamView isTemporaryVirtualGamepadEditingEnabled]];
         if ([self->_streamView isTemporaryVirtualGamepadEditingEnabled]) {
             [self->_streamView setTemporaryVirtualGamepadVisible:YES];
-            [self showTemporaryTipText:@"点选虚拟手柄控件可调整位置和大小"];
+            [self showTemporaryTipText:StreamMenuLocalized(@"stream.menu.manage_virtual_gamepad.tip")];
         }
         else {
             self->_selectedVirtualGamepadIdentifier = nil;
@@ -2468,8 +2470,8 @@ static const CGFloat kStreamFloatingMenuExpandedAlpha = 0.96f;
         NSString* message;
         
         if (portTestResults != ML_TEST_RESULT_INCONCLUSIVE && portTestResults != 0) {
-            title = @"连接错误";
-            message = @"您的设备网络连接受限，可能无法进行串流。";
+            title = StreamMenuLocalized(@"stream.connection.error_title");
+            message = StreamMenuLocalized(@"stream.connection.restricted_network");
         }
         else {
             switch (errorCode) {
@@ -2478,29 +2480,29 @@ static const CGFloat kStreamFloatingMenuExpandedAlpha = 0.96f;
                     return;
                     
                 case ML_ERROR_NO_VIDEO_TRAFFIC:
-                    title = @"连接错误";
-                    message = @"未收到主机发送的视频。";
+                    title = StreamMenuLocalized(@"stream.connection.error_title");
+                    message = StreamMenuLocalized(@"stream.connection.no_video_traffic");
                     if (portFlags != 0) {
                         char failingPorts[256];
                         LiStringifyPortFlags(portFlags, "\n", failingPorts, sizeof(failingPorts));
-                        message = [message stringByAppendingString:[NSString stringWithFormat:@"请检查您的防火墙和端口转发规则，确认端口是否已启用：\n%s", failingPorts]];
+                        message = [message stringByAppendingString:[NSString stringWithFormat:StreamMenuLocalized(@"stream.connection.failed_ports"), failingPorts]];
                     }
                     break;
                     
                 case ML_ERROR_NO_VIDEO_FRAME:
-                    title = @"连接错误";
-                    message = @"您的网络连接性能不佳。请降低视频比特率设置或尝试更快的连接。";
+                    title = StreamMenuLocalized(@"stream.connection.error_title");
+                    message = StreamMenuLocalized(@"stream.connection.no_video_frame");
                     break;
                     
                 case ML_ERROR_UNEXPECTED_EARLY_TERMINATION:
                 case ML_ERROR_PROTECTED_CONTENT:
-                    title = @"连接错误";
-                    message = @"启动串流时，主机电脑出现问题。\n\n请确保主机电脑上没有打开任何受 DRM 保护的内容。您也可以尝试重启主机电脑。\n\n如果问题仍然存在，请尝试重新安装显卡驱动程序和 GeForce Experience。";
+                    title = StreamMenuLocalized(@"stream.connection.error_title");
+                    message = StreamMenuLocalized(@"stream.connection.host_problem");
                     break;
                     
                 case ML_ERROR_FRAME_CONVERSION:
-                    title = @"连接错误";
-                    message = @"主机报告出现致命的视频编码错误。\n\n请尝试禁用 HDR 模式、更改流媒体分辨率或更改主机的显示分辨率。";
+                    title = StreamMenuLocalized(@"stream.connection.error_title");
+                    message = StreamMenuLocalized(@"stream.connection.frame_conversion");
                     break;
                     
                 default:
@@ -2515,8 +2517,8 @@ static const CGFloat kStreamFloatingMenuExpandedAlpha = 0.96f;
                         errorString = [NSString stringWithFormat:@"%d", errorCode];
                     }
                     
-                    title = @"连接已终止";
-                    message = [NSString stringWithFormat: @"连接已终止\in\错误代码：%@", errorString];
+                    title = StreamMenuLocalized(@"stream.connection.terminated_title");
+                    message = [NSString stringWithFormat:StreamMenuLocalized(@"stream.connection.terminated_message"), errorString];
                     break;
                 }
             }
@@ -2526,7 +2528,7 @@ static const CGFloat kStreamFloatingMenuExpandedAlpha = 0.96f;
                                                                               message:message
                                                                        preferredStyle:UIAlertControllerStyleAlert];
         [Utils addHelpOptionToDialog:conTermAlert];
-        [conTermAlert addAction:[UIAlertAction actionWithTitle:@"OK" style:UIAlertActionStyleDefault handler:^(UIAlertAction* action){
+        [conTermAlert addAction:[UIAlertAction actionWithTitle:StreamMenuLocalized(@"common.ok") style:UIAlertActionStyleDefault handler:^(UIAlertAction* action){
             [self returnToMainFrame];
         }]];
         [self presentViewController:conTermAlert animated:YES completion:nil];
@@ -2557,21 +2559,23 @@ static const CGFloat kStreamFloatingMenuExpandedAlpha = 0.96f;
         // Allow the display to go to sleep now
         [UIApplication sharedApplication].idleTimerDisabled = NO;
         
-        NSString* message = [NSString stringWithFormat:@"%s failed with error %d", stageName, errorCode];
+        NSString* message = [NSString stringWithFormat:StreamMenuLocalized(@"stream.connection.stage_failed"),
+                             [NSString stringWithUTF8String:stageName],
+                             errorCode];
         if (portTestFlags != 0) {
             char failingPorts[256];
             LiStringifyPortFlags(portTestFlags, "\n", failingPorts, sizeof(failingPorts));
-            message = [message stringByAppendingString:[NSString stringWithFormat:@"请检查您的防火墙和端口转发规则，确认端口是否已启用：\n%s", failingPorts]];
+            message = [message stringByAppendingString:[NSString stringWithFormat:StreamMenuLocalized(@"stream.connection.failed_ports"), failingPorts]];
         }
         if (portTestResults != ML_TEST_RESULT_INCONCLUSIVE && portTestResults != 0) {
-            message = [message stringByAppendingString:@"您的设备网络连接受限，可能无法进行串流。"];
+            message = [message stringByAppendingString:StreamMenuLocalized(@"stream.connection.restricted_network")];
         }
         
-        UIAlertController* alert = [UIAlertController alertControllerWithTitle:@"连接失败"
+        UIAlertController* alert = [UIAlertController alertControllerWithTitle:StreamMenuLocalized(@"stream.connection.failed_title")
                                                                        message:message
                                                                 preferredStyle:UIAlertControllerStyleAlert];
         [Utils addHelpOptionToDialog:alert];
-        [alert addAction:[UIAlertAction actionWithTitle:@"确认" style:UIAlertActionStyleDefault handler:^(UIAlertAction* action){
+        [alert addAction:[UIAlertAction actionWithTitle:StreamMenuLocalized(@"common.ok") style:UIAlertActionStyleDefault handler:^(UIAlertAction* action){
             [self returnToMainFrame];
         }]];
         [self presentViewController:alert animated:YES completion:nil];
@@ -2587,11 +2591,11 @@ static const CGFloat kStreamFloatingMenuExpandedAlpha = 0.96f;
         // Allow the display to go to sleep now
         [UIApplication sharedApplication].idleTimerDisabled = NO;
         
-        UIAlertController* alert = [UIAlertController alertControllerWithTitle:@"连接错误"
+        UIAlertController* alert = [UIAlertController alertControllerWithTitle:StreamMenuLocalized(@"stream.connection.error_title")
                                                                        message:message
                                                                 preferredStyle:UIAlertControllerStyleAlert];
         [Utils addHelpOptionToDialog:alert];
-        [alert addAction:[UIAlertAction actionWithTitle:@"确认" style:UIAlertActionStyleDefault handler:^(UIAlertAction* action){
+        [alert addAction:[UIAlertAction actionWithTitle:StreamMenuLocalized(@"common.ok") style:UIAlertActionStyleDefault handler:^(UIAlertAction* action){
             [self returnToMainFrame];
         }]];
         [self presentViewController:alert animated:YES completion:nil];
@@ -2638,10 +2642,10 @@ static const CGFloat kStreamFloatingMenuExpandedAlpha = 0.96f;
                 
             case CONN_STATUS_POOR:
                 if (self->_streamConfig.bitRate > 5000) {
-                    [self updateOverlayText:@"电脑连接速度缓慢，请降低码率！"];
+                    [self updateOverlayText:StreamMenuLocalized(@"stream.connection.poor_slow")];
                 }
                 else {
-                    [self updateOverlayText:@"电脑连接不良"];
+                    [self updateOverlayText:StreamMenuLocalized(@"stream.connection.poor")];
                 }
                 break;
         }
@@ -2797,10 +2801,10 @@ static const CGFloat kStreamFloatingMenuExpandedAlpha = 0.96f;
     if (kbPerSecond > 1000) {
         float mbPerSecond = kbPerSecond / 1024.0;  // 转换为兆字节每秒（MB/s）
 //        NSLog(@"Network speed: %.2f MB/s", mbPerSecond);  // 输出 MB/s
-        return [NSString stringWithFormat:@"带宽: %.2f MB/s",mbPerSecond];
+        return [NSString stringWithFormat:StreamMenuLocalized(@"stream.bandwidth.mb"), mbPerSecond];
     } else {
 //        NSLog(@"Network speed: %.2f KB/s", kbPerSecond);  // 输出 KB/s
-        return [NSString stringWithFormat:@"带宽: %.2f KB/s",kbPerSecond];
+        return [NSString stringWithFormat:StreamMenuLocalized(@"stream.bandwidth.kb"), kbPerSecond];
     }
     return @"";
 }
@@ -2927,7 +2931,7 @@ static const CGFloat kStreamFloatingMenuExpandedAlpha = 0.96f;
     [[self customShortcutDefinitions] addObject:definition];
     [self persistCustomShortcutDefinitions];
     [self refreshShortcutPanelIfNeeded];
-    [self showTemporaryTipText:@"快捷键已添加"];
+    [self showTemporaryTipText:StreamMenuLocalized(@"stream.shortcuts.added")];
 }
 
 - (void)streamShortcutPanelHostingViewController:(StreamShortcutPanelHostingViewController *)controller
@@ -2943,7 +2947,7 @@ static const CGFloat kStreamFloatingMenuExpandedAlpha = 0.96f;
     [[self customShortcutDefinitions] removeObjectsAtIndexes:indexes];
     [self persistCustomShortcutDefinitions];
     [self refreshShortcutPanelIfNeeded];
-    [self showTemporaryTipText:@"快捷键已删除"];
+    [self showTemporaryTipText:StreamMenuLocalized(@"stream.shortcuts.deleted")];
 }
 
 - (void)streamVirtualKeyboardPanelHostingViewControllerDidCancel:(StreamVirtualKeyboardPanelHostingViewController *)controller {
@@ -2978,7 +2982,7 @@ static const CGFloat kStreamFloatingMenuExpandedAlpha = 0.96f;
         [_streamView setTemporaryVirtualButtonsVisible:YES];
         _streamVirtualButtonsPanelHostingViewController = nil;
         [controller dismissViewControllerAnimated:YES completion:nil];
-        [self showTemporaryTipText:@"点选虚拟按键可调整位置和大小"];
+        [self showTemporaryTipText:StreamMenuLocalized(@"stream.virtual_buttons.editing_tip")];
     }
     else {
         _selectedVirtualButtonIdentifier = nil;

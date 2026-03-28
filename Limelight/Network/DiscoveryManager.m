@@ -20,6 +20,8 @@
 #include <sys/socket.h>
 #include <netdb.h>
 
+#define DiscoveryLocalized(key) NSLocalizedString((key), nil)
+
 @implementation DiscoveryManager {
     NSMutableArray* _hostQueue;
     NSMutableSet* _pausedHosts;
@@ -128,7 +130,7 @@
 
 - (void) discoverHost:(NSString *)hostAddress withCallback:(void (^)(TemporaryHost *, NSString*))callback {
     BOOL prohibitedAddress = [DiscoveryManager isProhibitedAddress:hostAddress];
-    NSString* prohibitedAddressMessage = [NSString stringWithFormat: @"此应用仅支持在 %s 上添加本地网络上的 PC。",
+    NSString* prohibitedAddressMessage = [NSString stringWithFormat: DiscoveryLocalized(@"discovery.prohibited_address"),
     #if TARGET_OS_TV
                                    "tvOS"
     #else
@@ -197,12 +199,12 @@
         }
         
         if (![self addHostToDiscovery:host]) {
-            callback(nil, @"主机信息已更新");
+            callback(nil, DiscoveryLocalized(@"discovery.host_updated"));
         } else {
             callback(host, nil);
         }
     } else if (!prohibitedAddress) {
-        callback(nil, @"无法连接到主机。\n\n如果您使用 GeForce Experience 托管服务器，请确保已在 SHIELD 选项卡上启用相应开关。\n\n如果您使用 Sunshine 托管服务器，请确保其运行正常。如果您使用的是非默认端口，则需要在此处添加该端口号。");
+        callback(nil, DiscoveryLocalized(@"discovery.connection_failed"));
     } else {
         callback(nil, prohibitedAddressMessage);
     }

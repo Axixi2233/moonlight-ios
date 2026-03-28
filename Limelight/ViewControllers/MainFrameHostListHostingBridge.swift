@@ -2,6 +2,10 @@ import UIKit
 #if canImport(SwiftUI)
 import SwiftUI
 
+private func MainFrameHostListLocalized(_ key: String) -> String {
+    NSLocalizedString(key, comment: "")
+}
+
 @objcMembers
 final class MainFrameHostListItemSnapshot: NSObject {
     var title: String = ""
@@ -73,12 +77,12 @@ private struct MainFrameHostListRootView: View {
             }
 
             VStack(spacing: 8) {
-                Text("还没有添加可控设备")
+                Text(MainFrameHostListLocalized("home.empty.title"))
                     .font(.system(size: 22, weight: .bold))
                     .foregroundColor(Color(red: 0.26, green: 0.20, blue: 0.37))
                     .multilineTextAlignment(.center)
 
-                Text("点击右上角的加号按钮添加可控设备")
+                Text(MainFrameHostListLocalized("home.empty.subtitle"))
                     .font(.system(size: 14, weight: .medium))
                     .foregroundColor(Color(red: 0.40, green: 0.34, blue: 0.52))
                     .multilineTextAlignment(.center)

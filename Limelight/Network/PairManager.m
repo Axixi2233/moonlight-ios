@@ -15,6 +15,8 @@
 
 #include <dispatch/dispatch.h>
 
+#define PairLocalized(key) NSLocalizedString((key), nil)
+
 @implementation PairManager {
     HttpManager* _httpManager;
     NSData* _clientCert;
@@ -41,7 +43,7 @@
         if (![[serverInfoResp getStringTag:@"PairStatus"] isEqual:@"1"]) {
             NSString* appversion = [serverInfoResp getStringTag:@"appversion"];
             if (appversion == nil) {
-                [_callback pairFailed:@"Missing XML element"];
+                [_callback pairFailed:PairLocalized(@"pairing.error.missing_xml")];
                 return;
             }            
             [self initiatePairWithPin:PIN forServerMajorVersion:[[appversion substringToIndex:1] intValue] withState:[serverInfoResp getStringTag:@"state"]];
@@ -99,17 +101,17 @@
     if (![self verifyResponseStatus:pairResp]) {
         // GFE does not allow pairing while a server is busy, but Sunshine does. We give it a try and display the busy error if it fails.
         if ([state hasSuffix:@"_SERVER_BUSY"]) {
-            [self finishPairing:bgId forResponse:pairResp withFallbackError:@"You cannot pair while a previous session is still running on the host PC. Quit any running games or reboot the host PC, then try pairing again."];
+            [self finishPairing:bgId forResponse:pairResp withFallbackError:PairLocalized(@"pairing.error.server_busy")];
         }
         else {
-            [self finishPairing:bgId forResponse:pairResp withFallbackError:@"Pairing was declined by the target."];
+            [self finishPairing:bgId forResponse:pairResp withFallbackError:PairLocalized(@"pairing.error.declined")];
         }
         return;
     }
     
     NSString* plainCert = [pairResp getStringTag:@"plaincert"];
     if ([plainCert length] == 0) {
-        [self finishPairing:bgId forResponse:pairResp withFallbackError:@"Another pairing attempt is already in progress."];
+        [self finishPairing:bgId forResponse:pairResp withFallbackError:PairLocalized(@"pairing.error.in_progress")];
         return;
     }
     
@@ -137,7 +139,7 @@
     HttpResponse* challengeResp = [[HttpResponse alloc] init];
     [_httpManager executeRequestSynchronously:[HttpRequest requestForResponse:challengeResp withUrlRequest:[_httpManager newChallengeRequest:encryptedChallenge]]];
     if (![self verifyResponseStatus:challengeResp]) {
-        [self finishPairing:bgId forResponse:challengeResp withFallbackError:@"Pairing stage #2 failed"];
+        [self finishPairing:bgId forResponse:challengeResp withFallbackError:PairLocalized(@"pairing.error.stage_2")];
         return;
     }
     
@@ -166,7 +168,7 @@
     HttpResponse* secretResp = [[HttpResponse alloc] init];
     [_httpManager executeRequestSynchronously:[HttpRequest requestForResponse:secretResp withUrlRequest:[_httpManager newChallengeRespRequest:challengeRespEncrypted]]];
     if (![self verifyResponseStatus:secretResp]) {
-        [self finishPairing:bgId forResponse:secretResp withFallbackError:@"Pairing stage #3 failed"];
+        [self finishPairing:bgId forResponse:secretResp withFallbackError:PairLocalized(@"pairing.error.stage_3")];
         return;
     }
     
@@ -175,7 +177,7 @@
     NSData* serverSignature = [serverSecretResp subdataWithRange:NSMakeRange(16, serverSecretResp.length - 16)];
     
     if (![cryptoMan verifySignature:serverSecret withSignature:serverSignature andCert:[Utils hexToBytes:plainCert]]) {
-        [self finishPairing:bgId forResponse:secretResp withFallbackError:@"Server certificate invalid"];
+        [self finishPairing:bgId forResponse:secretResp withFallbackError:PairLocalized(@"pairing.error.invalid_certificate")];
         return;
     }
     
@@ -188,7 +190,7 @@
         serverChallengeRespHash = [cryptoMan SHA1HashData: serverChallengeRespHashInput];
     }
     if (![serverChallengeRespHash isEqual:serverResponse]) {
-        [self finishPairing:bgId forResponse:secretResp withFallbackError:@"Incorrect PIN"];
+        [self finishPairing:bgId forResponse:secretResp withFallbackError:PairLocalized(@"pairing.error.incorrect_pin")];
         return;
     }
     
@@ -196,14 +198,14 @@
     HttpResponse* clientSecretResp = [[HttpResponse alloc] init];
     [_httpManager executeRequestSynchronously:[HttpRequest requestForResponse:clientSecretResp withUrlRequest:[_httpManager newClientSecretRespRequest:[Utils bytesToHex:clientPairingSecret]]]];
     if (![self verifyResponseStatus:clientSecretResp]) {
-        [self finishPairing:bgId forResponse:clientSecretResp withFallbackError:@"Pairing stage #4 failed"];
+        [self finishPairing:bgId forResponse:clientSecretResp withFallbackError:PairLocalized(@"pairing.error.stage_4")];
         return;
     }
     
     HttpResponse* clientPairChallengeResp = [[HttpResponse alloc] init];
     [_httpManager executeRequestSynchronously:[HttpRequest requestForResponse:clientPairChallengeResp withUrlRequest:[_httpManager newPairChallenge]]];
     if (![self verifyResponseStatus:clientPairChallengeResp]) {
-        [self finishPairing:bgId forResponse:clientPairChallengeResp withFallbackError:@"Pairing stage #5 failed"];
+        [self finishPairing:bgId forResponse:clientPairChallengeResp withFallbackError:PairLocalized(@"pairing.error.stage_5")];
         return;
     }
     

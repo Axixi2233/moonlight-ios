@@ -21,6 +21,8 @@
 
 @end
 
+#define AppDelegateLocalized(key) NSLocalizedString((key), nil)
+
 @implementation AppLaunchOverlayView {
     CAGradientLayer *_backgroundLayer;
     UIView *_glowView;
@@ -88,7 +90,7 @@
 
     _subtitleLabel = [[UILabel alloc] init];
     _subtitleLabel.translatesAutoresizingMaskIntoConstraints = NO;
-    _subtitleLabel.text = @"随时随地，畅联你的电脑！";
+    _subtitleLabel.text = AppDelegateLocalized(@"launch.subtitle");
     _subtitleLabel.textAlignment = NSTextAlignmentCenter;
     _subtitleLabel.textColor = [UIColor colorWithRed:0.43 green:0.35 blue:0.60 alpha:0.92];
     _subtitleLabel.font = [UIFont systemFontOfSize:13.0 weight:UIFontWeightMedium];

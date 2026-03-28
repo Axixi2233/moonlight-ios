@@ -2,6 +2,10 @@ import UIKit
 #if canImport(SwiftUI)
 import SwiftUI
 
+private func MainFrameAddHostLocalized(_ key: String) -> String {
+    NSLocalizedString(key, comment: "")
+}
+
 @objc protocol MainFrameAddHostSheetHostingViewControllerDelegate: NSObjectProtocol {
     func mainFrameAddHostSheetHostingViewControllerDidCancel(_ controller: MainFrameAddHostSheetHostingViewController)
     func mainFrameAddHostSheetHostingViewController(_ controller: MainFrameAddHostSheetHostingViewController, didSubmitHostAddress hostAddress: String)
@@ -103,7 +107,7 @@ private struct MainFrameAddHostSheetRootView: View {
                             .foregroundColor(Color(red: 0.39, green: 0.31, blue: 0.58))
 
                         MainFrameAddHostTextField(text: $hostAddress,
-                                                  placeholder: "输入 IPv4 / IPv6 / 主机地址",
+                                                  placeholder: MainFrameAddHostLocalized("home.manual_add.placeholder"),
                                                   onReturn: submitIfPossible)
                             .frame(height: 24)
                     }
@@ -120,7 +124,7 @@ private struct MainFrameAddHostSheetRootView: View {
 
                     HStack(spacing: 12) {
                         Button(action: onCancel) {
-                            Text("取消")
+                            Text(MainFrameAddHostLocalized("common.cancel"))
                                 .font(.system(size: 17, weight: .semibold))
                                 .foregroundColor(.primary)
                                 .frame(maxWidth: .infinity)
@@ -133,7 +137,7 @@ private struct MainFrameAddHostSheetRootView: View {
                         .buttonStyle(PlainButtonStyle())
 
                         Button(action: submitIfPossible) {
-                            Text("添加")
+                            Text(MainFrameAddHostLocalized("home.manual_add.add"))
                                 .font(.system(size: 17, weight: .bold))
                                 .foregroundColor(.white)
                                 .frame(maxWidth: .infinity)
