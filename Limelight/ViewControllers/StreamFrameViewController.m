@@ -118,7 +118,7 @@ static const CGFloat kStreamFloatingMenuExpandedAlpha = 0.96f;
 #endif
     //外接显示器-----------start
     UIWindow *_extWindow;
-    UIView *_renderView;
+    StreamView *_renderView;
     UIWindow *_deviceWindow;
     //外接显示器-----------end
 }
@@ -619,6 +619,11 @@ static const CGFloat kStreamFloatingMenuExpandedAlpha = 0.96f;
 - (void)viewDidAppear:(BOOL)animated
 {
     [super viewDidAppear:animated];
+#if defined(__IPHONE_14_0)
+    if (@available(iOS 14.0, *)) {
+        [self setNeedsUpdateOfPrefersPointerLocked];
+    }
+#endif
     //外接显示器
     if(_settings.externalMonitor){
         _deviceWindow = self.view.window;
@@ -674,7 +679,8 @@ static const CGFloat kStreamFloatingMenuExpandedAlpha = 0.96f;
     [self loadVirtualButtonDefinitionsFromCurrentScheme];
     [self loadVirtualGamepadDefinitionsFromCurrentScheme];
     [self loadCustomShortcutDefinitions];
-    _currentSessionTouchModeSelection = !_settings.absoluteTouchMode ? 0 : (_settings.multiTouchScreen ? 2 : 1);
+    _currentSessionTouchModeSelection = MAX(StreamTouchModeSelectionTrackpad,
+                                            MIN(_settings.touchModeSelection, StreamTouchModeSelectionDisabled));
     _currentSessionVideoAlignmentSelection = MAX(0, MIN(_settings.videoAlignmentSelection, 2));
     _currentSessionVideoAlignmentMargin = MAX(0.0f, MIN(_settings.videoAlignmentMargin, 150.0f));
     _currentSessionPerformanceOverlayPositionSelection = MAX(0, MIN(_settings.performanceOverlayPositionSelection, 5));
@@ -708,8 +714,10 @@ static const CGFloat kStreamFloatingMenuExpandedAlpha = 0.96f;
     
     //外接显示器
     if(_settings.externalMonitor){
-        _renderView = (StreamView*)[[UIView alloc] initWithFrame:self.view.frame];
+        _renderView = [[StreamView alloc] initWithFrame:self.view.frame];
         _renderView.bounds = _streamView.bounds;
+        [_renderView setVideoAlignmentMode:_currentSessionVideoAlignmentSelection];
+        [_renderView setVideoAlignmentMargin:_currentSessionVideoAlignmentMargin];
     }
     
     [_streamView setupStreamView:_controllerSupport interactionDelegate:self config:self.streamConfig];
@@ -1250,37 +1258,13 @@ static const CGFloat kStreamFloatingMenuExpandedAlpha = 0.96f;
 }
 
 - (void)applyTouchModeSelectionToCurrentSession:(NSInteger)selection {
-    BOOL absoluteTouchMode = NO;
-    BOOL multiTouchScreen = NO;
-    BOOL directScreenTouchInputDisabled = NO;
+    NSInteger normalizedSelection = MAX(StreamTouchModeSelectionTrackpad,
+                                        MIN(selection, StreamTouchModeSelectionDisabled));
+    _currentSessionTouchModeSelection = normalizedSelection;
+    _settings.touchModeSelection = normalizedSelection;
+    [[[DataManager alloc] init] saveTouchModeSelection:normalizedSelection];
 
-    switch (selection) {
-        case 1:
-            absoluteTouchMode = YES;
-            multiTouchScreen = NO;
-            break;
-        case 2:
-            absoluteTouchMode = YES;
-            multiTouchScreen = YES;
-            break;
-        case 3:
-            absoluteTouchMode = NO;
-            multiTouchScreen = NO;
-            directScreenTouchInputDisabled = YES;
-            break;
-        default:
-            absoluteTouchMode = NO;
-            multiTouchScreen = NO;
-            break;
-    }
-
-    _currentSessionTouchModeSelection = selection;
-    _settings.absoluteTouchMode = absoluteTouchMode;
-    _settings.multiTouchScreen = multiTouchScreen;
-
-    [_streamView applyTemporaryTouchModeWithAbsoluteTouchMode:absoluteTouchMode
-                                             multiTouchScreen:multiTouchScreen];
-    [_streamView setDirectScreenTouchInputDisabled:directScreenTouchInputDisabled];
+    [_streamView applyTemporaryTouchModeSelection:normalizedSelection];
     [self updateStreamingTouchModeLayout];
     [_streamView resetAfterTemporaryTouchModeChange];
 }
@@ -1384,7 +1368,7 @@ static const CGFloat kStreamFloatingMenuExpandedAlpha = 0.96f;
 - (NSString *)touchModeTitleForSelection:(NSInteger)selection {
     switch (selection) {
         case 1:
-            return @"鼠标";
+            return @"普通鼠标";
         case 2:
             return @"多点触控";
         case 3:
@@ -2792,9 +2776,12 @@ static const CGFloat kStreamFloatingMenuExpandedAlpha = 0.96f;
 
 - (BOOL)prefersPointerLocked {
     // Pointer lock breaks the UIKit mouse APIs, which is a problem because
-    // GCMouse is horribly broken on iOS 14.0 for certain mice. Only lock
-    // the cursor if there is a GCMouse present.
-    return [GCMouse mice].count > 0;
+    // GCMouse is horribly broken on iOS 14.0 for certain mice. Respect the
+    // user-facing toggle semantics here so pointer lock matches the stream view.
+    if (_settings.remoteMouseMode) {
+        return NO;
+    }
+    return !_settings.captureMouseCursor && [GCMouse mice].count > 0;
 }
 #endif
 

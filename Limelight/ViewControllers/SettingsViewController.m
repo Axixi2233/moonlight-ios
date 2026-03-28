@@ -43,6 +43,30 @@ BOOL isCustomResolution(CGSize res) {
     return YES;
 }
 
+static NSInteger AudioConfigSelectionFromChannelCount(NSInteger channelCount) {
+    switch (channelCount) {
+        case 6:
+            return 1;
+        case 8:
+            return 2;
+        case 2:
+        default:
+            return 0;
+    }
+}
+
+static NSInteger ChannelCountFromAudioConfigSelection(NSInteger selection) {
+    switch (selection) {
+        case 1:
+            return 6;
+        case 2:
+            return 8;
+        case 0:
+        default:
+            return 2;
+    }
+}
+
 - (UIColor *)navigationAccentColor {
     return [UIColor colorWithRed:0.31 green:0.23 blue:0.46 alpha:1.0];
 }
@@ -112,10 +136,27 @@ BOOL isCustomResolution(CGSize res) {
                                                                                  target:self
                                                                                  action:@selector(closeSettings:)];
     }
-    self.navigationItem.rightBarButtonItem = [[UIBarButtonItem alloc] initWithTitle:@"重置"
-                                                                               style:UIBarButtonItemStylePlain
-                                                                              target:self
-                                                                              action:@selector(promptResetToDefaults:)];
+    UIImage *resetImage = nil;
+    if (@available(iOS 13.0, *)) {
+        UIImageSymbolConfiguration *symbolConfig = [UIImageSymbolConfiguration configurationWithPointSize:18 weight:UIImageSymbolWeightSemibold];
+        resetImage = [[UIImage systemImageNamed:@"arrow.trianglehead.counterclockwise"] imageByApplyingSymbolConfiguration:symbolConfig];
+    }
+
+    if (resetImage != nil) {
+        UIBarButtonItem *resetButtonItem = [[UIBarButtonItem alloc] initWithImage:resetImage
+                                                                             style:UIBarButtonItemStylePlain
+                                                                            target:self
+                                                                            action:@selector(promptResetToDefaults:)];
+        resetButtonItem.accessibilityLabel = @"恢复初始化设置";
+        resetButtonItem.accessibilityHint = @"重置当前设置项";
+        self.navigationItem.rightBarButtonItem = resetButtonItem;
+    }
+    else {
+        self.navigationItem.rightBarButtonItem = [[UIBarButtonItem alloc] initWithTitle:@"重置"
+                                                                                   style:UIBarButtonItemStylePlain
+                                                                                  target:self
+                                                                                  action:@selector(promptResetToDefaults:)];
+    }
     [self applyNavigationBarAppearance];
     [self installSwiftUISettingsIfPossible];
 }
@@ -346,17 +387,19 @@ BOOL isCustomResolution(CGSize res) {
     snapshot.hdrSupported = VTIsHardwareDecodeSupported(kCMVideoCodecType_HEVC) && (AVPlayer.availableHDRModes & AVPlayerHDRModeHDR10);
     snapshot.enableHdr = snapshot.hdrSupported ? currentSettings.enableHdr : NO;
     snapshot.useFramePacing = currentSettings.useFramePacing;
+    snapshot.audioConfigSelection = AudioConfigSelectionFromChannelCount([currentSettings.audioConfig intValue]);
 
-    snapshot.absoluteTouchMode = currentSettings.absoluteTouchMode;
+    snapshot.touchModeSelection = currentSettings.touchModeSelection;
     snapshot.optimizeGames = currentSettings.optimizeGames;
     snapshot.multiController = currentSettings.multiController;
     snapshot.swapABXYButtons = currentSettings.swapABXYButtons;
     snapshot.playAudioOnPC = currentSettings.playAudioOnPC;
     snapshot.btMouseSupport = currentSettings.btMouseSupport;
+    snapshot.remoteMouseMode = currentSettings.remoteMouseMode;
+    snapshot.captureMouseCursor = currentSettings.captureMouseCursor;
+    snapshot.relativeMouseSensitivity = currentSettings.relativeMouseSensitivity;
     snapshot.statsOverlay = currentSettings.statsOverlay;
-    snapshot.rumblePhone = currentSettings.rumblePhone;
-    snapshot.showRumblePhoneOption = [UIDevice currentDevice].userInterfaceIdiom == UIUserInterfaceIdiomPhone;
-    snapshot.multiTouchScreen = currentSettings.multiTouchScreen;
+    snapshot.rumbleModeSelection = currentSettings.rumbleModeSelection;
     snapshot.externalMonitor = currentSettings.externalMonitor;
     snapshot.motionMode = [currentSettings.motionMode intValue];
     snapshot.virtualDisplayMode = [currentSettings.virtualDisplayMode intValue];
@@ -368,6 +411,8 @@ BOOL isCustomResolution(CGSize res) {
     snapshot.performanceOverlayPositionSelection = currentSettings.performanceOverlayPositionSelection;
     snapshot.performanceOverlayMargin = (NSInteger)currentSettings.performanceOverlayMargin;
     snapshot.floatingMenuEnabled = currentSettings.floatingMenuEnabled;
+    snapshot.virtualButtonsEnabled = currentSettings.virtualButtonsEnabled;
+    snapshot.virtualGamepadEnabled = currentSettings.virtualGamepadEnabled;
     snapshot.virtualButtonSchemeSelection = currentSettings.virtualButtonSchemeSelection;
     snapshot.virtualGamepadSchemeSelection = currentSettings.virtualGamepadSchemeSelection;
     snapshot.virtualGamepadOpacity = (NSInteger)lrint(currentSettings.virtualGamepadOpacity * 100.0);
@@ -398,13 +443,14 @@ BOOL isCustomResolution(CGSize res) {
     NSInteger framerate = snapshot.framerate;
     NSInteger height = [self chosenStreamHeightFromSnapshot:snapshot];
     NSInteger width = [self chosenStreamWidthFromSnapshot:snapshot];
+    NSInteger audioConfig = ChannelCountFromAudioConfigSelection(snapshot.audioConfigSelection);
     CGFloat virtualGamepadOpacity = MAX(0.05, MIN(snapshot.virtualGamepadOpacity / 100.0, 1.0));
 
     [dataMan saveSettingsWithBitrate:snapshot.bitrateKbps
                            framerate:framerate
                               height:height
                                width:width
-                         audioConfig:2
+                         audioConfig:audioConfig
                     onscreenControls:0
                        optimizeGames:snapshot.optimizeGames
                      multiController:snapshot.multiController
@@ -414,10 +460,12 @@ BOOL isCustomResolution(CGSize res) {
                       useFramePacing:snapshot.useFramePacing
                            enableHdr:snapshot.enableHdr
                       btMouseSupport:snapshot.btMouseSupport
-                   absoluteTouchMode:snapshot.absoluteTouchMode
+                     remoteMouseMode:snapshot.remoteMouseMode
+                  captureMouseCursor:snapshot.captureMouseCursor
+            relativeMouseSensitivity:snapshot.relativeMouseSensitivity
+                  touchModeSelection:snapshot.touchModeSelection
                         statsOverlay:snapshot.statsOverlay
-                         rumblePhone:snapshot.rumblePhone
-                    multiTouchScreen:snapshot.multiTouchScreen
+                 rumbleModeSelection:snapshot.rumbleModeSelection
                      externalMonitor:snapshot.externalMonitor
               touchSensitivityGlobal:snapshot.touchSensitivityGlobal
               enableTouchSensitivity:snapshot.enableTouchSensitivity
@@ -429,6 +477,8 @@ BOOL isCustomResolution(CGSize res) {
 performanceOverlayPositionSelection:snapshot.performanceOverlayPositionSelection
          performanceOverlayMargin:snapshot.performanceOverlayMargin
               floatingMenuEnabled:snapshot.floatingMenuEnabled
+             virtualButtonsEnabled:snapshot.virtualButtonsEnabled
+             virtualGamepadEnabled:snapshot.virtualGamepadEnabled
        virtualButtonSchemeSelection:snapshot.virtualButtonSchemeSelection
      virtualGamepadSchemeSelection:snapshot.virtualGamepadSchemeSelection
              virtualGamepadOpacity:virtualGamepadOpacity];

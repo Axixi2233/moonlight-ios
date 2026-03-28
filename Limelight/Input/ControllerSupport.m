@@ -11,6 +11,8 @@
 
 #import "DataManager.h"
 #include "Limelight.h"
+#include <limits.h>
+#include <math.h>
 
 @import GameController;
 @import AudioToolbox;
@@ -20,7 +22,35 @@
     @import CoreMotion;
 #endif
 
-static const double MOUSE_SPEED_DIVISOR = 1.25;
+static const double MOUSE_SPEED_DIVISOR = 1.0;
+
+static float AdjustMouseDeltaForLowSpeed(float delta) {
+    float magnitude = fabsf(delta);
+    if (magnitude < 1.0f) {
+        return delta * 1.35f;
+    }
+    if (magnitude < 2.0f) {
+        return delta * 1.15f;
+    }
+    return delta;
+}
+
+static short ConsumeAccumulatedMouseDelta(float *accumulatedDelta) {
+    if (accumulatedDelta == NULL || fabsf(*accumulatedDelta) < 0.5f) {
+        return 0;
+    }
+
+    float roundedDelta = *accumulatedDelta > 0.0f ? floorf(*accumulatedDelta + 0.5f) : ceilf(*accumulatedDelta - 0.5f);
+    roundedDelta = fmaxf((float)SHRT_MIN, fminf((float)SHRT_MAX, roundedDelta));
+
+    short emittedDelta = (short)roundedDelta;
+    *accumulatedDelta -= emittedDelta;
+    return emittedDelta;
+}
+
+static float MouseSensitivityScaleForPercentage(NSInteger relativeMouseSensitivity) {
+    return MAX(0.5f, MIN((float)relativeMouseSensitivity / 100.0f, 3.0f));
+}
 
 @implementation ControllerSupport {
     id _controllerConnectObserver;
@@ -51,7 +81,9 @@ static const double MOUSE_SPEED_DIVISOR = 1.25;
     
     int _motionMode;//陀螺仪模式
     
-    bool _rumblePhone;//iphone震动
+    NSInteger _rumbleMode;
+    BOOL _remoteMouseMode;
+    float _relativeMouseSensitivityScale;
 }
 
 // UPDATE_BUTTON_FLAG(controller, flag, pressed)
@@ -60,13 +92,42 @@ static const double MOUSE_SPEED_DIVISOR = 1.25;
 
 #define MAX_MAGNITUDE(x, y) (abs(x) > abs(y) ? (x) : (y))
 
+#if !TARGET_OS_TV
+- (void)startDeviceMotionUpdatesForController:(Controller *)controller reportRateHz:(uint16_t)reportRateHz {
+    if (controller.motionManager == nil) {
+        controller.motionManager = [[CMMotionManager alloc] init];
+    }
+
+    if (reportRateHz > 0) {
+        controller.motionManager.deviceMotionUpdateInterval = 1.0 / reportRateHz;
+    }
+
+    if (!controller.motionManager.isDeviceMotionActive) {
+        [controller.motionManager startDeviceMotionUpdates];
+    }
+}
+
+- (void)stopDeviceMotionUpdatesIfIdleForController:(Controller *)controller {
+    if (controller.motionManager == nil) {
+        return;
+    }
+
+    if (controller.accelTimer == nil && controller.gyroTimer == nil && controller.motionManager.isDeviceMotionActive) {
+        [controller.motionManager stopDeviceMotionUpdates];
+    }
+}
+#endif
+
 -(void) rumble:(unsigned short)controllerNumber lowFreqMotor:(unsigned short)lowFreqMotor highFreqMotor:(unsigned short)highFreqMotor
 {
+    if (_rumbleMode == StreamRumbleModeSelectionDisabled) {
+        return;
+    }
+
     Controller* controller = [_controllers objectForKey:[NSNumber numberWithInteger:controllerNumber]];
     if (controller == nil && controllerNumber == 0 && _oscEnabled) {
         // TODO: Rumble emulation for OSC
-        //iPhone震动
-        if(_rumblePhone){
+        if (_rumbleMode == StreamRumbleModeSelectionDevice) {
             controller = _oscController;
             [self initializeControllerHaptics:controller];
         }
@@ -82,6 +143,10 @@ static const double MOUSE_SPEED_DIVISOR = 1.25;
 
 -(void) rumbleTriggers:(uint16_t)controllerNumber leftTrigger:(uint16_t)leftTrigger rightTrigger:(uint16_t)rightTrigger
 {
+    if (_rumbleMode == StreamRumbleModeSelectionDisabled) {
+        return;
+    }
+
     Controller* controller = [_controllers objectForKey:[NSNumber numberWithInteger:controllerNumber]];
     if (controller == nil && controllerNumber == 0 && _oscEnabled) {
         // TODO: Trigger rumble emulation for OSC
@@ -134,9 +199,6 @@ static const double MOUSE_SPEED_DIVISOR = 1.25;
                         // No connected controller for this player, use the _oscController instead
                         controller = _oscController;
                     }
-                    if(!controller.motionManager) {
-                        controller.motionManager = [[CMMotionManager alloc] init];
-                    }
 
                     switch (motionType) {
                         case LI_MOTION_TYPE_ACCEL:
@@ -146,6 +208,13 @@ static const double MOUSE_SPEED_DIVISOR = 1.25;
                             // Reset the last motion sample
                             CMAcceleration emptyDeviceAccelSample = {};
                             controller.lastDeviceAccelSample = emptyDeviceAccelSample;
+
+                            if (!reportRateHz) {
+                                [self stopDeviceMotionUpdatesIfIdleForController:controller];
+                                break;
+                            }
+
+                            [self startDeviceMotionUpdatesForController:controller reportRateHz:reportRateHz];
 
                             {dispatch_sync(dispatch_get_main_queue(), ^{
                                 controller.accelTimer = [NSTimer scheduledTimerWithTimeInterval:1.0 / reportRateHz repeats:YES block:^(NSTimer *timer) {
@@ -188,7 +257,12 @@ static const double MOUSE_SPEED_DIVISOR = 1.25;
                             CMRotationRate emptyDeviceGyroSample = {};
                             controller.lastDeviceGyroSample = emptyDeviceGyroSample;
 
-                            [controller.motionManager startDeviceMotionUpdates];
+                            if (!reportRateHz) {
+                                [self stopDeviceMotionUpdatesIfIdleForController:controller];
+                                break;
+                            }
+
+                            [self startDeviceMotionUpdatesForController:controller reportRateHz:reportRateHz];
 
                             dispatch_sync(dispatch_get_main_queue(), ^{
                                 controller.gyroTimer = [NSTimer scheduledTimerWithTimeInterval:1.0 / reportRateHz repeats:YES block:^(NSTimer *timer) {
@@ -550,12 +624,18 @@ static const double MOUSE_SPEED_DIVISOR = 1.25;
     if (@available(iOS 14.0, tvOS 14.0, *)) {
         // Stop sensor sampling timers
         [controller.gyroTimer invalidate];
+        controller.gyroTimer = nil;
         [controller.accelTimer invalidate];
+        controller.accelTimer = nil;
         
         // Disable motion sensors if they require manual activation
         if (controller.gamepad && controller.gamepad.motion && controller.gamepad.motion.sensorsRequireManualActivation) {
             controller.gamepad.motion.sensorsActive = NO;
         }
+
+#if !TARGET_OS_TV
+        [self stopDeviceMotionUpdatesIfIdleForController:controller];
+#endif
     }
 }
 
@@ -976,38 +1056,57 @@ static const double MOUSE_SPEED_DIVISOR = 1.25;
 
 -(void) registerMouseCallbacks:(GCMouse*) mouse API_AVAILABLE(ios(14.0)) {
     mouse.mouseInput.mouseMovedHandler = ^(GCMouseInput * _Nonnull mouse, float deltaX, float deltaY) {
-        self->accumulatedDeltaX += deltaX / MOUSE_SPEED_DIVISOR;
-        self->accumulatedDeltaY += -deltaY / MOUSE_SPEED_DIVISOR;
+        if (self->_remoteMouseMode) {
+            return;
+        }
+
+        float adjustedDeltaX = AdjustMouseDeltaForLowSpeed(deltaX) / MOUSE_SPEED_DIVISOR;
+        float adjustedDeltaY = AdjustMouseDeltaForLowSpeed(deltaY) / MOUSE_SPEED_DIVISOR;
+
+        self->accumulatedDeltaX += adjustedDeltaX * self->_relativeMouseSensitivityScale;
+        self->accumulatedDeltaY += -adjustedDeltaY * self->_relativeMouseSensitivityScale;
         
-        short truncatedDeltaX = (short)self->accumulatedDeltaX;
-        short truncatedDeltaY = (short)self->accumulatedDeltaY;
+        short truncatedDeltaX = ConsumeAccumulatedMouseDelta(&self->accumulatedDeltaX);
+        short truncatedDeltaY = ConsumeAccumulatedMouseDelta(&self->accumulatedDeltaY);
         
         if (truncatedDeltaX != 0 || truncatedDeltaY != 0) {
             LiSendMouseMoveEvent(truncatedDeltaX, truncatedDeltaY);
-            
-            self->accumulatedDeltaX -= truncatedDeltaX;
-            self->accumulatedDeltaY -= truncatedDeltaY;
         }
     };
     
     mouse.mouseInput.leftButton.pressedChangedHandler = ^(GCControllerButtonInput * _Nonnull button, float value, BOOL pressed) {
+        if (self->_remoteMouseMode) {
+            return;
+        }
         LiSendMouseButtonEvent(pressed ? BUTTON_ACTION_PRESS : BUTTON_ACTION_RELEASE, BUTTON_LEFT);
     };
     mouse.mouseInput.middleButton.pressedChangedHandler = ^(GCControllerButtonInput * _Nonnull button, float value, BOOL pressed) {
+        if (self->_remoteMouseMode) {
+            return;
+        }
         LiSendMouseButtonEvent(pressed ? BUTTON_ACTION_PRESS : BUTTON_ACTION_RELEASE, BUTTON_MIDDLE);
     };
     mouse.mouseInput.rightButton.pressedChangedHandler = ^(GCControllerButtonInput * _Nonnull button, float value, BOOL pressed) {
+        if (self->_remoteMouseMode) {
+            return;
+        }
         LiSendMouseButtonEvent(pressed ? BUTTON_ACTION_PRESS : BUTTON_ACTION_RELEASE, BUTTON_RIGHT);
     };
     
     if (mouse.mouseInput.auxiliaryButtons != nil) {
         if (mouse.mouseInput.auxiliaryButtons.count >= 1) {
             mouse.mouseInput.auxiliaryButtons[0].pressedChangedHandler = ^(GCControllerButtonInput * _Nonnull button, float value, BOOL pressed) {
+                if (self->_remoteMouseMode) {
+                    return;
+                }
                 LiSendMouseButtonEvent(pressed ? BUTTON_ACTION_PRESS : BUTTON_ACTION_RELEASE, BUTTON_X1);
             };
         }
         if (mouse.mouseInput.auxiliaryButtons.count >= 2) {
             mouse.mouseInput.auxiliaryButtons[1].pressedChangedHandler = ^(GCControllerButtonInput * _Nonnull button, float value, BOOL pressed) {
+                if (self->_remoteMouseMode) {
+                    return;
+                }
                 LiSendMouseButtonEvent(pressed ? BUTTON_ACTION_PRESS : BUTTON_ACTION_RELEASE, BUTTON_X2);
             };
         }
@@ -1171,8 +1270,10 @@ static const double MOUSE_SPEED_DIVISOR = 1.25;
 
     _oscEnabled = NO;
     DataManager* dataMan = [[DataManager alloc] init];
-    //iPhone震动
-    _rumblePhone=[dataMan getSettings].rumblePhone;
+    TemporarySettings *currentSettings = [dataMan getSettings];
+    _rumbleMode = currentSettings.rumbleModeSelection;
+    _remoteMouseMode = currentSettings.remoteMouseMode;
+    _relativeMouseSensitivityScale = MouseSensitivityScaleForPercentage(currentSettings.relativeMouseSensitivity);
     
     Log(LOG_I, @"Number of supported controllers connected: %d", [ControllerSupport getGamepadCount]);
     Log(LOG_I, @"Multi-controller: %d", _multiController);

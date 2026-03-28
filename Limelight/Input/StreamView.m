@@ -13,6 +13,7 @@
 #import "KeyboardSupport.h"
 #import "RelativeTouchHandler.h"
 #import "AbsoluteTouchHandler.h"
+#import "PassThroughTouchHandler.h"
 #import "KeyboardInputField.h"
 
 static const double X1_MOUSE_SPEED_DIVISOR = 2.5;
@@ -532,7 +533,6 @@ typedef NS_OPTIONS(NSUInteger, StreamVirtualDirectionMask) {
     NSMutableSet* keysDown;
     
     float streamAspectRatio;
-    BOOL directScreenTouchInputDisabled;
     
     // iOS 13.4 mouse support
     NSInteger lastMouseButtonMask;
@@ -553,12 +553,6 @@ typedef NS_OPTIONS(NSUInteger, StreamVirtualDirectionMask) {
     BOOL hasUserInteracted;
     TemporarySettings* settings;
     NSDictionary<NSString *, NSNumber *> *dictCodes;
-    TouchScreenManager* touchManager;
-    
-    NSMutableDictionary<NSNumber *, SensitivityBean *> *sensitivityMap;
-    BOOL touchSensitivityGlobal;
-    BOOL enableTouchSensitivity;
-    CGFloat touchSensitivity;
     CGSize lastPostedBoundsSize;
     StreamViewVideoAlignmentMode videoAlignmentMode;
     CGFloat videoAlignmentMargin;
@@ -587,14 +581,9 @@ typedef NS_OPTIONS(NSUInteger, StreamVirtualDirectionMask) {
     self->controllerSupport = controllerSupport;
     self.multipleTouchEnabled = YES;
     virtualButtonDescriptors = [[self builtInVirtualButtonDescriptors] copy];
+    temporaryVirtualButtonsVisible = settings.virtualButtonsEnabled;
+    temporaryVirtualGamepadVisible = settings.virtualGamepadEnabled;
     lockedMouseActionIdentifiers = [[NSMutableSet alloc] init];
-    
-    self->touchManager = [[TouchScreenManager alloc] init];
-    
-    self->sensitivityMap = [NSMutableDictionary dictionary];
-    self->touchSensitivityGlobal = settings.touchSensitivityGlobal; // 根据你的实际需求初始化
-    self->touchSensitivity = settings.touchSensitivity.floatValue; // 根据你的实际需求初始化
-    self->enableTouchSensitivity=settings.enableTouchSensitivity;
     
     keysDown = [[NSMutableSet alloc] init];
     keyInputField = [[KeyboardInputField alloc] initWithFrame:CGRectZero];
@@ -609,8 +598,7 @@ typedef NS_OPTIONS(NSUInteger, StreamVirtualDirectionMask) {
     self->touchHandler = [[RelativeTouchHandler alloc] initWithView:self];
 #else
     // iOS uses RelativeTouchHandler or AbsoluteTouchHandler depending on user preference
-    [self applyTemporaryTouchModeWithAbsoluteTouchMode:settings.absoluteTouchMode
-                                      multiTouchScreen:settings.multiTouchScreen];
+    [self applyTemporaryTouchModeSelection:settings.touchModeSelection];
 
     // It would be nice to just use GCMouse on iOS 14+ and the older API on iOS 13
     // but unfortunately that isn't possible today. GCMouse doesn't recognize many
@@ -647,21 +635,26 @@ typedef NS_OPTIONS(NSUInteger, StreamVirtualDirectionMask) {
     if (settings.btMouseSupport) {
         [x1mouse start];
     }
+
+#if !TARGET_OS_TV
+    [self setTemporaryVirtualButtonsVisible:temporaryVirtualButtonsVisible];
+    [self setTemporaryVirtualGamepadVisible:temporaryVirtualGamepadVisible];
+#endif
     
     // This is critical to ensure keyboard events are delivered to this
     // StreamView and not our parent UIView, especially on tvOS.
     [self becomeFirstResponder];
 }
 
-- (void)applyTemporaryTouchModeWithAbsoluteTouchMode:(BOOL)absoluteTouchMode
-                                    multiTouchScreen:(BOOL)multiTouchScreen {
+- (void)applyTemporaryTouchModeSelection:(NSInteger)selection {
 #if !TARGET_OS_TV
-    settings.absoluteTouchMode = absoluteTouchMode;
-    settings.multiTouchScreen = multiTouchScreen;
+    settings.touchModeSelection = selection;
     self.multipleTouchEnabled = YES;
-    touchManager = [[TouchScreenManager alloc] init];
 
-    if (absoluteTouchMode) {
+    if (settings.touchModeSelection == StreamTouchModeSelectionMultiTouch) {
+        touchHandler = [[PassThroughTouchHandler alloc] initWithView:self settings:settings];
+    }
+    else if ([settings usesAbsoluteTouchMode]) {
         touchHandler = [[AbsoluteTouchHandler alloc] initWithView:self settings:settings];
     }
     else {
@@ -670,8 +663,20 @@ typedef NS_OPTIONS(NSUInteger, StreamVirtualDirectionMask) {
 #endif
 }
 
-- (void)setDirectScreenTouchInputDisabled:(BOOL)disabled {
-    directScreenTouchInputDisabled = disabled;
+- (BOOL)shouldCaptureMouseCursor {
+#if !TARGET_OS_TV
+    return !settings.captureMouseCursor;
+#else
+    return NO;
+#endif
+}
+
+- (BOOL)shouldUseRemoteMouseMode {
+#if !TARGET_OS_TV
+    return settings.remoteMouseMode;
+#else
+    return NO;
+#endif
 }
 
 - (void)resetAfterTemporaryTouchModeChange {
@@ -2427,44 +2432,6 @@ typedef NS_OPTIONS(NSUInteger, StreamVirtualDirectionMask) {
     return 90 - MIN(90, altitudeDegs);
 }
 
-- (BOOL)trySendTouchEvent:(UITouch*)event{
-    uint8_t type;
-    uint32_t touchID;
-    switch (event.phase) {
-        case UITouchPhaseBegan://开始触摸
-            type = LI_TOUCH_EVENT_DOWN;
-            touchID= [touchManager identifierForTouch:event];
-            break;
-        case UITouchPhaseMoved://移动
-            type = LI_TOUCH_EVENT_MOVE;
-            touchID= [touchManager identifierForTouch:event];
-            break;
-        case UITouchPhaseEnded://触摸结束
-            type = LI_TOUCH_EVENT_UP;
-            touchID= [touchManager identifierForTouch:event];
-            [touchManager removeTouch:event];
-            break;
-        case UITouchPhaseCancelled://触摸取消
-            type = LI_TOUCH_EVENT_CANCEL_ALL;
-            touchID= [touchManager identifierForTouch:event];
-            [touchManager removeTouch:event];
-//            NSLog(@"trySendTouchEvent UITouchPhaseCancelled %d,%d",(uint32_t)UITouchPhaseCancelled,(uint32_t)event);
-            break;
-        default:
-//            NSLog(@"trySendTouchEvent %ld,%d",(long)event.phase,(uint32_t)event);
-            return NO;
-    }
-    CGPoint location = [self adjustCoordinatesForVideoArea:[event locationInView:self]];
-    //触控灵敏度
-    if(enableTouchSensitivity&&touchSensitivity!=100.0){
-        location=[self getStreamViewRelativeSensitivityXY:event touchID:touchID];
-    }
-    CGSize videoSize = [self getVideoAreaSize];
-//    NSLog(@"trySendTouchEvent touchID %d,%d",type,touchID);
-//    uint32_t pointerId = [self crc32OfUint64:((uint64_t)event)];
-    return LiSendTouchEvent(type,touchID,location.x / videoSize.width, location.y / videoSize.height,(event.force / event.maximumPossibleForce) / sin(event.altitudeAngle),0.0f, 0.0f,[self getRotationFromAzimuthAngle:[event azimuthAngleInView:self]]);
-}
-
 
 - (BOOL)sendStylusEvent:(UITouch*)event {
     uint8_t type;
@@ -2557,7 +2524,7 @@ typedef NS_OPTIONS(NSUInteger, StreamVirtualDirectionMask) {
         return;
     }
 
-    if (directScreenTouchInputDisabled) {
+    if ([settings disablesDirectScreenTouchInput]) {
         return;
     }
     
@@ -2567,7 +2534,7 @@ typedef NS_OPTIONS(NSUInteger, StreamVirtualDirectionMask) {
     [self startInteractionTimer];
     
 #if !TARGET_OS_TV
-    if (directScreenTouchInputDisabled) {
+    if ([settings disablesDirectScreenTouchInput]) {
         if (@available(iOS 13.4, *)) {
             UITouch *touch = [touches anyObject];
             if (touch.type == UITouchTypeIndirectPointer) {
@@ -2584,20 +2551,6 @@ typedef NS_OPTIONS(NSUInteger, StreamVirtualDirectionMask) {
         return;
     }
 
-    for (UITouch* touch in touches) {
-        if (@available(iOS 13.4, *)) {
-            if(touch.type == UITouchTypePencil){
-                if ([self sendStylusEvent:touch]) {
-                    return;
-                }
-            }
-        }
-        if (settings.multiTouchScreen) {
-            if([self trySendTouchEvent:touch]){
-                return;
-            }
-        }
-    }
 #endif
     
     // We still inform the touch handler even if we're going trigger the
@@ -2927,7 +2880,7 @@ typedef NS_OPTIONS(NSUInteger, StreamVirtualDirectionMask) {
         UITouch* touch = [touches anyObject];
         if (touch.type == UITouchTypeIndirectPointer) {
             if (@available(iOS 14.0, *)) {
-                if ([GCMouse current] != nil) {
+                if ([GCMouse current] != nil && ![self shouldUseRemoteMouseMode]) {
                     // We'll handle this with GCMouse. Do nothing here.
                     return YES;
                 }
@@ -2989,26 +2942,11 @@ typedef NS_OPTIONS(NSUInteger, StreamVirtualDirectionMask) {
     }
 
 #if !TARGET_OS_TV
-    
-    for (UITouch* touch in touches) {
-        if (@available(iOS 13.4, *)) {
-            if(touch.type == UITouchTypePencil){
-                if ([self sendStylusEvent:touch]) {
-                    return;
-                }
-            }
-        }
-        if (settings.multiTouchScreen) {
-            if([self trySendTouchEvent:touch]){
-                return;
-            }
-        }
-    }
     if (@available(iOS 13.4, *)) {
         UITouch *touch = [touches anyObject];
         if (touch.type == UITouchTypeIndirectPointer) {
             if (@available(iOS 14.0, *)) {
-                if ([GCMouse current] != nil) {
+                if ([GCMouse current] != nil && ![self shouldUseRemoteMouseMode]) {
                     // We'll handle this with GCMouse. Do nothing here.
                     return;
                 }
@@ -3082,7 +3020,7 @@ typedef NS_OPTIONS(NSUInteger, StreamVirtualDirectionMask) {
         return;
     }
 
-    if (directScreenTouchInputDisabled) {
+    if ([settings disablesDirectScreenTouchInput]) {
         return;
     }
     
@@ -3091,20 +3029,6 @@ typedef NS_OPTIONS(NSUInteger, StreamVirtualDirectionMask) {
     hasUserInteracted = YES;
     
 #if !TARGET_OS_TV
-    for (UITouch* touch in touches) {
-        if (@available(iOS 13.4, *)) {
-            if(touch.type == UITouchTypePencil){
-                if ([self sendStylusEvent:touch]) {
-                    return;
-                }
-            }
-        }
-        if (settings.multiTouchScreen) {
-            if([self trySendTouchEvent:touch]){
-                return;
-            }
-        }
-    }
 #endif
     
     [touchHandler touchesEnded:touches withEvent:event];
@@ -3116,7 +3040,7 @@ typedef NS_OPTIONS(NSUInteger, StreamVirtualDirectionMask) {
         return;
     }
 
-    if (directScreenTouchInputDisabled) {
+    if ([settings disablesDirectScreenTouchInput]) {
         [self handleMouseButtonEvent:BUTTON_ACTION_RELEASE
                           forTouches:touches
                            withEvent:event];
@@ -3128,20 +3052,6 @@ typedef NS_OPTIONS(NSUInteger, StreamVirtualDirectionMask) {
                       forTouches:touches
                        withEvent:event];
 #if !TARGET_OS_TV
-    for (UITouch* touch in touches) {
-        if (@available(iOS 13.4, *)) {
-            if(touch.type == UITouchTypePencil){
-                if ([self sendStylusEvent:touch]) {
-                    return;
-                }
-            }
-        }
-        if (settings.multiTouchScreen) {
-            if([self trySendTouchEvent:touch]){
-                return;
-            }
-        }
-    }
 #endif
 }
 
@@ -3173,7 +3083,7 @@ typedef NS_OPTIONS(NSUInteger, StreamVirtualDirectionMask) {
                        regionForRequest:(UIPointerRegionRequest *)request
                           defaultRegion:(UIPointerRegion *)defaultRegion API_AVAILABLE(ios(13.4)) {
     if (@available(iOS 14.0, *)) {
-        if ([GCMouse current] != nil) {
+        if ([GCMouse current] != nil && ![self shouldUseRemoteMouseMode]) {
             // We'll handle this with GCMouse. Do nothing here.
             return nil;
         }
@@ -3200,7 +3110,11 @@ typedef NS_OPTIONS(NSUInteger, StreamVirtualDirectionMask) {
 }
 
 - (UIPointerStyle *)pointerInteraction:(UIPointerInteraction *)interaction styleForRegion:(UIPointerRegion *)region  API_AVAILABLE(ios(13.4)) {
-    // Always hide the mouse cursor over our stream view
+    if (![self shouldCaptureMouseCursor]) {
+        return nil;
+    }
+
+    // Hide the local cursor while the stream view is actively capturing mouse input.
     return [UIPointerStyle hiddenPointerStyle];
 }
 
@@ -3462,51 +3376,6 @@ typedef NS_OPTIONS(NSUInteger, StreamVirtualDirectionMask) {
 - (void)wheelDidScrollWithIdentifier:(NSUUID * _Nonnull)identifier deltaZ:(int8_t)deltaZ {
     LiSendScrollEvent(deltaZ);
 }
-
-- (CGFloat)getScreenWidth {
-    return [UIScreen mainScreen].bounds.size.width;
-}
-
-- (CGPoint)getStreamViewRelativeSensitivityXY:(UITouch *)touch touchID:(uint32_t)touchID {
-    CGPoint location = [self adjustCoordinatesForVideoArea:[touch locationInView:self]];
-    CGFloat normalizedX = location.x;
-    CGFloat normalizedY = location.y;
-    if (!touchSensitivityGlobal && normalizedX < [self getScreenWidth] / 2) {
-        return location;
-    }
-    NSNumber *key = [NSNumber numberWithUnsignedInt:touchID];
-
-    if (touch.phase == UITouchPhaseMoved) {
-        SensitivityBean *bean = [sensitivityMap objectForKey:key];
-        if (!bean) {
-            bean = [[SensitivityBean alloc] init];
-        }
-
-        if (bean.lastAbsoluteX != -1) {
-            CGFloat dx = normalizedX - bean.lastAbsoluteX;
-            CGFloat dy = normalizedY - bean.lastAbsoluteY;
-            dx *= 0.01f * touchSensitivity; // 灵敏度
-            dy *= 0.01f * touchSensitivity;
-            normalizedX = bean.lastRelativelyX + dx;
-            normalizedY = bean.lastRelativelyY + dy;
-        }
-
-        bean.lastAbsoluteX = location.x;
-        bean.lastAbsoluteY = location.y;
-        bean.lastRelativelyX = normalizedX;
-        bean.lastRelativelyY = normalizedY;
-        [sensitivityMap setObject:bean forKey:key];
-    }
-
-    if (touch.phase == UITouchPhaseEnded || touch.phase == UITouchPhaseCancelled) {
-        [sensitivityMap removeObjectForKey:key];
-    }
-
-    location.x = normalizedX;
-    location.y = normalizedY;
-    return location;
-}
-
 
 #if !TARGET_OS_TV
 - (BOOL)isMultipleTouchEnabled {

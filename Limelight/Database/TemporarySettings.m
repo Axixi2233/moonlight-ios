@@ -13,11 +13,81 @@ NSString * const StreamPreferenceVideoAlignmentMarginKey = @"StreamPreferenceVid
 NSString * const StreamPreferencePerformanceOverlayPositionSelectionKey = @"StreamPreferencePerformanceOverlayPositionSelection";
 NSString * const StreamPreferencePerformanceOverlayMarginKey = @"StreamPreferencePerformanceOverlayMargin";
 NSString * const StreamPreferenceFloatingMenuEnabledKey = @"StreamPreferenceFloatingMenuEnabled";
+NSString * const StreamPreferenceTouchModeSelectionKey = @"StreamPreferenceTouchModeSelection";
 NSString * const StreamPreferenceVirtualButtonSchemeSelectionKey = @"StreamPreferenceVirtualButtonSchemeSelection";
 NSString * const StreamPreferenceVirtualGamepadSchemeSelectionKey = @"StreamPreferenceVirtualGamepadSchemeSelection";
 NSString * const StreamPreferenceVirtualGamepadOpacityKey = @"StreamPreferenceVirtualGamepadOpacity";
+NSString * const StreamPreferenceVirtualButtonsEnabledKey = @"StreamPreferenceVirtualButtonsEnabled";
+NSString * const StreamPreferenceVirtualGamepadEnabledKey = @"StreamPreferenceVirtualGamepadEnabled";
+NSString * const StreamPreferenceCaptureMouseCursorKey = @"StreamPreferenceCaptureMouseCursor";
+NSString * const StreamPreferenceRumbleModeSelectionKey = @"StreamPreferenceRumbleModeSelection";
+NSString * const StreamPreferenceRemoteMouseModeKey = @"StreamPreferenceRemoteMouseMode";
+NSString * const StreamPreferenceRelativeMouseSensitivityKey = @"StreamPreferenceRelativeMouseSensitivity";
 
 @implementation TemporarySettings
+
+@synthesize touchModeSelection = _touchModeSelection;
+@synthesize rumbleModeSelection = _rumbleModeSelection;
+
+- (StreamTouchModeSelection)normalizedTouchModeSelection:(NSInteger)touchModeSelection {
+    switch (touchModeSelection) {
+        case StreamTouchModeSelectionMouse:
+        case StreamTouchModeSelectionMultiTouch:
+        case StreamTouchModeSelectionDisabled:
+            return (StreamTouchModeSelection)touchModeSelection;
+        default:
+            return StreamTouchModeSelectionTrackpad;
+    }
+}
+
+- (void)setTouchModeSelection:(NSInteger)touchModeSelection {
+    StreamTouchModeSelection normalizedSelection = [self normalizedTouchModeSelection:touchModeSelection];
+    _touchModeSelection = normalizedSelection;
+    self.absoluteTouchMode = (normalizedSelection == StreamTouchModeSelectionMouse ||
+                              normalizedSelection == StreamTouchModeSelectionMultiTouch);
+    self.multiTouchScreen = (normalizedSelection == StreamTouchModeSelectionMultiTouch);
+}
+
+- (StreamRumbleModeSelection)normalizedRumbleModeSelection:(NSInteger)rumbleModeSelection {
+    switch (rumbleModeSelection) {
+        case StreamRumbleModeSelectionDevice:
+        case StreamRumbleModeSelectionDisabled:
+            return (StreamRumbleModeSelection)rumbleModeSelection;
+        default:
+            return StreamRumbleModeSelectionController;
+    }
+}
+
+- (void)setRumbleModeSelection:(NSInteger)rumbleModeSelection {
+    StreamRumbleModeSelection normalizedSelection = [self normalizedRumbleModeSelection:rumbleModeSelection];
+    _rumbleModeSelection = normalizedSelection;
+    self.rumblePhone = (normalizedSelection == StreamRumbleModeSelectionDevice);
+}
+
+- (BOOL)usesAbsoluteTouchMode {
+    return self.touchModeSelection == StreamTouchModeSelectionMouse ||
+           self.touchModeSelection == StreamTouchModeSelectionMultiTouch;
+}
+
+- (BOOL)usesMultiTouchScreen {
+    return self.touchModeSelection == StreamTouchModeSelectionMultiTouch;
+}
+
+- (BOOL)disablesDirectScreenTouchInput {
+    return self.touchModeSelection == StreamTouchModeSelectionDisabled;
+}
+
+- (BOOL)usesControllerRumble {
+    return self.rumbleModeSelection == StreamRumbleModeSelectionController;
+}
+
+- (BOOL)usesDeviceRumble {
+    return self.rumbleModeSelection == StreamRumbleModeSelectionDevice;
+}
+
+- (NSInteger)normalizedRelativeMouseSensitivity:(NSInteger)relativeMouseSensitivity {
+    return MAX(50, MIN(relativeMouseSensitivity, 300));
+}
 
 - (id) initFromSettings:(Settings*)settings {
     self = [self init];
@@ -30,9 +100,16 @@ NSString * const StreamPreferenceVirtualGamepadOpacityKey = @"StreamPreferenceVi
         StreamPreferencePerformanceOverlayPositionSelectionKey: @(0),
         StreamPreferencePerformanceOverlayMarginKey: @(6.0),
         StreamPreferenceFloatingMenuEnabledKey: @(YES),
+        StreamPreferenceTouchModeSelectionKey: @(StreamTouchModeSelectionTrackpad),
+        StreamPreferenceVirtualButtonsEnabledKey: @(NO),
+        StreamPreferenceVirtualGamepadEnabledKey: @(NO),
         StreamPreferenceVirtualButtonSchemeSelectionKey: @(0),
         StreamPreferenceVirtualGamepadSchemeSelectionKey: @(0),
-        StreamPreferenceVirtualGamepadOpacityKey: @(0.52)
+        StreamPreferenceVirtualGamepadOpacityKey: @(0.52),
+        StreamPreferenceCaptureMouseCursorKey: @(YES),
+        StreamPreferenceRumbleModeSelectionKey: @(StreamRumbleModeSelectionController),
+        StreamPreferenceRemoteMouseModeKey: @(NO),
+        StreamPreferenceRelativeMouseSensitivityKey: @(100)
     };
     [[NSUserDefaults standardUserDefaults] registerDefaults:streamPreferenceDefaults];
     
@@ -103,10 +180,8 @@ NSString * const StreamPreferenceVirtualGamepadOpacityKey = @"StreamPreferenceVi
     self.swapABXYButtons = settings.swapABXYButtons;
     self.onscreenControls = settings.onscreenControls;
     self.btMouseSupport = settings.btMouseSupport;
-    self.absoluteTouchMode = settings.absoluteTouchMode;
     self.statsOverlay = settings.statsOverlay;
     self.rumblePhone=settings.rumblePhone;
-    self.multiTouchScreen=settings.multiTouchScreen;
     self.externalMonitor=settings.externalMonitor;
     self.touchSensitivity=settings.touchSensitivity;
     self.enableTouchSensitivity=settings.enableTouchSensitivity;
@@ -115,11 +190,31 @@ NSString * const StreamPreferenceVirtualGamepadOpacityKey = @"StreamPreferenceVi
     self.virtualDisplayMode=settings.virtualDisplayMode;
 #endif
     self.uniqueId = settings.uniqueId;
+    NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
+    self.remoteMouseMode = [defaults boolForKey:StreamPreferenceRemoteMouseModeKey];
+    self.captureMouseCursor = [defaults boolForKey:StreamPreferenceCaptureMouseCursorKey];
+    self.relativeMouseSensitivity = [self normalizedRelativeMouseSensitivity:[defaults integerForKey:StreamPreferenceRelativeMouseSensitivityKey]];
+    id storedRumbleMode = [defaults objectForKey:StreamPreferenceRumbleModeSelectionKey];
+    if ([storedRumbleMode isKindOfClass:[NSNumber class]]) {
+        self.rumbleModeSelection = [storedRumbleMode integerValue];
+    } else {
+        self.rumbleModeSelection = settings.rumblePhone ? StreamRumbleModeSelectionDevice : StreamRumbleModeSelectionController;
+    }
+    id storedTouchMode = [defaults objectForKey:StreamPreferenceTouchModeSelectionKey];
+    if ([storedTouchMode isKindOfClass:[NSNumber class]]) {
+        self.touchModeSelection = [storedTouchMode integerValue];
+    } else if (settings.absoluteTouchMode) {
+        self.touchModeSelection = settings.multiTouchScreen ? StreamTouchModeSelectionMultiTouch : StreamTouchModeSelectionMouse;
+    } else {
+        self.touchModeSelection = StreamTouchModeSelectionTrackpad;
+    }
     self.videoAlignmentSelection = [[NSUserDefaults standardUserDefaults] integerForKey:StreamPreferenceVideoAlignmentSelectionKey];
     self.videoAlignmentMargin = (CGFloat)[[NSUserDefaults standardUserDefaults] doubleForKey:StreamPreferenceVideoAlignmentMarginKey];
     self.performanceOverlayPositionSelection = [[NSUserDefaults standardUserDefaults] integerForKey:StreamPreferencePerformanceOverlayPositionSelectionKey];
     self.performanceOverlayMargin = (CGFloat)[[NSUserDefaults standardUserDefaults] doubleForKey:StreamPreferencePerformanceOverlayMarginKey];
     self.floatingMenuEnabled = [[NSUserDefaults standardUserDefaults] boolForKey:StreamPreferenceFloatingMenuEnabledKey];
+    self.virtualButtonsEnabled = [[NSUserDefaults standardUserDefaults] boolForKey:StreamPreferenceVirtualButtonsEnabledKey];
+    self.virtualGamepadEnabled = [[NSUserDefaults standardUserDefaults] boolForKey:StreamPreferenceVirtualGamepadEnabledKey];
     self.virtualButtonSchemeSelection = [[NSUserDefaults standardUserDefaults] integerForKey:StreamPreferenceVirtualButtonSchemeSelectionKey];
     self.virtualGamepadSchemeSelection = [[NSUserDefaults standardUserDefaults] integerForKey:StreamPreferenceVirtualGamepadSchemeSelectionKey];
     self.virtualGamepadOpacity = (CGFloat)[[NSUserDefaults standardUserDefaults] doubleForKey:StreamPreferenceVirtualGamepadOpacityKey];

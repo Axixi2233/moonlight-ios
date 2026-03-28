@@ -41,6 +41,31 @@ static NSString *VirtualGamepadOpacityDefaultsKeyForSchemeSelection(NSInteger sc
 
 static NSString * const CustomShortcutDefinitionsDefaultsKey = @"StreamPreferenceCustomShortcutDefinitions";
 
+static StreamTouchModeSelection NormalizedTouchModeSelection(NSInteger touchModeSelection) {
+    switch (touchModeSelection) {
+        case StreamTouchModeSelectionMouse:
+        case StreamTouchModeSelectionMultiTouch:
+        case StreamTouchModeSelectionDisabled:
+            return (StreamTouchModeSelection)touchModeSelection;
+        default:
+            return StreamTouchModeSelectionTrackpad;
+    }
+}
+
+static StreamRumbleModeSelection NormalizedRumbleModeSelection(NSInteger rumbleModeSelection) {
+    switch (rumbleModeSelection) {
+        case StreamRumbleModeSelectionDevice:
+        case StreamRumbleModeSelectionDisabled:
+            return (StreamRumbleModeSelection)rumbleModeSelection;
+        default:
+            return StreamRumbleModeSelectionController;
+    }
+}
+
+static NSInteger NormalizedRelativeMouseSensitivity(NSInteger relativeMouseSensitivity) {
+    return MAX(50, MIN(relativeMouseSensitivity, 300));
+}
+
 - (id) init {
     self = [super init];
     
@@ -92,10 +117,12 @@ static NSString * const CustomShortcutDefinitionsDefaultsKey = @"StreamPreferenc
                   useFramePacing:(BOOL)useFramePacing
                        enableHdr:(BOOL)enableHdr
                   btMouseSupport:(BOOL)btMouseSupport
-               absoluteTouchMode:(BOOL)absoluteTouchMode
+                 remoteMouseMode:(BOOL)remoteMouseMode
+              captureMouseCursor:(BOOL)captureMouseCursor
+      relativeMouseSensitivity:(NSInteger)relativeMouseSensitivity
+              touchModeSelection:(NSInteger)touchModeSelection
                     statsOverlay:(BOOL)statsOverlay
-                     rumblePhone:(BOOL)rumblePhone
-                multiTouchScreen:(BOOL)multiTouchScreen
+             rumbleModeSelection:(NSInteger)rumbleModeSelection
                  externalMonitor:(BOOL)externalMonitor
           touchSensitivityGlobal:(BOOL)touchSensitivityGlobal
           enableTouchSensitivity:(BOOL)enableTouchSensitivity
@@ -107,6 +134,8 @@ static NSString * const CustomShortcutDefinitionsDefaultsKey = @"StreamPreferenc
 performanceOverlayPositionSelection:(NSInteger)performanceOverlayPositionSelection
          performanceOverlayMargin:(CGFloat)performanceOverlayMargin
                floatingMenuEnabled:(BOOL)floatingMenuEnabled
+             virtualButtonsEnabled:(BOOL)virtualButtonsEnabled
+             virtualGamepadEnabled:(BOOL)virtualGamepadEnabled
        virtualButtonSchemeSelection:(NSInteger)virtualButtonSchemeSelection
      virtualGamepadSchemeSelection:(NSInteger)virtualGamepadSchemeSelection
              virtualGamepadOpacity:(CGFloat)virtualGamepadOpacity{
@@ -127,10 +156,14 @@ performanceOverlayPositionSelection:(NSInteger)performanceOverlayPositionSelecti
         settingsToSave.useFramePacing = useFramePacing;
         settingsToSave.enableHdr = enableHdr;
         settingsToSave.btMouseSupport = btMouseSupport;
-        settingsToSave.absoluteTouchMode = absoluteTouchMode;
+        NSInteger normalizedRelativeMouseSensitivity = NormalizedRelativeMouseSensitivity(relativeMouseSensitivity);
+        StreamTouchModeSelection normalizedTouchModeSelection = NormalizedTouchModeSelection(touchModeSelection);
+        StreamRumbleModeSelection normalizedRumbleModeSelection = NormalizedRumbleModeSelection(rumbleModeSelection);
+        settingsToSave.absoluteTouchMode = (normalizedTouchModeSelection == StreamTouchModeSelectionMouse ||
+                                            normalizedTouchModeSelection == StreamTouchModeSelectionMultiTouch);
         settingsToSave.statsOverlay = statsOverlay;
-        settingsToSave.rumblePhone = rumblePhone;
-        settingsToSave.multiTouchScreen = multiTouchScreen;
+        settingsToSave.rumblePhone = (normalizedRumbleModeSelection == StreamRumbleModeSelectionDevice);
+        settingsToSave.multiTouchScreen = (normalizedTouchModeSelection == StreamTouchModeSelectionMultiTouch);
         settingsToSave.externalMonitor = externalMonitor;
         settingsToSave.enableTouchSensitivity=enableTouchSensitivity;
         settingsToSave.touchSensitivity=[NSNumber numberWithInteger:touchSensitivity];
@@ -143,6 +176,13 @@ performanceOverlayPositionSelection:(NSInteger)performanceOverlayPositionSelecti
         [defaults setInteger:MAX(0, MIN(performanceOverlayPositionSelection, 5)) forKey:StreamPreferencePerformanceOverlayPositionSelectionKey];
         [defaults setDouble:MAX(0.0, MIN(performanceOverlayMargin, 150.0)) forKey:StreamPreferencePerformanceOverlayMarginKey];
         [defaults setBool:floatingMenuEnabled forKey:StreamPreferenceFloatingMenuEnabledKey];
+        [defaults setBool:virtualButtonsEnabled forKey:StreamPreferenceVirtualButtonsEnabledKey];
+        [defaults setBool:virtualGamepadEnabled forKey:StreamPreferenceVirtualGamepadEnabledKey];
+        [defaults setBool:remoteMouseMode forKey:StreamPreferenceRemoteMouseModeKey];
+        [defaults setBool:captureMouseCursor forKey:StreamPreferenceCaptureMouseCursorKey];
+        [defaults setInteger:normalizedRelativeMouseSensitivity forKey:StreamPreferenceRelativeMouseSensitivityKey];
+        [defaults setInteger:normalizedTouchModeSelection forKey:StreamPreferenceTouchModeSelectionKey];
+        [defaults setInteger:normalizedRumbleModeSelection forKey:StreamPreferenceRumbleModeSelectionKey];
         [defaults setInteger:MAX(0, MIN(virtualButtonSchemeSelection, 4)) forKey:StreamPreferenceVirtualButtonSchemeSelectionKey];
         [defaults setInteger:MAX(0, MIN(virtualGamepadSchemeSelection, 4)) forKey:StreamPreferenceVirtualGamepadSchemeSelectionKey];
         [defaults setDouble:MAX(0.05f, MIN(virtualGamepadOpacity, 1.0f)) forKey:StreamPreferenceVirtualGamepadOpacityKey];
@@ -287,6 +327,21 @@ performanceOverlayPositionSelection:(NSInteger)performanceOverlayPositionSelecti
     return definitions;
 }
 
+- (void)saveTouchModeSelection:(NSInteger)touchModeSelection {
+    [_managedObjectContext performBlockAndWait:^{
+        StreamTouchModeSelection normalizedTouchModeSelection = NormalizedTouchModeSelection(touchModeSelection);
+        Settings *settingsToSave = [self retrieveSettings];
+        settingsToSave.absoluteTouchMode = (normalizedTouchModeSelection == StreamTouchModeSelectionMouse ||
+                                            normalizedTouchModeSelection == StreamTouchModeSelectionMultiTouch);
+        settingsToSave.multiTouchScreen = (normalizedTouchModeSelection == StreamTouchModeSelectionMultiTouch);
+
+        NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
+        [defaults setInteger:normalizedTouchModeSelection forKey:StreamPreferenceTouchModeSelectionKey];
+        [defaults synchronize];
+        [self saveData];
+    }];
+}
+
 - (void)saveCustomShortcutDefinitions:(NSArray<NSDictionary *> *)definitions {
     NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
     [defaults setObject:(definitions ?: @[]) forKey:CustomShortcutDefinitionsDefaultsKey];
@@ -308,6 +363,8 @@ performanceOverlayPositionSelection:(NSInteger)performanceOverlayPositionSelecti
         settings.bitrate = @30000;
         settings.width = @1920;
         settings.height = @1080;
+        settings.absoluteTouchMode = NO;
+        settings.multiTouchScreen = NO;
         settings.statsOverlay = YES;
 
         NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
@@ -317,6 +374,13 @@ performanceOverlayPositionSelection:(NSInteger)performanceOverlayPositionSelecti
             StreamPreferencePerformanceOverlayPositionSelectionKey,
             StreamPreferencePerformanceOverlayMarginKey,
             StreamPreferenceFloatingMenuEnabledKey,
+            StreamPreferenceVirtualButtonsEnabledKey,
+            StreamPreferenceVirtualGamepadEnabledKey,
+            StreamPreferenceRemoteMouseModeKey,
+            StreamPreferenceCaptureMouseCursorKey,
+            StreamPreferenceRelativeMouseSensitivityKey,
+            StreamPreferenceTouchModeSelectionKey,
+            StreamPreferenceRumbleModeSelectionKey,
             StreamPreferenceVirtualButtonSchemeSelectionKey,
             StreamPreferenceVirtualGamepadSchemeSelectionKey,
             StreamPreferenceVirtualGamepadOpacityKey
@@ -353,6 +417,8 @@ performanceOverlayPositionSelection:(NSInteger)performanceOverlayPositionSelecti
         settings.bitrate = @30000;
         settings.width = @1920;
         settings.height = @1080;
+        settings.absoluteTouchMode = NO;
+        settings.multiTouchScreen = NO;
         settings.statsOverlay = YES;
         
         return settings;

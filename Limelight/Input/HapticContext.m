@@ -88,12 +88,24 @@
 -(id) initWithGamepad:(GCController*)gamepad locality:(GCHapticsLocality)locality API_AVAILABLE(ios(14.0), tvos(14.0)) {
     DataManager* dataMan = [[DataManager alloc] init];
     TemporarySettings* currentSettings = [dataMan getSettings];
-    //增加控制器不支持震动 手机震动
-    if(currentSettings.rumblePhone){
+    if (currentSettings.rumbleModeSelection == StreamRumbleModeSelectionDisabled) {
+        return nil;
+    }
+
+    if (currentSettings.rumbleModeSelection == StreamRumbleModeSelectionDevice) {
+        if (!CHHapticEngine.capabilitiesForHardware.supportsHaptics) {
+            Log(LOG_W, @"Device does not support haptics");
+            return nil;
+        }
+
         NSError *error = nil;
         _hapticEngine = [[CHHapticEngine alloc] initAndReturnError:&error];
-        Log(LOG_W, @"Controller %d 强制启用iPhone震动", gamepad.playerIndex);
-    }else{
+        if (error != nil || _hapticEngine == nil) {
+            Log(LOG_W, @"Device haptic engine creation failed: %@", error);
+            return nil;
+        }
+        Log(LOG_W, @"Controller %d 使用设备震动", gamepad.playerIndex);
+    } else {
         if (gamepad.haptics == nil) {
             Log(LOG_W, @"Controller %d does not support haptics", gamepad.playerIndex);
             return nil;

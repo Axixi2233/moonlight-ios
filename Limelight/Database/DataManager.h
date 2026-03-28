@@ -27,10 +27,12 @@
                   useFramePacing:(BOOL)useFramePacing
                        enableHdr:(BOOL)enableHdr
                   btMouseSupport:(BOOL)btMouseSupport
-               absoluteTouchMode:(BOOL)absoluteTouchMode
+                 remoteMouseMode:(BOOL)remoteMouseMode
+              captureMouseCursor:(BOOL)captureMouseCursor
+      relativeMouseSensitivity:(NSInteger)relativeMouseSensitivity
+              touchModeSelection:(NSInteger)touchModeSelection
                     statsOverlay:(BOOL)statsOverlay
-                     rumblePhone:(BOOL)rumblePhone
-                multiTouchScreen:(BOOL)multiTouchScreen
+             rumbleModeSelection:(NSInteger)rumbleModeSelection
                  externalMonitor:(BOOL)externalMonitor
             touchSensitivityGlobal:(BOOL)touchSensitivityGlobal
             enableTouchSensitivity:(BOOL)enableTouchSensitivity
@@ -42,6 +44,8 @@
 performanceOverlayPositionSelection:(NSInteger)performanceOverlayPositionSelection
          performanceOverlayMargin:(CGFloat)performanceOverlayMargin
                floatingMenuEnabled:(BOOL)floatingMenuEnabled
+             virtualButtonsEnabled:(BOOL)virtualButtonsEnabled
+             virtualGamepadEnabled:(BOOL)virtualGamepadEnabled
        virtualButtonSchemeSelection:(NSInteger)virtualButtonSchemeSelection
      virtualGamepadSchemeSelection:(NSInteger)virtualGamepadSchemeSelection
              virtualGamepadOpacity:(CGFloat)virtualGamepadOpacity;
@@ -71,6 +75,7 @@ performanceOverlayPositionSelection:(NSInteger)performanceOverlayPositionSelecti
                              portrait:(BOOL)portrait;
 - (NSArray<NSDictionary *> *)customShortcutDefinitions;
 - (void)saveCustomShortcutDefinitions:(NSArray<NSDictionary *> *)definitions;
+- (void)saveTouchModeSelection:(NSInteger)touchModeSelection;
 - (void)resetSettingsToDefaultsClearingCustomData:(BOOL)clearCustomData;
 
 - (void) updateUniqueId:(NSString*)uniqueId;

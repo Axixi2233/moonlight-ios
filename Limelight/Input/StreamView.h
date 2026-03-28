@@ -61,13 +61,14 @@ typedef NS_ENUM(NSInteger, StreamViewVideoAlignmentMode) {
 - (void) showKeyInputBoard;
 - (void) sendShortcutPrimaryKeyCodes:(NSArray<NSNumber *> *)primaryKeyCodes
                    secondaryKeyCodes:(NSArray<NSNumber *> *)secondaryKeyCodes;
-- (void) applyTemporaryTouchModeWithAbsoluteTouchMode:(BOOL)absoluteTouchMode
-                                     multiTouchScreen:(BOOL)multiTouchScreen;
-- (void) setDirectScreenTouchInputDisabled:(BOOL)disabled;
+- (void) applyTemporaryTouchModeSelection:(NSInteger)selection;
 - (void) resetAfterTemporaryTouchModeChange;
 
 #if !TARGET_OS_TV
 - (void) updateCursorLocation:(CGPoint)location isMouse:(BOOL)isMouse;
+- (CGSize) getVideoAreaSize;
+- (CGPoint) adjustCoordinatesForVideoArea:(CGPoint)point;
+- (uint16_t) getRotationFromAzimuthAngle:(float)azimuthAngle;
 #endif
 
 @end

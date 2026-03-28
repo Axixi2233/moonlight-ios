@@ -9,6 +9,7 @@ final class SettingsFormSnapshot: NSObject {
     var bitrateKbps: Int = 10000
     var bitrateMinimumKbps: Int = 10000
     var bitrateMaximumKbps: Int = 500000
+    var audioConfigSelection: Int = 1
 
     var framerateOptions: [NSNumber] = []
     var framerate: Int = 60
@@ -28,16 +29,17 @@ final class SettingsFormSnapshot: NSObject {
     var enableHdr: Bool = false
     var useFramePacing: Bool = false
 
-    var absoluteTouchMode: Bool = false
+    var touchModeSelection: Int = 0
     var optimizeGames: Bool = true
     var multiController: Bool = false
     var swapABXYButtons: Bool = false
     var playAudioOnPC: Bool = false
     var btMouseSupport: Bool = false
+    var remoteMouseMode: Bool = false
+    var captureMouseCursor: Bool = true
+    var relativeMouseSensitivity: Int = 100
     var statsOverlay: Bool = false
-    var rumblePhone: Bool = false
-    var showRumblePhoneOption: Bool = false
-    var multiTouchScreen: Bool = false
+    var rumbleModeSelection: Int = 0
     var externalMonitor: Bool = false
     var motionMode: Int = 0
     var virtualDisplayMode: Int = 0
@@ -49,6 +51,8 @@ final class SettingsFormSnapshot: NSObject {
     var performanceOverlayPositionSelection: Int = 0
     var performanceOverlayMargin: Int = 6
     var floatingMenuEnabled: Bool = false
+    var virtualButtonsEnabled: Bool = false
+    var virtualGamepadEnabled: Bool = false
     var virtualButtonSchemeSelection: Int = 0
     var virtualGamepadSchemeSelection: Int = 0
     var virtualGamepadOpacity: Int = 52
@@ -67,6 +71,7 @@ private final class SettingsFormViewModel: ObservableObject {
     @Published var bitrateMinimumKbps: Int = 10000
     @Published var bitrateMaximumKbps: Int = 500000
     @Published var bitrateSliderPosition: Double = 0
+    @Published var audioConfigSelection: Int = 1
 
     @Published var framerateOptions: [Int] = []
     @Published var framerate: Int = 60
@@ -86,16 +91,17 @@ private final class SettingsFormViewModel: ObservableObject {
     @Published var enableHdr: Bool = false
     @Published var useFramePacing: Bool = false
 
-    @Published var absoluteTouchMode: Bool = false
+    @Published var touchModeSelection: Int = 0
     @Published var optimizeGames: Bool = true
     @Published var multiController: Bool = false
     @Published var swapABXYButtons: Bool = false
     @Published var playAudioOnPC: Bool = false
     @Published var btMouseSupport: Bool = false
+    @Published var remoteMouseMode: Bool = false
+    @Published var captureMouseCursor: Bool = true
+    @Published var relativeMouseSensitivity: Double = 100
     @Published var statsOverlay: Bool = false
-    @Published var rumblePhone: Bool = false
-    @Published var showRumblePhoneOption: Bool = false
-    @Published var multiTouchScreen: Bool = false
+    @Published var rumbleModeSelection: Int = 0
     @Published var externalMonitor: Bool = false
     @Published var motionMode: Int = 0
     @Published var virtualDisplayMode: Int = 0
@@ -107,6 +113,8 @@ private final class SettingsFormViewModel: ObservableObject {
     @Published var performanceOverlayPositionSelection: Int = 0
     @Published var performanceOverlayMargin: Double = 6
     @Published var floatingMenuEnabled: Bool = false
+    @Published var virtualButtonsEnabled: Bool = false
+    @Published var virtualGamepadEnabled: Bool = false
     @Published var virtualButtonSchemeSelection: Int = 0
     @Published var virtualGamepadSchemeSelection: Int = 0
     @Published var virtualGamepadOpacity: Double = 52
@@ -117,6 +125,7 @@ private final class SettingsFormViewModel: ObservableObject {
         bitrateMinimumKbps = snapshot.bitrateMinimumKbps
         bitrateMaximumKbps = snapshot.bitrateMaximumKbps
         syncBitrateSliderPositionFromBitrate()
+        audioConfigSelection = snapshot.audioConfigSelection
 
         framerateOptions = snapshot.framerateOptions.map { $0.intValue }
         framerate = snapshot.framerate
@@ -136,16 +145,17 @@ private final class SettingsFormViewModel: ObservableObject {
         enableHdr = snapshot.enableHdr
         useFramePacing = snapshot.useFramePacing
 
-        absoluteTouchMode = snapshot.absoluteTouchMode
+        touchModeSelection = snapshot.touchModeSelection
         optimizeGames = snapshot.optimizeGames
         multiController = snapshot.multiController
         swapABXYButtons = snapshot.swapABXYButtons
         playAudioOnPC = snapshot.playAudioOnPC
         btMouseSupport = snapshot.btMouseSupport
+        remoteMouseMode = snapshot.remoteMouseMode
+        captureMouseCursor = snapshot.captureMouseCursor
+        relativeMouseSensitivity = Double(snapshot.relativeMouseSensitivity)
         statsOverlay = snapshot.statsOverlay
-        rumblePhone = snapshot.rumblePhone
-        showRumblePhoneOption = snapshot.showRumblePhoneOption
-        multiTouchScreen = snapshot.multiTouchScreen
+        rumbleModeSelection = snapshot.rumbleModeSelection
         externalMonitor = snapshot.externalMonitor
         motionMode = snapshot.motionMode
         virtualDisplayMode = snapshot.virtualDisplayMode
@@ -157,6 +167,8 @@ private final class SettingsFormViewModel: ObservableObject {
         performanceOverlayPositionSelection = snapshot.performanceOverlayPositionSelection
         performanceOverlayMargin = Double(snapshot.performanceOverlayMargin)
         floatingMenuEnabled = snapshot.floatingMenuEnabled
+        virtualButtonsEnabled = snapshot.virtualButtonsEnabled
+        virtualGamepadEnabled = snapshot.virtualGamepadEnabled
         virtualButtonSchemeSelection = snapshot.virtualButtonSchemeSelection
         virtualGamepadSchemeSelection = snapshot.virtualGamepadSchemeSelection
         virtualGamepadOpacity = Double(snapshot.virtualGamepadOpacity)
@@ -168,6 +180,7 @@ private final class SettingsFormViewModel: ObservableObject {
         snapshot.bitrateKbps = bitrateKbps
         snapshot.bitrateMinimumKbps = bitrateMinimumKbps
         snapshot.bitrateMaximumKbps = bitrateMaximumKbps
+        snapshot.audioConfigSelection = audioConfigSelection
         snapshot.framerateOptions = framerateOptions.map { NSNumber(value: $0) }
         snapshot.framerate = framerate
         snapshot.resolutionTitles = resolutionTitles
@@ -182,16 +195,17 @@ private final class SettingsFormViewModel: ObservableObject {
         snapshot.hdrSupported = hdrSupported
         snapshot.enableHdr = enableHdr
         snapshot.useFramePacing = useFramePacing
-        snapshot.absoluteTouchMode = absoluteTouchMode
+        snapshot.touchModeSelection = touchModeSelection
         snapshot.optimizeGames = optimizeGames
         snapshot.multiController = multiController
         snapshot.swapABXYButtons = swapABXYButtons
         snapshot.playAudioOnPC = playAudioOnPC
         snapshot.btMouseSupport = btMouseSupport
+        snapshot.remoteMouseMode = remoteMouseMode
+        snapshot.captureMouseCursor = captureMouseCursor
+        snapshot.relativeMouseSensitivity = Int(relativeMouseSensitivity.rounded())
         snapshot.statsOverlay = statsOverlay
-        snapshot.rumblePhone = rumblePhone
-        snapshot.showRumblePhoneOption = showRumblePhoneOption
-        snapshot.multiTouchScreen = multiTouchScreen
+        snapshot.rumbleModeSelection = rumbleModeSelection
         snapshot.externalMonitor = externalMonitor
         snapshot.motionMode = motionMode
         snapshot.virtualDisplayMode = virtualDisplayMode
@@ -203,6 +217,8 @@ private final class SettingsFormViewModel: ObservableObject {
         snapshot.performanceOverlayPositionSelection = performanceOverlayPositionSelection
         snapshot.performanceOverlayMargin = Int(performanceOverlayMargin.rounded())
         snapshot.floatingMenuEnabled = floatingMenuEnabled
+        snapshot.virtualButtonsEnabled = virtualButtonsEnabled
+        snapshot.virtualGamepadEnabled = virtualGamepadEnabled
         snapshot.virtualButtonSchemeSelection = virtualButtonSchemeSelection
         snapshot.virtualGamepadSchemeSelection = virtualGamepadSchemeSelection
         snapshot.virtualGamepadOpacity = Int(virtualGamepadOpacity.rounded())
@@ -215,6 +231,10 @@ private final class SettingsFormViewModel: ObservableObject {
 
     var touchSensitivityLabel: String {
         String(format: "触控灵敏度(百分比): %.1f", touchSensitivity)
+    }
+
+    var relativeMouseSensitivityLabel: String {
+        String(format: "相对鼠标灵敏度: %.0f%%", relativeMouseSensitivity)
     }
 
     var customResolutionLabel: String {
@@ -436,7 +456,7 @@ private struct SettingsRootView: View {
             SettingsPurpleBackground()
 
             Form {
-                Section(header: Text("画面设置")) {
+                Section(header: Text("视频与画质")) {
                     choiceSection(
                         title: "分辨率",
                         subtitle: model.selectedResolutionTitle,
@@ -457,13 +477,6 @@ private struct SettingsRootView: View {
                     }) {
                         Text("设置自定义分辨率: \(model.customResolutionLabel)")
                     }
-
-//                    Button(action: {
-//                        openExternalURL("https://moonlight-stream.org/custom-resolution")
-//                    }) {
-//                        Text("查看分辨率说明")
-//                    }
-
                     segmentedSection(title: "帧率", selection: bindingForFramerate(), labels: model.framerateOptions.map { "\($0) FPS" })
 
                     VStack(alignment: .leading, spacing: 8) {
@@ -483,7 +496,8 @@ private struct SettingsRootView: View {
                             .foregroundColor(.secondary)
                     }
 
-                    segmentedSection(title: "视频帧数调节", selection: boolSelection($model.useFramePacing), labels: ["低延迟", "流畅视频"])
+                    segmentedSection(title: "帧同步", selection: boolSelection($model.useFramePacing), labels: ["低延迟", "最流畅的视频"])
+
                     segmentedSection(title: "画面位置", selection: $model.videoAlignmentSelection, labels: model.videoAlignmentTitles)
 
                     VStack(alignment: .leading, spacing: 8) {
@@ -491,27 +505,57 @@ private struct SettingsRootView: View {
                             .font(.headline)
                         Slider(value: $model.videoAlignmentMargin, in: 0...150, step: 1)
                     }
+
                 }
 
-                Section(header: Text("输入设置")) {
+                Section(header: Text("输入选项")) {
                     segmentedSection(title: "触控模式", selection: touchModeSelection(), labels: model.touchModeTitles)
-
-                    Toggle("优化游戏设置", isOn: $model.optimizeGames).font(.headline)
+                    segmentedSection(title: "体感", selection: $model.motionMode, labels: ["自动", "设备", "手柄"])
+                    segmentedSection(title: "触觉反馈", selection: $model.rumbleModeSelection, labels: model.rumbleModeTitles)
+                    Toggle("触控灵敏度", isOn: $model.enableTouchSensitivity).font(.headline)
+                    Toggle("触控灵敏度全局生效", isOn: $model.touchSensitivityGlobal).font(.headline)
+                    if model.enableTouchSensitivity {
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text(model.touchSensitivityLabel)
+                                .font(.headline)
+                            Slider(value: $model.touchSensitivity, in: 10...300, step: 1)
+                        }
+                    }
                     Toggle("多控制器模式", isOn: $model.multiController).font(.headline)
                     Toggle("交换 A/B 和 X/Y 按钮", isOn: $model.swapABXYButtons).font(.headline)
-                    Toggle("在电脑上播放声音", isOn: $model.playAudioOnPC).font(.headline)
                     Toggle("Citrix X1 鼠标支持", isOn: $model.btMouseSupport).font(.headline)
-                    segmentedSection(title: "陀螺仪选项", selection: $model.motionMode, labels: ["自动", "设备", "手柄"])
+                    Toggle("本地物理鼠标", isOn: $model.captureMouseCursor).font(.headline)
+                    Toggle("远程鼠标", isOn: $model.remoteMouseMode).font(.headline)
+                    if !model.remoteMouseMode {
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text(model.relativeMouseSensitivityLabel)
+                                .font(.headline)
+                            Slider(value: $model.relativeMouseSensitivity, in: 50...300, step: 1)
+                        }
+                    }
                 }
 
-                Section(header: Text("其他设置")) {
-                    if model.showRumblePhoneOption {
-                        Toggle("启用机身震动", isOn: $model.rumblePhone).font(.headline)
-                    }
-                    Toggle("性能信息", isOn: $model.statsOverlay).font(.headline)
-                    Toggle("悬浮球", isOn: $model.floatingMenuEnabled).font(.headline)
+                Section(header: Text("高级设置")) {
                     choiceSection(
-                        title: "虚拟按钮方案",
+                        title: "声道输出",
+                        subtitle: model.audioConfigTitle,
+                        options: Array(model.audioConfigTitles.enumerated()),
+                        selectedIndex: model.audioConfigSelection
+                    ) { index in
+                        model.audioConfigSelection = index
+                    } isDisabled: { _ in false }
+                    Toggle("本设备和PC同时发声", isOn: $model.playAudioOnPC).font(.headline)
+                    Toggle("优化游戏设置", isOn: $model.optimizeGames).font(.headline)
+                    Toggle("启用悬浮球", isOn: $model.floatingMenuEnabled).font(.headline)
+                    Toggle("外接显示器模式", isOn: $model.externalMonitor).font(.headline)
+                    Toggle("虚拟显示器", isOn: virtualDisplayToggle()).font(.headline)
+                }
+
+                Section(header: Text("虚拟控件")) {
+                    Toggle("启用虚拟按键", isOn: $model.virtualButtonsEnabled).font(.headline)
+                    Toggle("启用虚拟手柄", isOn: $model.virtualGamepadEnabled).font(.headline)
+                    choiceSection(
+                        title: "虚拟按键方案",
                         subtitle: model.virtualButtonSchemeTitle,
                         options: Array(model.virtualButtonSchemeTitles.enumerated()),
                         selectedIndex: model.virtualButtonSchemeSelection
@@ -531,6 +575,10 @@ private struct SettingsRootView: View {
                             .font(.headline)
                         Slider(value: $model.virtualGamepadOpacity, in: 5...100, step: 1)
                     }
+                }
+
+                Section(header: Text("性能信息")) {
+                    Toggle("启用性能信息", isOn: $model.statsOverlay).font(.headline)
                     choiceSection(
                         title: "性能信息位置",
                         subtitle: model.performanceOverlayPositionTitle,
@@ -544,26 +592,7 @@ private struct SettingsRootView: View {
                             .font(.headline)
                         Slider(value: $model.performanceOverlayMargin, in: 0...150, step: 1)
                     }
-                    Toggle("外接显示器模式", isOn: $model.externalMonitor).font(.headline)
-                    Toggle("虚拟显示器", isOn: virtualDisplayToggle()).font(.headline)
-                    Toggle("启用触控灵敏度", isOn: $model.enableTouchSensitivity).font(.headline)
-                    Toggle("触控灵敏度全局生效", isOn: $model.touchSensitivityGlobal).font(.headline)
-                    if model.enableTouchSensitivity {
-                        VStack(alignment: .leading, spacing: 8) {
-                            Text(model.touchSensitivityLabel)
-                                .font(.headline)
-                            Slider(value: $model.touchSensitivity, in: 10...300, step: 1)
-                        }
-                    }
                 }
-
-//                Section(header: Text("关于")) {
-//                    Button(action: {
-//                        openExternalURL("https://space.bilibili.com/16893379")
-//                    }) {
-//                        Text("阿西西的日常@2025")
-//                    }
-//                }
             }
             .background(Color.clear)
             .onAppear {
@@ -655,15 +684,16 @@ private struct SettingsRootView: View {
 
 @available(iOS 13.0, *)
 private extension SettingsFormViewModel {
+    var rumbleModeTitles: [String] {
+        ["手柄", "设备", "关闭"]
+    }
+
     var touchModeTitles: [String] {
-        ["触控板", "普通鼠标", "多点触控"]
+        ["触控板", "普通鼠标", "多点触控", "禁止触控"]
     }
 
     var touchModeSelectionIndex: Int {
-        if !absoluteTouchMode {
-            return 0
-        }
-        return multiTouchScreen ? 2 : 1
+        min(max(touchModeSelection, 0), touchModeTitles.count - 1)
     }
 
     var touchModeTitle: String {
@@ -674,20 +704,7 @@ private extension SettingsFormViewModel {
     }
 
     func setTouchModeSelectionIndex(_ index: Int) {
-        switch index {
-        case 0:
-            absoluteTouchMode = false
-            multiTouchScreen = false
-        case 1:
-            absoluteTouchMode = true
-            multiTouchScreen = false
-        case 2:
-            absoluteTouchMode = true
-            multiTouchScreen = true
-        default:
-            absoluteTouchMode = false
-            multiTouchScreen = false
-        }
+        touchModeSelection = min(max(index, 0), touchModeTitles.count - 1)
     }
 
     var codecDisplayTitle: String {
@@ -703,6 +720,17 @@ private extension SettingsFormViewModel {
 
     var videoAlignmentTitles: [String] {
         ["居中", "顶部居中", "底部居中"]
+    }
+
+    var audioConfigTitles: [String] {
+        ["立体声", "5.1", "7.1"]
+    }
+
+    var audioConfigTitle: String {
+        guard audioConfigTitles.indices.contains(audioConfigSelection) else {
+            return "立体声"
+        }
+        return audioConfigTitles[audioConfigSelection]
     }
 
     var performanceOverlayPositionTitles: [String] {

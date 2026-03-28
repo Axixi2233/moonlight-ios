@@ -13,9 +13,29 @@ FOUNDATION_EXTERN NSString * const StreamPreferenceVideoAlignmentMarginKey;
 FOUNDATION_EXTERN NSString * const StreamPreferencePerformanceOverlayPositionSelectionKey;
 FOUNDATION_EXTERN NSString * const StreamPreferencePerformanceOverlayMarginKey;
 FOUNDATION_EXTERN NSString * const StreamPreferenceFloatingMenuEnabledKey;
+FOUNDATION_EXTERN NSString * const StreamPreferenceTouchModeSelectionKey;
 FOUNDATION_EXTERN NSString * const StreamPreferenceVirtualButtonSchemeSelectionKey;
 FOUNDATION_EXTERN NSString * const StreamPreferenceVirtualGamepadSchemeSelectionKey;
 FOUNDATION_EXTERN NSString * const StreamPreferenceVirtualGamepadOpacityKey;
+FOUNDATION_EXTERN NSString * const StreamPreferenceVirtualButtonsEnabledKey;
+FOUNDATION_EXTERN NSString * const StreamPreferenceVirtualGamepadEnabledKey;
+FOUNDATION_EXTERN NSString * const StreamPreferenceCaptureMouseCursorKey;
+FOUNDATION_EXTERN NSString * const StreamPreferenceRumbleModeSelectionKey;
+FOUNDATION_EXTERN NSString * const StreamPreferenceRemoteMouseModeKey;
+FOUNDATION_EXTERN NSString * const StreamPreferenceRelativeMouseSensitivityKey;
+
+typedef NS_ENUM(NSInteger, StreamTouchModeSelection) {
+    StreamTouchModeSelectionTrackpad = 0,
+    StreamTouchModeSelectionMouse = 1,
+    StreamTouchModeSelectionMultiTouch = 2,
+    StreamTouchModeSelectionDisabled = 3
+};
+
+typedef NS_ENUM(NSInteger, StreamRumbleModeSelection) {
+    StreamRumbleModeSelectionController = 0,
+    StreamRumbleModeSelectionDevice = 1,
+    StreamRumbleModeSelectionDisabled = 2
+};
 
 @interface TemporarySettings : NSObject
 
@@ -41,9 +61,12 @@ FOUNDATION_EXTERN NSString * const StreamPreferenceVirtualGamepadOpacityKey;
 @property (nonatomic) BOOL optimizeGames;
 @property (nonatomic) BOOL enableHdr;
 @property (nonatomic) BOOL btMouseSupport;
+@property (nonatomic) BOOL remoteMouseMode;
+@property (nonatomic) BOOL captureMouseCursor;
 @property (nonatomic) BOOL absoluteTouchMode;
 @property (nonatomic) BOOL statsOverlay;
 @property (nonatomic) BOOL rumblePhone;
+@property (nonatomic) NSInteger rumbleModeSelection;
 @property (nonatomic, retain) NSNumber * motionMode;
 @property (nonatomic, retain) NSNumber * virtualDisplayMode;
 @property (nonatomic) BOOL multiTouchScreen;
@@ -51,15 +74,24 @@ FOUNDATION_EXTERN NSString * const StreamPreferenceVirtualGamepadOpacityKey;
 @property (nonatomic) BOOL enableTouchSensitivity;
 @property (nonatomic) BOOL touchSensitivityGlobal;
 @property (nonatomic, retain) NSNumber * touchSensitivity;
+@property (nonatomic) NSInteger touchModeSelection;
 @property (nonatomic) NSInteger videoAlignmentSelection;
 @property (nonatomic) CGFloat videoAlignmentMargin;
 @property (nonatomic) NSInteger performanceOverlayPositionSelection;
 @property (nonatomic) CGFloat performanceOverlayMargin;
 @property (nonatomic) BOOL floatingMenuEnabled;
+@property (nonatomic) BOOL virtualButtonsEnabled;
+@property (nonatomic) BOOL virtualGamepadEnabled;
 @property (nonatomic) NSInteger virtualButtonSchemeSelection;
 @property (nonatomic) NSInteger virtualGamepadSchemeSelection;
 @property (nonatomic) CGFloat virtualGamepadOpacity;
+@property (nonatomic) NSInteger relativeMouseSensitivity;
 
 - (id) initFromSettings:(Settings*)settings;
+- (BOOL)usesAbsoluteTouchMode;
+- (BOOL)usesMultiTouchScreen;
+- (BOOL)disablesDirectScreenTouchInput;
+- (BOOL)usesControllerRumble;
+- (BOOL)usesDeviceRumble;
 
 @end

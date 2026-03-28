@@ -18,6 +18,7 @@
 		7F0A00072D00000100000001 /* AboutSwiftUIView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7F0A00072D00000100000002 /* AboutSwiftUIView.swift */; };
 		7F0A00082D00000100000001 /* GamepadTestSwiftUIView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7F0A00082D00000100000002 /* GamepadTestSwiftUIView.swift */; };
 		7F0A00092D00000100000001 /* MainFrameAddHostSheetHostingBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7F0A00092D00000100000002 /* MainFrameAddHostSheetHostingBridge.swift */; };
+		7F0A00102E00000100000001 /* PassThroughTouchHandler.m in Sources */ = {isa = PBXBuildFile; fileRef = 7F0A00122E00000100000001 /* PassThroughTouchHandler.m */; };
 		98181BE92791277400E43572 /* libSDL2.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 98181BE82791275D00E43572 /* libSDL2.a */; };
 		98181BEB2791278F00E43572 /* libSDL2.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 98181BEA2791278300E43572 /* libSDL2.a */; };
 		98181BED2791281100E43572 /* CoreMotion.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 98181BEC2791281100E43572 /* CoreMotion.framework */; };
@@ -192,6 +193,8 @@
 		7F0A00072D00000100000002 /* AboutSwiftUIView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AboutSwiftUIView.swift; sourceTree = "<group>"; };
 		7F0A00082D00000100000002 /* GamepadTestSwiftUIView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GamepadTestSwiftUIView.swift; sourceTree = "<group>"; };
 		7F0A00092D00000100000002 /* MainFrameAddHostSheetHostingBridge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MainFrameAddHostSheetHostingBridge.swift; sourceTree = "<group>"; };
+		7F0A00112E00000100000001 /* PassThroughTouchHandler.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = PassThroughTouchHandler.h; sourceTree = "<group>"; };
+		7F0A00122E00000100000001 /* PassThroughTouchHandler.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = PassThroughTouchHandler.m; sourceTree = "<group>"; };
 		9803CCAB254F9EAF00EE185E /* ConnectionCallbacks.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = ConnectionCallbacks.h; sourceTree = "<group>"; };
 		98132E8C20BC9A62007A053F /* Moonlight v1.1.xcdatamodel */ = {isa = PBXFileReference; lastKnownFileType = wrapper.xcdatamodel; path = "Moonlight v1.1.xcdatamodel"; sourceTree = "<group>"; };
 		98181BE82791275D00E43572 /* libSDL2.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; name = libSDL2.a; path = libs/SDL2/lib/iOS/libSDL2.a; sourceTree = "<group>"; };
@@ -534,6 +537,8 @@
 				9819CC13254F107A008A7C8E /* RelativeTouchHandler.m */,
 				9819CC20254F180F008A7C8E /* AbsoluteTouchHandler.h */,
 				9819CC21254F180F008A7C8E /* AbsoluteTouchHandler.m */,
+				7F0A00112E00000100000001 /* PassThroughTouchHandler.h */,
+				7F0A00122E00000100000001 /* PassThroughTouchHandler.m */,
 				988FCD3F293B091B003050E2 /* KeyboardInputField.h */,
 				988FCD40293B091B003050E2 /* KeyboardInputField.m */,
 				791F0E5E2BF5D82500837217 /* TouchScreenManager.m */,
@@ -956,6 +961,7 @@
 				98D585701C0ED0E800F6CC00 /* TemporarySettings.m in Sources */,
 				FB89462819F646E200339C8A /* CryptoManager.m in Sources */,
 				DC1F5A07206436B20037755F /* ConnectionHelper.m in Sources */,
+				7F0A00102E00000100000001 /* PassThroughTouchHandler.m in Sources */,
 				FB89462E19F646E200339C8A /* PairManager.m in Sources */,
 				FB9AFD371A7E02DB00872C98 /* HttpRequest.m in Sources */,
 				FB290D0019B2C406004C83CF /* main.m in Sources */,
