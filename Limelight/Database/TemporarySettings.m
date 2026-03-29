@@ -23,6 +23,7 @@ NSString * const StreamPreferenceCaptureMouseCursorKey = @"StreamPreferenceCaptu
 NSString * const StreamPreferenceRumbleModeSelectionKey = @"StreamPreferenceRumbleModeSelection";
 NSString * const StreamPreferenceRemoteMouseModeKey = @"StreamPreferenceRemoteMouseMode";
 NSString * const StreamPreferenceRelativeMouseSensitivityKey = @"StreamPreferenceRelativeMouseSensitivity";
+NSString * const StreamPreferenceRendererSelectionKey = @"StreamPreferenceRendererSelection";
 
 @implementation TemporarySettings
 
@@ -89,6 +90,16 @@ NSString * const StreamPreferenceRelativeMouseSensitivityKey = @"StreamPreferenc
     return MAX(50, MIN(relativeMouseSensitivity, 300));
 }
 
+- (NSInteger)normalizedRendererSelection:(NSInteger)rendererSelection {
+    switch (rendererSelection) {
+        case 1:
+            return 1;
+        case 0:
+        default:
+            return 0;
+    }
+}
+
 - (id) initFromSettings:(Settings*)settings {
     self = [self init];
     
@@ -109,7 +120,8 @@ NSString * const StreamPreferenceRelativeMouseSensitivityKey = @"StreamPreferenc
         StreamPreferenceCaptureMouseCursorKey: @(YES),
         StreamPreferenceRumbleModeSelectionKey: @(StreamRumbleModeSelectionController),
         StreamPreferenceRemoteMouseModeKey: @(NO),
-        StreamPreferenceRelativeMouseSensitivityKey: @(100)
+        StreamPreferenceRelativeMouseSensitivityKey: @(100),
+        StreamPreferenceRendererSelectionKey: @(0)
     };
     [[NSUserDefaults standardUserDefaults] registerDefaults:streamPreferenceDefaults];
     
@@ -194,6 +206,7 @@ NSString * const StreamPreferenceRelativeMouseSensitivityKey = @"StreamPreferenc
     self.remoteMouseMode = [defaults boolForKey:StreamPreferenceRemoteMouseModeKey];
     self.captureMouseCursor = [defaults boolForKey:StreamPreferenceCaptureMouseCursorKey];
     self.relativeMouseSensitivity = [self normalizedRelativeMouseSensitivity:[defaults integerForKey:StreamPreferenceRelativeMouseSensitivityKey]];
+    self.rendererSelection = [self normalizedRendererSelection:[defaults integerForKey:StreamPreferenceRendererSelectionKey]];
     id storedRumbleMode = [defaults objectForKey:StreamPreferenceRumbleModeSelectionKey];
     if ([storedRumbleMode isKindOfClass:[NSNumber class]]) {
         self.rumbleModeSelection = [storedRumbleMode integerValue];

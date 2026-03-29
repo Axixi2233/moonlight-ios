@@ -2,7 +2,7 @@
 "about.find_developer" = "在这里找到开发者";
 "about.credits.heading" = "感谢一路同行的你们";
 "about.credits.list_title" = "鸣谢墙";
-"about.credits.message" = "这份名单献给每一位支持星光·阿西西的朋友。因为有你们，项目才得以持续前进。";
+"about.credits.message" = "这份名单献给每一位支持阿西西的朋友。因为有你们，项目才得以持续前进。";
 "about.credits.subtitle" = "感谢每一位支持与陪伴的朋友";
 "about.credits.title" = "鸣谢";
 "about.gamepad_test.subtitle" = "实时查看摇杆、按键和扳机状态，手柄震动，体感测试。";
@@ -68,6 +68,9 @@
 "settings.performance_overlay_position.top_right" = "顶部居右";
 "settings.play_audio_on_pc.toggle" = "本设备和PC同时发声";
 "settings.relative_mouse_sensitivity.label" = "相对鼠标灵敏度: %.0f%%";
+"settings.renderer.metal" = "Metal 渲染";
+"settings.renderer.system" = "系统渲染";
+"settings.renderer.title" = "视频渲染";
 "settings.remote_mouse_mode.toggle" = "远程鼠标";
 "settings.reset.button" = "重置";
 "settings.reset.clear_custom_data" = "重置并清空自定义数据";
@@ -367,8 +370,9 @@
 "stream.stats.client" = " 客户端：%.1f ms";
 "stream.stats.dropped" = " 丢帧：%.2f%%";
 "stream.stats.encoding" = " 编码：%.1f ms";
+"stream.stats.decode" = " 解码：%.1f ms";
 "stream.stats.latency" = "延迟：%u ms (抖动%u ms)";
-"stream.stats.overlay" = "%dx%d %@ %@%@%@%@ FPS：%.2f";
+"stream.stats.overlay" = "%dx%d %@ %@%@%@%@%@ FPS：%.2f";
 "stream.bandwidth.mb" = "带宽: %.2f MB/s";
 "stream.bandwidth.kb" = "带宽: %.2f KB/s";
 "home.app.default_name" = "应用";

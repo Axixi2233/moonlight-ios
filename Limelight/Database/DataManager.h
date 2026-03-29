@@ -30,6 +30,7 @@
                  remoteMouseMode:(BOOL)remoteMouseMode
               captureMouseCursor:(BOOL)captureMouseCursor
       relativeMouseSensitivity:(NSInteger)relativeMouseSensitivity
+               rendererSelection:(NSInteger)rendererSelection
               touchModeSelection:(NSInteger)touchModeSelection
                     statsOverlay:(BOOL)statsOverlay
              rumbleModeSelection:(NSInteger)rumbleModeSelection

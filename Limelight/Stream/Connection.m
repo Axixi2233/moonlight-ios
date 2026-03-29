@@ -43,7 +43,31 @@ static OPUS_MULTISTREAM_CONFIGURATION audioConfig;
 static void* audioBuffer;
 static int audioFrameSize;
 
-static VideoDecoderRenderer* renderer;
+static id<VideoRendering> renderer;
+
+static void DrainCompletedRendererDecoderStats(void)
+{
+    if (renderer == nil || ![renderer respondsToSelector:@selector(consumeCompletedDecoderLatencyTotal:frames:min:max:)]) {
+        return;
+    }
+
+    uint64_t total = 0;
+    int frames = 0;
+    uint64_t min = 0;
+    uint64_t max = 0;
+    if (![renderer consumeCompletedDecoderLatencyTotal:&total frames:&frames min:&min max:&max]) {
+        return;
+    }
+
+    currentVideoStats.totalDecoderLatency += total;
+    currentVideoStats.framesWithDecoderLatency += frames;
+    if (currentVideoStats.minDecoderLatency == 0 || (min != 0 && min < currentVideoStats.minDecoderLatency)) {
+        currentVideoStats.minDecoderLatency = min;
+    }
+    if (max > currentVideoStats.maxDecoderLatency) {
+        currentVideoStats.maxDecoderLatency = max;
+    }
+}
 
 int DrDecoderSetup(int videoFormat, int width, int height, int redrawRate, void* context, int drFlags)
 {
@@ -67,10 +91,22 @@ void DrStop(void)
 
 -(BOOL) getVideoStats:(video_stats_t*)stats
 {
-    // We return lastVideoStats because it is a complete 1 second window
     [videoStatsLock lock];
+    DrainCompletedRendererDecoderStats();
+
     if (lastVideoStats.endTime != 0) {
         memcpy(stats, &lastVideoStats, sizeof(*stats));
+
+        // Metal decode latency is produced asynchronously by VideoToolbox callbacks.
+        // If the last completed 1-second window hasn't picked it up yet, surface the
+        // most recent in-flight decode stats so the overlay doesn't appear blank.
+        if (stats->framesWithDecoderLatency == 0 && currentVideoStats.framesWithDecoderLatency != 0) {
+            stats->totalDecoderLatency = currentVideoStats.totalDecoderLatency;
+            stats->framesWithDecoderLatency = currentVideoStats.framesWithDecoderLatency;
+            stats->maxDecoderLatency = currentVideoStats.maxDecoderLatency;
+            stats->minDecoderLatency = currentVideoStats.minDecoderLatency;
+        }
+
         [videoStatsLock unlock];
         return YES;
     }
@@ -156,6 +192,7 @@ int DrSubmitDecodeUnit(PDECODE_UNIT decodeUnit)
     else {
         // Flip stats roughly every second
         if (now - currentVideoStats.startTime >= 1.0f) {
+            DrainCompletedRendererDecoderStats();
             currentVideoStats.endTime = now;
             
             [videoStatsLock lock];
@@ -229,7 +266,7 @@ int DrSubmitDecodeUnit(PDECODE_UNIT decodeUnit)
     return [renderer submitDecodeBuffer:data
                                  length:offset
                              bufferType:BUFFER_TYPE_PICDATA
-                             decodeUnit:decodeUnit];
+                              decodeUnit:decodeUnit];
 }
 
 int ArInit(int audioConfiguration, POPUS_MULTISTREAM_CONFIGURATION opusConfig, void* context, int flags)
@@ -414,7 +451,7 @@ void ClSetControllerLED(uint16_t controllerNumber, uint8_t r, uint8_t g, uint8_t
     });
 }
 
--(id) initWithConfig:(StreamConfiguration*)config renderer:(VideoDecoderRenderer*)myRenderer connectionCallbacks:(id<ConnectionCallbacks>)callbacks
+-(id) initWithConfig:(StreamConfiguration*)config renderer:(id<VideoRendering>)myRenderer connectionCallbacks:(id<ConnectionCallbacks>)callbacks
 {
     self = [super init];
 

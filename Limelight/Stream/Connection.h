@@ -25,11 +25,15 @@ typedef struct {
     int framesWithClientQueueLatency;
     uint64_t maxClientQueueLatency;
     uint64_t minClientQueueLatency;
+    uint64_t totalDecoderLatency;
+    int framesWithDecoderLatency;
+    uint64_t maxDecoderLatency;
+    uint64_t minDecoderLatency;
 } video_stats_t;
 
 @interface Connection : NSOperation <NSStreamDelegate>
 
--(id) initWithConfig:(StreamConfiguration*)config renderer:(VideoDecoderRenderer*)myRenderer connectionCallbacks:(id<ConnectionCallbacks>)callbacks;
+-(id) initWithConfig:(StreamConfiguration*)config renderer:(id<VideoRendering>)myRenderer connectionCallbacks:(id<ConnectionCallbacks>)callbacks;
 -(void) terminate;
 -(void) main;
 -(BOOL) getVideoStats:(video_stats_t*)stats;

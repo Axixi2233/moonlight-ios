@@ -66,6 +66,16 @@ static NSInteger NormalizedRelativeMouseSensitivity(NSInteger relativeMouseSensi
     return MAX(50, MIN(relativeMouseSensitivity, 300));
 }
 
+static NSInteger NormalizedRendererSelection(NSInteger rendererSelection) {
+    switch (rendererSelection) {
+        case 1:
+            return 1;
+        case 0:
+        default:
+            return 0;
+    }
+}
+
 - (id) init {
     self = [super init];
     
@@ -120,6 +130,7 @@ static NSInteger NormalizedRelativeMouseSensitivity(NSInteger relativeMouseSensi
                  remoteMouseMode:(BOOL)remoteMouseMode
               captureMouseCursor:(BOOL)captureMouseCursor
       relativeMouseSensitivity:(NSInteger)relativeMouseSensitivity
+               rendererSelection:(NSInteger)rendererSelection
               touchModeSelection:(NSInteger)touchModeSelection
                     statsOverlay:(BOOL)statsOverlay
              rumbleModeSelection:(NSInteger)rumbleModeSelection
@@ -157,6 +168,7 @@ performanceOverlayPositionSelection:(NSInteger)performanceOverlayPositionSelecti
         settingsToSave.enableHdr = enableHdr;
         settingsToSave.btMouseSupport = btMouseSupport;
         NSInteger normalizedRelativeMouseSensitivity = NormalizedRelativeMouseSensitivity(relativeMouseSensitivity);
+        NSInteger normalizedRendererSelection = NormalizedRendererSelection(rendererSelection);
         StreamTouchModeSelection normalizedTouchModeSelection = NormalizedTouchModeSelection(touchModeSelection);
         StreamRumbleModeSelection normalizedRumbleModeSelection = NormalizedRumbleModeSelection(rumbleModeSelection);
         settingsToSave.absoluteTouchMode = (normalizedTouchModeSelection == StreamTouchModeSelectionMouse ||
@@ -181,6 +193,7 @@ performanceOverlayPositionSelection:(NSInteger)performanceOverlayPositionSelecti
         [defaults setBool:remoteMouseMode forKey:StreamPreferenceRemoteMouseModeKey];
         [defaults setBool:captureMouseCursor forKey:StreamPreferenceCaptureMouseCursorKey];
         [defaults setInteger:normalizedRelativeMouseSensitivity forKey:StreamPreferenceRelativeMouseSensitivityKey];
+        [defaults setInteger:normalizedRendererSelection forKey:StreamPreferenceRendererSelectionKey];
         [defaults setInteger:normalizedTouchModeSelection forKey:StreamPreferenceTouchModeSelectionKey];
         [defaults setInteger:normalizedRumbleModeSelection forKey:StreamPreferenceRumbleModeSelectionKey];
         [defaults setInteger:MAX(0, MIN(virtualButtonSchemeSelection, 4)) forKey:StreamPreferenceVirtualButtonSchemeSelectionKey];

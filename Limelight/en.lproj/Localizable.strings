@@ -68,6 +68,9 @@
 "settings.performance_overlay_position.top_right" = "Top Right";
 "settings.play_audio_on_pc.toggle" = "Play audio on this device and PC";
 "settings.relative_mouse_sensitivity.label" = "Relative mouse sensitivity: %.0f%%";
+"settings.renderer.metal" = "Metal Renderer";
+"settings.renderer.system" = "System Renderer";
+"settings.renderer.title" = "Video Renderer";
 "settings.remote_mouse_mode.toggle" = "Remote Mouse";
 "settings.reset.button" = "Reset";
 "settings.reset.clear_custom_data" = "Reset and Clear Custom Data";
@@ -367,8 +370,9 @@
 "stream.stats.client" = " Client: %.1f ms";
 "stream.stats.dropped" = " Dropped: %.2f%%";
 "stream.stats.encoding" = " Encoding: %.1f ms";
+"stream.stats.decode" = " Decoding: %.1f ms";
 "stream.stats.latency" = "Latency: %u ms (jitter %u ms)";
-"stream.stats.overlay" = "%dx%d %@ %@%@%@%@ FPS: %.2f";
+"stream.stats.overlay" = "%dx%d %@ %@%@%@%@%@ FPS: %.2f";
 "stream.bandwidth.mb" = "Bandwidth: %.2f MB/s";
 "stream.bandwidth.kb" = "Bandwidth: %.2f KB/s";
 "home.app.default_name" = "App";

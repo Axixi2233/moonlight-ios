@@ -2,7 +2,7 @@
 "about.find_developer" = "開発者はこちら";
 "about.credits.heading" = "ここまで支えてくれた皆さまへ";
 "about.credits.list_title" = "クレジットウォール";
-"about.credits.message" = "この一覧は、星光・阿西西を支えてくださったすべての皆さまへ贈るものです。皆さまの応援が、プロジェクトを前へ進めてくれています。";
+"about.credits.message" = "この一覧は、阿西西を支えてくださったすべての皆さまへ贈るものです。皆さまの応援が、プロジェクトを前へ進めてくれています。";
 "about.credits.subtitle" = "支えてくださった皆さまへ、心からの感謝を";
 "about.credits.title" = "謝辞";
 "about.gamepad_test.subtitle" = "スティック、ボタン、トリガー、振動、モーションをリアルタイムで確認します。";
@@ -68,6 +68,9 @@
 "settings.performance_overlay_position.top_right" = "右上";
 "settings.play_audio_on_pc.toggle" = "PC側で音声を再生";
 "settings.relative_mouse_sensitivity.label" = "相対マウス感度: %.0f%%";
+"settings.renderer.metal" = "Metal レンダラー";
+"settings.renderer.system" = "システムレンダラー";
+"settings.renderer.title" = "映像レンダラー";
 "settings.remote_mouse_mode.toggle" = "リモートマウス";
 "settings.reset.button" = "リセット";
 "settings.reset.clear_custom_data" = "リセットしてカスタムデータも削除";
@@ -367,8 +370,9 @@
 "stream.stats.client" = " クライアント: %.1f ms";
 "stream.stats.dropped" = " ドロップ: %.2f%%";
 "stream.stats.encoding" = " エンコード: %.1f ms";
+"stream.stats.decode" = " デコード: %.1f ms";
 "stream.stats.latency" = "遅延: %u ms (ジッター %u ms)";
-"stream.stats.overlay" = "%dx%d %@ %@%@%@%@ FPS: %.2f";
+"stream.stats.overlay" = "%dx%d %@ %@%@%@%@%@ FPS: %.2f";
 "stream.bandwidth.mb" = "帯域: %.2f MB/s";
 "stream.bandwidth.kb" = "帯域: %.2f KB/s";
 "home.app.default_name" = "App";

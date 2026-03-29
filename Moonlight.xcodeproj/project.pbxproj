@@ -20,6 +20,7 @@
 		7F0A00092D00000100000001 /* MainFrameAddHostSheetHostingBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7F0A00092D00000100000002 /* MainFrameAddHostSheetHostingBridge.swift */; };
 		7F0A00132E00000100000001 /* CreditsSwiftUIView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7F0A00132E00000100000002 /* CreditsSwiftUIView.swift */; };
 		7F0A00102E00000100000001 /* PassThroughTouchHandler.m in Sources */ = {isa = PBXBuildFile; fileRef = 7F0A00122E00000100000001 /* PassThroughTouchHandler.m */; };
+		A2C100032E10000100000001 /* MetalVideoRenderer.m in Sources */ = {isa = PBXBuildFile; fileRef = A2C100022E10000100000001 /* MetalVideoRenderer.m */; };
 		98181BE92791277400E43572 /* libSDL2.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 98181BE82791275D00E43572 /* libSDL2.a */; };
 		98181BEB2791278F00E43572 /* libSDL2.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 98181BEA2791278300E43572 /* libSDL2.a */; };
 		98181BED2791281100E43572 /* CoreMotion.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 98181BEC2791281100E43572 /* CoreMotion.framework */; };
@@ -199,6 +200,8 @@
 		7F0A00132E00000100000002 /* CreditsSwiftUIView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CreditsSwiftUIView.swift; sourceTree = "<group>"; };
 		7F0A00112E00000100000001 /* PassThroughTouchHandler.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = PassThroughTouchHandler.h; sourceTree = "<group>"; };
 		7F0A00122E00000100000001 /* PassThroughTouchHandler.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = PassThroughTouchHandler.m; sourceTree = "<group>"; };
+		A2C100012E10000100000001 /* MetalVideoRenderer.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = MetalVideoRenderer.h; sourceTree = "<group>"; };
+		A2C100022E10000100000001 /* MetalVideoRenderer.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = MetalVideoRenderer.m; sourceTree = "<group>"; };
 		9803CCAB254F9EAF00EE185E /* ConnectionCallbacks.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = ConnectionCallbacks.h; sourceTree = "<group>"; };
 		98132E8C20BC9A62007A053F /* Moonlight v1.1.xcdatamodel */ = {isa = PBXFileReference; lastKnownFileType = wrapper.xcdatamodel; path = "Moonlight v1.1.xcdatamodel"; sourceTree = "<group>"; };
 		98181BE82791275D00E43572 /* libSDL2.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; name = libSDL2.a; path = libs/SDL2/lib/iOS/libSDL2.a; sourceTree = "<group>"; };
@@ -590,6 +593,8 @@
 				FB89461B19F646E200339C8A /* StreamManager.m */,
 				FB89461C19F646E200339C8A /* VideoDecoderRenderer.h */,
 				FB89461D19F646E200339C8A /* VideoDecoderRenderer.m */,
+				A2C100012E10000100000001 /* MetalVideoRenderer.h */,
+				A2C100022E10000100000001 /* MetalVideoRenderer.m */,
 				9803CCAB254F9EAF00EE185E /* ConnectionCallbacks.h */,
 			);
 			path = Stream;
@@ -929,6 +934,7 @@
 				FB1A67A5213245BD00507771 /* StreamConfiguration.m in Sources */,
 				FB1A67A7213245BD00507771 /* StreamManager.m in Sources */,
 				FB1A67A9213245BD00507771 /* VideoDecoderRenderer.m in Sources */,
+				A2C100032E10000100000001 /* MetalVideoRenderer.m in Sources */,
 				FB1A67A12132458C00507771 /* main.m in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -996,6 +1002,7 @@
 				FB4A23B81A9D3637004D2EF2 /* LoadingFrameViewController.m in Sources */,
 				FB9AFD3A1A7E05CE00872C98 /* ServerInfoResponse.m in Sources */,
 				FB89463119F646E200339C8A /* StreamManager.m in Sources */,
+				A2C100032E10000100000001 /* MetalVideoRenderer.m in Sources */,
 				988FCD41293B091B003050E2 /* KeyboardInputField.m in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

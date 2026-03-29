@@ -23,6 +23,7 @@ FOUNDATION_EXTERN NSString * const StreamPreferenceCaptureMouseCursorKey;
 FOUNDATION_EXTERN NSString * const StreamPreferenceRumbleModeSelectionKey;
 FOUNDATION_EXTERN NSString * const StreamPreferenceRemoteMouseModeKey;
 FOUNDATION_EXTERN NSString * const StreamPreferenceRelativeMouseSensitivityKey;
+FOUNDATION_EXTERN NSString * const StreamPreferenceRendererSelectionKey;
 
 typedef NS_ENUM(NSInteger, StreamTouchModeSelection) {
     StreamTouchModeSelectionTrackpad = 0,
@@ -86,6 +87,7 @@ typedef NS_ENUM(NSInteger, StreamRumbleModeSelection) {
 @property (nonatomic) NSInteger virtualGamepadSchemeSelection;
 @property (nonatomic) CGFloat virtualGamepadOpacity;
 @property (nonatomic) NSInteger relativeMouseSensitivity;
+@property (nonatomic) NSInteger rendererSelection;
 
 - (id) initFromSettings:(Settings*)settings;
 - (BOOL)usesAbsoluteTouchMode;

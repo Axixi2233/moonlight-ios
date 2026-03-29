@@ -10,8 +10,10 @@
 #import "CryptoManager.h"
 #import "HttpManager.h"
 #import "Utils.h"
+#import "DataManager.h"
 
 #import "StreamView.h"
+#import "MetalVideoRenderer.h"
 #import "ServerInfoResponse.h"
 #import "HttpResponse.h"
 #import "HttpRequest.h"
@@ -27,6 +29,27 @@
     UIView* _renderView;
     id<ConnectionCallbacks> _callbacks;
     Connection* _connection;
+}
+
+- (id<VideoRendering>)makeRendererForCurrentSettings
+{
+    TemporarySettings *settings = [[[DataManager alloc] init] getSettings];
+    StreamVideoRendererSelection selection = (StreamVideoRendererSelection)settings.rendererSelection;
+    float aspectRatio = (float)self->_config.width / (float)self->_config.height;
+
+    switch (selection) {
+        case StreamVideoRendererSelectionMetal:
+            return [[MetalVideoRenderer alloc] initWithView:self->_renderView
+                                                  callbacks:self->_callbacks
+                                          streamAspectRatio:aspectRatio
+                                             useFramePacing:self->_config.useFramePacing];
+        case StreamVideoRendererSelectionSystem:
+        default:
+            return [[VideoDecoderRenderer alloc] initWithView:self->_renderView
+                                                    callbacks:self->_callbacks
+                                            streamAspectRatio:aspectRatio
+                                               useFramePacing:self->_config.useFramePacing];
+    }
 }
 
 - (id) initWithConfig:(StreamConfiguration*)config renderView:(UIView*)view connectionCallbacks:(id<ConnectionCallbacks>)callbacks {
@@ -101,7 +124,7 @@
     
     // Initializing the renderer must be done on the main thread
     dispatch_async(dispatch_get_main_queue(), ^{
-        VideoDecoderRenderer* renderer = [[VideoDecoderRenderer alloc] initWithView:self->_renderView callbacks:self->_callbacks streamAspectRatio:(float)self->_config.width / (float)self->_config.height useFramePacing:self->_config.useFramePacing];
+        id<VideoRendering> renderer = [self makeRendererForCurrentSettings];
         self->_connection = [[Connection alloc] initWithConfig:self->_config renderer:renderer connectionCallbacks:self->_callbacks];
         NSOperationQueue* opQueue = [[NSOperationQueue alloc] init];
         [opQueue addOperation:self->_connection];
@@ -163,6 +186,9 @@
     if (![_connection getVideoStats:&stats]) {
         return @"";
     }
+
+    TemporarySettings *settings = [[[DataManager alloc] init] getSettings];
+    BOOL shouldShowDecoderLatency = settings.rendererSelection == StreamVideoRendererSelectionMetal;
     
     uint32_t rtt, variance;
     NSString* latencyString;
@@ -194,6 +220,15 @@
         clientLatencyStringLite = @"";
     }
 
+    NSString* decoderLatencyStringLite;
+    if (shouldShowDecoderLatency && stats.framesWithDecoderLatency != 0) {
+        decoderLatencyStringLite = [NSString stringWithFormat:StreamManagerLocalized(@"stream.stats.decode"),
+                                    (double)stats.totalDecoderLatency / (double)stats.framesWithDecoderLatency];
+    }
+    else {
+        decoderLatencyStringLite = @"";
+    }
+
     float interval = stats.endTime - stats.startTime;
 
     NSString* droppedFramesStringLite;
@@ -210,6 +245,7 @@
             _config.height,
             [_connection getActiveCodecNameLite],
             latencyStringLite,
+            decoderLatencyStringLite,
             hostProcessingStringLite,
             clientLatencyStringLite,
             droppedFramesStringLite,

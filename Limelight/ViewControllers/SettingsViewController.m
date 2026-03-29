@@ -409,6 +409,7 @@ static NSInteger ChannelCountFromAudioConfigSelection(NSInteger selection) {
     snapshot.remoteMouseMode = currentSettings.remoteMouseMode;
     snapshot.captureMouseCursor = currentSettings.captureMouseCursor;
     snapshot.relativeMouseSensitivity = currentSettings.relativeMouseSensitivity;
+    snapshot.rendererSelection = currentSettings.rendererSelection;
     snapshot.statsOverlay = currentSettings.statsOverlay;
     snapshot.rumbleModeSelection = currentSettings.rumbleModeSelection;
     snapshot.externalMonitor = currentSettings.externalMonitor;
@@ -471,9 +472,10 @@ static NSInteger ChannelCountFromAudioConfigSelection(NSInteger selection) {
                       useFramePacing:snapshot.useFramePacing
                            enableHdr:snapshot.enableHdr
                       btMouseSupport:snapshot.btMouseSupport
-                     remoteMouseMode:snapshot.remoteMouseMode
-                  captureMouseCursor:snapshot.captureMouseCursor
+                 remoteMouseMode:snapshot.remoteMouseMode
+              captureMouseCursor:snapshot.captureMouseCursor
             relativeMouseSensitivity:snapshot.relativeMouseSensitivity
+                rendererSelection:snapshot.rendererSelection
                   touchModeSelection:snapshot.touchModeSelection
                         statsOverlay:snapshot.statsOverlay
                  rumbleModeSelection:snapshot.rumbleModeSelection

@@ -46,6 +46,7 @@ final class SettingsFormSnapshot: NSObject {
     var remoteMouseMode: Bool = false
     var captureMouseCursor: Bool = true
     var relativeMouseSensitivity: Int = 100
+    var rendererSelection: Int = 0
     var statsOverlay: Bool = false
     var rumbleModeSelection: Int = 0
     var externalMonitor: Bool = false
@@ -108,6 +109,7 @@ private final class SettingsFormViewModel: ObservableObject {
     @Published var remoteMouseMode: Bool = false
     @Published var captureMouseCursor: Bool = true
     @Published var relativeMouseSensitivity: Double = 100
+    @Published var rendererSelection: Int = 0
     @Published var statsOverlay: Bool = false
     @Published var rumbleModeSelection: Int = 0
     @Published var externalMonitor: Bool = false
@@ -162,6 +164,7 @@ private final class SettingsFormViewModel: ObservableObject {
         remoteMouseMode = snapshot.remoteMouseMode
         captureMouseCursor = snapshot.captureMouseCursor
         relativeMouseSensitivity = Double(snapshot.relativeMouseSensitivity)
+        rendererSelection = snapshot.rendererSelection
         statsOverlay = snapshot.statsOverlay
         rumbleModeSelection = snapshot.rumbleModeSelection
         externalMonitor = snapshot.externalMonitor
@@ -212,6 +215,7 @@ private final class SettingsFormViewModel: ObservableObject {
         snapshot.remoteMouseMode = remoteMouseMode
         snapshot.captureMouseCursor = captureMouseCursor
         snapshot.relativeMouseSensitivity = Int(relativeMouseSensitivity.rounded())
+        snapshot.rendererSelection = rendererSelection
         snapshot.statsOverlay = statsOverlay
         snapshot.rumbleModeSelection = rumbleModeSelection
         snapshot.externalMonitor = externalMonitor
@@ -496,6 +500,14 @@ private struct SettingsRootView: View {
                     }
 
                     segmentedSection(title: SettingsLocalized("settings.codec.title"), selection: codecSelection(), labels: model.codecTitles)
+                    choiceSection(
+                        title: SettingsLocalized("settings.renderer.title"),
+                        subtitle: model.rendererTitle,
+                        options: Array(model.rendererTitles.enumerated()),
+                        selectedIndex: model.rendererSelection
+                    ) { index in
+                        model.rendererSelection = index
+                    } isDisabled: { _ in false }
 
                     if model.hdrSupported {
                         Toggle("HDR (Beta)", isOn: $model.enableHdr).font(.headline)
@@ -745,6 +757,20 @@ private extension SettingsFormViewModel {
             SettingsLocalized("settings.audio_config.surround_5_1"),
             SettingsLocalized("settings.audio_config.surround_7_1")
         ]
+    }
+
+    var rendererTitles: [String] {
+        [
+            SettingsLocalized("settings.renderer.system"),
+            SettingsLocalized("settings.renderer.metal")
+        ]
+    }
+
+    var rendererTitle: String {
+        guard rendererTitles.indices.contains(rendererSelection) else {
+            return SettingsLocalized("settings.renderer.system")
+        }
+        return rendererTitles[rendererSelection]
     }
 
     var audioConfigTitle: String {
