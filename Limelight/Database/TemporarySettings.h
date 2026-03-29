@@ -24,6 +24,8 @@ FOUNDATION_EXTERN NSString * const StreamPreferenceRumbleModeSelectionKey;
 FOUNDATION_EXTERN NSString * const StreamPreferenceRemoteMouseModeKey;
 FOUNDATION_EXTERN NSString * const StreamPreferenceRelativeMouseSensitivityKey;
 FOUNDATION_EXTERN NSString * const StreamPreferenceRendererSelectionKey;
+FOUNDATION_EXTERN NSString * const StreamPreferenceMetalFxScalingSelectionKey;
+FOUNDATION_EXTERN NSString * const StreamPreferenceMetalFxSharpenSelectionKey;
 
 typedef NS_ENUM(NSInteger, StreamTouchModeSelection) {
     StreamTouchModeSelectionTrackpad = 0,
@@ -36,6 +38,19 @@ typedef NS_ENUM(NSInteger, StreamRumbleModeSelection) {
     StreamRumbleModeSelectionController = 0,
     StreamRumbleModeSelectionDevice = 1,
     StreamRumbleModeSelectionDisabled = 2
+};
+
+typedef NS_ENUM(NSInteger, StreamMetalFxScalingSelection) {
+    StreamMetalFxScalingSelectionAutomatic = 0,
+    StreamMetalFxScalingSelectionOnePointFiveX = 1,
+    StreamMetalFxScalingSelectionTwoX = 2,
+    StreamMetalFxScalingSelectionDisabled = 3
+};
+
+typedef NS_ENUM(NSInteger, StreamMetalFxSharpenSelection) {
+    StreamMetalFxSharpenSelectionDisabled = 0,
+    StreamMetalFxSharpenSelectionStandard = 1,
+    StreamMetalFxSharpenSelectionStrong = 2
 };
 
 @interface TemporarySettings : NSObject
@@ -88,6 +103,8 @@ typedef NS_ENUM(NSInteger, StreamRumbleModeSelection) {
 @property (nonatomic) CGFloat virtualGamepadOpacity;
 @property (nonatomic) NSInteger relativeMouseSensitivity;
 @property (nonatomic) NSInteger rendererSelection;
+@property (nonatomic) NSInteger metalFxScalingSelection;
+@property (nonatomic) NSInteger metalFxSharpenSelection;
 
 - (id) initFromSettings:(Settings*)settings;
 - (BOOL)usesAbsoluteTouchMode;

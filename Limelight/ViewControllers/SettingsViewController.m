@@ -13,6 +13,14 @@
 
 #import <VideoToolbox/VideoToolbox.h>
 #import <AVFoundation/AVFoundation.h>
+#import <Metal/Metal.h>
+#import <TargetConditionals.h>
+#if !TARGET_OS_SIMULATOR && __has_include(<MetalFX/MetalFX.h>)
+@import MetalFX;
+#define SETTINGS_HAS_METALFX 1
+#else
+#define SETTINGS_HAS_METALFX 0
+#endif
 
 static NSString * const MainFrameSettingsDidCloseNotification = @"MainFrameSettingsDidCloseNotification";
 #define SettingsLocalized(key) NSLocalizedString((key), nil)
@@ -66,6 +74,21 @@ static NSInteger ChannelCountFromAudioConfigSelection(NSInteger selection) {
         default:
             return 2;
     }
+}
+
+static BOOL SupportsMetalRenderer(void) {
+    id<MTLDevice> device = MTLCreateSystemDefaultDevice();
+    return device != nil;
+}
+
+static BOOL SupportsMetalFx(void) {
+#if SETTINGS_HAS_METALFX
+    if (@available(iOS 16.0, *)) {
+        id<MTLDevice> device = MTLCreateSystemDefaultDevice();
+        return device != nil && [MTLFXSpatialScalerDescriptor supportsDevice:device];
+    }
+#endif
+    return NO;
 }
 
 - (UIColor *)navigationAccentColor {
@@ -409,7 +432,11 @@ static NSInteger ChannelCountFromAudioConfigSelection(NSInteger selection) {
     snapshot.remoteMouseMode = currentSettings.remoteMouseMode;
     snapshot.captureMouseCursor = currentSettings.captureMouseCursor;
     snapshot.relativeMouseSensitivity = currentSettings.relativeMouseSensitivity;
-    snapshot.rendererSelection = currentSettings.rendererSelection;
+    snapshot.supportsMetalRenderer = SupportsMetalRenderer();
+    snapshot.supportsMetalFx = SupportsMetalFx();
+    snapshot.rendererSelection = snapshot.supportsMetalRenderer ? currentSettings.rendererSelection : 0;
+    snapshot.metalFxScalingSelection = currentSettings.metalFxScalingSelection;
+    snapshot.metalFxSharpenSelection = currentSettings.metalFxSharpenSelection;
     snapshot.statsOverlay = currentSettings.statsOverlay;
     snapshot.rumbleModeSelection = currentSettings.rumbleModeSelection;
     snapshot.externalMonitor = currentSettings.externalMonitor;
@@ -476,6 +503,8 @@ static NSInteger ChannelCountFromAudioConfigSelection(NSInteger selection) {
               captureMouseCursor:snapshot.captureMouseCursor
             relativeMouseSensitivity:snapshot.relativeMouseSensitivity
                 rendererSelection:snapshot.rendererSelection
+           metalFxScalingSelection:snapshot.metalFxScalingSelection
+           metalFxSharpenSelection:snapshot.metalFxSharpenSelection
                   touchModeSelection:snapshot.touchModeSelection
                         statsOverlay:snapshot.statsOverlay
                  rumbleModeSelection:snapshot.rumbleModeSelection

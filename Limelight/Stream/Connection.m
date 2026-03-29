@@ -174,6 +174,18 @@ void DrStop(void)
     }
 }
 
+-(CGFloat) getActiveMetalFxScale
+{
+    if (renderer == nil ||
+        ![renderer respondsToSelector:@selector(isMetalFxActive)] ||
+        ![renderer respondsToSelector:@selector(currentMetalFxScale)] ||
+        ![renderer isMetalFxActive]) {
+        return 0.0;
+    }
+
+    return [renderer currentMetalFxScale];
+}
+
 int DrSubmitDecodeUnit(PDECODE_UNIT decodeUnit)
 {
     int offset = 0;
@@ -240,6 +252,7 @@ int DrSubmitDecodeUnit(PDECODE_UNIT decodeUnit)
     
     currentVideoStats.receivedFrames++;
     currentVideoStats.totalFrames++;
+    currentVideoStats.totalVideoBytes += (uint64_t)decodeUnit->fullLength;
 
     PLENTRY entry = decodeUnit->bufferList;
     while (entry != NULL) {

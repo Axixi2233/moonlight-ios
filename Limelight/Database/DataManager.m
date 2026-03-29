@@ -76,6 +76,29 @@ static NSInteger NormalizedRendererSelection(NSInteger rendererSelection) {
     }
 }
 
+static NSInteger NormalizedMetalFxScalingSelection(NSInteger metalFxScalingSelection) {
+    switch (metalFxScalingSelection) {
+        case StreamMetalFxScalingSelectionOnePointFiveX:
+        case StreamMetalFxScalingSelectionTwoX:
+        case StreamMetalFxScalingSelectionDisabled:
+            return metalFxScalingSelection;
+        case StreamMetalFxScalingSelectionAutomatic:
+        default:
+            return StreamMetalFxScalingSelectionAutomatic;
+    }
+}
+
+static NSInteger NormalizedMetalFxSharpenSelection(NSInteger metalFxSharpenSelection) {
+    switch (metalFxSharpenSelection) {
+        case StreamMetalFxSharpenSelectionDisabled:
+        case StreamMetalFxSharpenSelectionStrong:
+            return metalFxSharpenSelection;
+        case StreamMetalFxSharpenSelectionStandard:
+        default:
+            return StreamMetalFxSharpenSelectionStandard;
+    }
+}
+
 - (id) init {
     self = [super init];
     
@@ -131,6 +154,8 @@ static NSInteger NormalizedRendererSelection(NSInteger rendererSelection) {
               captureMouseCursor:(BOOL)captureMouseCursor
       relativeMouseSensitivity:(NSInteger)relativeMouseSensitivity
                rendererSelection:(NSInteger)rendererSelection
+         metalFxScalingSelection:(NSInteger)metalFxScalingSelection
+         metalFxSharpenSelection:(NSInteger)metalFxSharpenSelection
               touchModeSelection:(NSInteger)touchModeSelection
                     statsOverlay:(BOOL)statsOverlay
              rumbleModeSelection:(NSInteger)rumbleModeSelection
@@ -169,6 +194,8 @@ performanceOverlayPositionSelection:(NSInteger)performanceOverlayPositionSelecti
         settingsToSave.btMouseSupport = btMouseSupport;
         NSInteger normalizedRelativeMouseSensitivity = NormalizedRelativeMouseSensitivity(relativeMouseSensitivity);
         NSInteger normalizedRendererSelection = NormalizedRendererSelection(rendererSelection);
+        NSInteger normalizedMetalFxScalingSelection = NormalizedMetalFxScalingSelection(metalFxScalingSelection);
+        NSInteger normalizedMetalFxSharpenSelection = NormalizedMetalFxSharpenSelection(metalFxSharpenSelection);
         StreamTouchModeSelection normalizedTouchModeSelection = NormalizedTouchModeSelection(touchModeSelection);
         StreamRumbleModeSelection normalizedRumbleModeSelection = NormalizedRumbleModeSelection(rumbleModeSelection);
         settingsToSave.absoluteTouchMode = (normalizedTouchModeSelection == StreamTouchModeSelectionMouse ||
@@ -194,6 +221,8 @@ performanceOverlayPositionSelection:(NSInteger)performanceOverlayPositionSelecti
         [defaults setBool:captureMouseCursor forKey:StreamPreferenceCaptureMouseCursorKey];
         [defaults setInteger:normalizedRelativeMouseSensitivity forKey:StreamPreferenceRelativeMouseSensitivityKey];
         [defaults setInteger:normalizedRendererSelection forKey:StreamPreferenceRendererSelectionKey];
+        [defaults setInteger:normalizedMetalFxScalingSelection forKey:StreamPreferenceMetalFxScalingSelectionKey];
+        [defaults setInteger:normalizedMetalFxSharpenSelection forKey:StreamPreferenceMetalFxSharpenSelectionKey];
         [defaults setInteger:normalizedTouchModeSelection forKey:StreamPreferenceTouchModeSelectionKey];
         [defaults setInteger:normalizedRumbleModeSelection forKey:StreamPreferenceRumbleModeSelectionKey];
         [defaults setInteger:MAX(0, MIN(virtualButtonSchemeSelection, 4)) forKey:StreamPreferenceVirtualButtonSchemeSelectionKey];
@@ -392,6 +421,9 @@ performanceOverlayPositionSelection:(NSInteger)performanceOverlayPositionSelecti
             StreamPreferenceRemoteMouseModeKey,
             StreamPreferenceCaptureMouseCursorKey,
             StreamPreferenceRelativeMouseSensitivityKey,
+            StreamPreferenceRendererSelectionKey,
+            StreamPreferenceMetalFxScalingSelectionKey,
+            StreamPreferenceMetalFxSharpenSelectionKey,
             StreamPreferenceTouchModeSelectionKey,
             StreamPreferenceRumbleModeSelectionKey,
             StreamPreferenceVirtualButtonSchemeSelectionKey,

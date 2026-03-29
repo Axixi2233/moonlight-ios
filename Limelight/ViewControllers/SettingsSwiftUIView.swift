@@ -47,6 +47,10 @@ final class SettingsFormSnapshot: NSObject {
     var captureMouseCursor: Bool = true
     var relativeMouseSensitivity: Int = 100
     var rendererSelection: Int = 0
+    var supportsMetalRenderer: Bool = false
+    var supportsMetalFx: Bool = false
+    var metalFxScalingSelection: Int = 0
+    var metalFxSharpenSelection: Int = 1
     var statsOverlay: Bool = false
     var rumbleModeSelection: Int = 0
     var externalMonitor: Bool = false
@@ -110,6 +114,10 @@ private final class SettingsFormViewModel: ObservableObject {
     @Published var captureMouseCursor: Bool = true
     @Published var relativeMouseSensitivity: Double = 100
     @Published var rendererSelection: Int = 0
+    @Published var supportsMetalRenderer: Bool = false
+    @Published var supportsMetalFx: Bool = false
+    @Published var metalFxScalingSelection: Int = 0
+    @Published var metalFxSharpenSelection: Int = 1
     @Published var statsOverlay: Bool = false
     @Published var rumbleModeSelection: Int = 0
     @Published var externalMonitor: Bool = false
@@ -165,6 +173,10 @@ private final class SettingsFormViewModel: ObservableObject {
         captureMouseCursor = snapshot.captureMouseCursor
         relativeMouseSensitivity = Double(snapshot.relativeMouseSensitivity)
         rendererSelection = snapshot.rendererSelection
+        supportsMetalRenderer = snapshot.supportsMetalRenderer
+        supportsMetalFx = snapshot.supportsMetalFx
+        metalFxScalingSelection = snapshot.metalFxScalingSelection
+        metalFxSharpenSelection = snapshot.metalFxSharpenSelection
         statsOverlay = snapshot.statsOverlay
         rumbleModeSelection = snapshot.rumbleModeSelection
         externalMonitor = snapshot.externalMonitor
@@ -216,6 +228,10 @@ private final class SettingsFormViewModel: ObservableObject {
         snapshot.captureMouseCursor = captureMouseCursor
         snapshot.relativeMouseSensitivity = Int(relativeMouseSensitivity.rounded())
         snapshot.rendererSelection = rendererSelection
+        snapshot.supportsMetalRenderer = supportsMetalRenderer
+        snapshot.supportsMetalFx = supportsMetalFx
+        snapshot.metalFxScalingSelection = metalFxScalingSelection
+        snapshot.metalFxSharpenSelection = metalFxSharpenSelection
         snapshot.statsOverlay = statsOverlay
         snapshot.rumbleModeSelection = rumbleModeSelection
         snapshot.externalMonitor = externalMonitor
@@ -500,14 +516,27 @@ private struct SettingsRootView: View {
                     }
 
                     segmentedSection(title: SettingsLocalized("settings.codec.title"), selection: codecSelection(), labels: model.codecTitles)
-                    choiceSection(
-                        title: SettingsLocalized("settings.renderer.title"),
-                        subtitle: model.rendererTitle,
-                        options: Array(model.rendererTitles.enumerated()),
-                        selectedIndex: model.rendererSelection
-                    ) { index in
-                        model.rendererSelection = index
-                    } isDisabled: { _ in false }
+                    if model.supportsMetalRenderer {
+                        segmentedSection(
+                            title: SettingsLocalized("settings.renderer.title"),
+                            selection: $model.rendererSelection,
+                            labels: model.rendererTitles
+                        )
+
+                        if model.rendererSelection == 1 && model.supportsMetalFx {
+                            segmentedSection(
+                                title: SettingsLocalized("settings.metalfx_scaling.title"),
+                                selection: metalFxScalingSelection(),
+                                labels: model.metalFxScalingTitles
+                            )
+
+                            segmentedSection(
+                                title: SettingsLocalized("settings.metalfx_sharpen.title"),
+                                selection: $model.metalFxSharpenSelection,
+                                labels: model.metalFxSharpenTitles
+                            )
+                        }
+                    }
 
                     if model.hdrSupported {
                         Toggle("HDR (Beta)", isOn: $model.enableHdr).font(.headline)
@@ -651,6 +680,39 @@ private struct SettingsRootView: View {
         )
     }
 
+    private func metalFxScalingSelection() -> Binding<Int> {
+        Binding(
+            get: {
+                switch model.metalFxScalingSelection {
+                    case 3:
+                        return 0
+                    case 1:
+                        return 2
+                    case 2:
+                        return 3
+                    case 0:
+                        fallthrough
+                    default:
+                        return 1
+                }
+            },
+            set: { newIndex in
+                switch newIndex {
+                    case 0:
+                        model.metalFxScalingSelection = 3
+                    case 2:
+                        model.metalFxScalingSelection = 1
+                    case 3:
+                        model.metalFxScalingSelection = 2
+                    case 1:
+                        fallthrough
+                    default:
+                        model.metalFxScalingSelection = 0
+                }
+            }
+        )
+    }
+
     private func touchModeSelection() -> Binding<Int> {
         Binding(
             get: { model.touchModeSelectionIndex },
@@ -771,6 +833,51 @@ private extension SettingsFormViewModel {
             return SettingsLocalized("settings.renderer.system")
         }
         return rendererTitles[rendererSelection]
+    }
+
+    var metalFxScalingTitles: [String] {
+        [
+            SettingsLocalized("common.off"),
+            SettingsLocalized("common.auto"),
+            SettingsLocalized("settings.metalfx_scaling.1_5x"),
+            SettingsLocalized("settings.metalfx_scaling.2_0x")
+        ]
+    }
+
+    var metalFxScalingTitle: String {
+        let displayIndex: Int
+        switch metalFxScalingSelection {
+            case 3:
+                displayIndex = 0
+            case 1:
+                displayIndex = 2
+            case 2:
+                displayIndex = 3
+            case 0:
+                fallthrough
+            default:
+                displayIndex = 1
+        }
+
+        guard metalFxScalingTitles.indices.contains(displayIndex) else {
+            return SettingsLocalized("common.auto")
+        }
+        return metalFxScalingTitles[displayIndex]
+    }
+
+    var metalFxSharpenTitles: [String] {
+        [
+            SettingsLocalized("common.off"),
+            SettingsLocalized("settings.metalfx_sharpen.standard"),
+            SettingsLocalized("settings.metalfx_sharpen.strong")
+        ]
+    }
+
+    var metalFxSharpenTitle: String {
+        guard metalFxSharpenTitles.indices.contains(metalFxSharpenSelection) else {
+            return SettingsLocalized("settings.metalfx_sharpen.standard")
+        }
+        return metalFxSharpenTitles[metalFxSharpenSelection]
     }
 
     var audioConfigTitle: String {

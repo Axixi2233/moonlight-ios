@@ -31,6 +31,8 @@
               captureMouseCursor:(BOOL)captureMouseCursor
       relativeMouseSensitivity:(NSInteger)relativeMouseSensitivity
                rendererSelection:(NSInteger)rendererSelection
+         metalFxScalingSelection:(NSInteger)metalFxScalingSelection
+         metalFxSharpenSelection:(NSInteger)metalFxSharpenSelection
               touchModeSelection:(NSInteger)touchModeSelection
                     statsOverlay:(BOOL)statsOverlay
              rumbleModeSelection:(NSInteger)rumbleModeSelection

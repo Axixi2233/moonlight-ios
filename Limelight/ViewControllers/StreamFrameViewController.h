@@ -26,6 +26,5 @@
 @property (nonatomic) StreamConfiguration* streamConfig;
 
 -(void)updatePreferredDisplayMode:(BOOL)streamActive;
-@property (nonatomic, assign) long long previousBytes;  // 上次获取的字节数
 
 @end

@@ -71,6 +71,12 @@
 "settings.renderer.metal" = "Metal 渲染";
 "settings.renderer.system" = "系统渲染";
 "settings.renderer.title" = "视频渲染";
+"settings.metalfx_scaling.title" = "MetalFX 倍率";
+"settings.metalfx_scaling.1_5x" = "1.5 倍";
+"settings.metalfx_scaling.2_0x" = "2.0 倍";
+"settings.metalfx_sharpen.title" = "MetalFX 锐化";
+"settings.metalfx_sharpen.standard" = "标准";
+"settings.metalfx_sharpen.strong" = "强";
 "settings.remote_mouse_mode.toggle" = "远程鼠标";
 "settings.reset.button" = "重置";
 "settings.reset.clear_custom_data" = "重置并清空自定义数据";
@@ -134,7 +140,7 @@
 "stream.menu.virtual_buttons.title" = "虚拟按键";
 "stream.menu.virtual_gamepad.subtitle" = "临时显示或隐藏屏幕虚拟手柄";
 "stream.menu.virtual_gamepad.title" = "虚拟手柄";
-"stream.performance.extended_metrics.toggle" = "显示编码/客户端延迟/丢帧率";
+"stream.performance.extended_metrics.toggle" = "显示抖动/编码/客户端延迟/丢帧率";
 "stream.performance.title" = "性能信息";
 "stream.touch_mode.disabled" = "禁止触控";
 "stream.touch_mode.mouse" = "普通鼠标";
@@ -371,8 +377,12 @@
 "stream.stats.dropped" = " 丢帧：%.2f%%";
 "stream.stats.encoding" = " 编码：%.1f ms";
 "stream.stats.decode" = " 解码：%.1f ms";
-"stream.stats.latency" = "延迟：%u ms (抖动%u ms)";
-"stream.stats.overlay" = "%dx%d %@ %@%@%@%@%@ FPS：%.2f";
+"stream.stats.jitter" = " 抖动：%u ms";
+"stream.stats.latency" = "延迟：%u ms";
+"stream.stats.metal" = " MTL";
+"stream.stats.mfx" = " MFX：%.1fx";
+"stream.stats.mfx_auto" = " MFX：Auto";
+"stream.stats.overlay" = "%dx%d %@%@ %@%@%@%@%@%@ FPS：%.2f";
 "stream.bandwidth.mb" = "带宽: %.2f MB/s";
 "stream.bandwidth.kb" = "带宽: %.2f KB/s";
 "home.app.default_name" = "应用";

@@ -21,6 +21,7 @@
 		7F0A00132E00000100000001 /* CreditsSwiftUIView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7F0A00132E00000100000002 /* CreditsSwiftUIView.swift */; };
 		7F0A00102E00000100000001 /* PassThroughTouchHandler.m in Sources */ = {isa = PBXBuildFile; fileRef = 7F0A00122E00000100000001 /* PassThroughTouchHandler.m */; };
 		A2C100032E10000100000001 /* MetalVideoRenderer.m in Sources */ = {isa = PBXBuildFile; fileRef = A2C100022E10000100000001 /* MetalVideoRenderer.m */; };
+		A2C100052E10000100000001 /* MetalTexturePresenter.metal in Sources */ = {isa = PBXBuildFile; fileRef = A2C100042E10000100000001 /* MetalTexturePresenter.metal */; };
 		98181BE92791277400E43572 /* libSDL2.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 98181BE82791275D00E43572 /* libSDL2.a */; };
 		98181BEB2791278F00E43572 /* libSDL2.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 98181BEA2791278300E43572 /* libSDL2.a */; };
 		98181BED2791281100E43572 /* CoreMotion.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 98181BEC2791281100E43572 /* CoreMotion.framework */; };
@@ -202,6 +203,7 @@
 		7F0A00122E00000100000001 /* PassThroughTouchHandler.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = PassThroughTouchHandler.m; sourceTree = "<group>"; };
 		A2C100012E10000100000001 /* MetalVideoRenderer.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = MetalVideoRenderer.h; sourceTree = "<group>"; };
 		A2C100022E10000100000001 /* MetalVideoRenderer.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = MetalVideoRenderer.m; sourceTree = "<group>"; };
+		A2C100042E10000100000001 /* MetalTexturePresenter.metal */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.metal; path = MetalTexturePresenter.metal; sourceTree = "<group>"; };
 		9803CCAB254F9EAF00EE185E /* ConnectionCallbacks.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = ConnectionCallbacks.h; sourceTree = "<group>"; };
 		98132E8C20BC9A62007A053F /* Moonlight v1.1.xcdatamodel */ = {isa = PBXFileReference; lastKnownFileType = wrapper.xcdatamodel; path = "Moonlight v1.1.xcdatamodel"; sourceTree = "<group>"; };
 		98181BE82791275D00E43572 /* libSDL2.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; name = libSDL2.a; path = libs/SDL2/lib/iOS/libSDL2.a; sourceTree = "<group>"; };
@@ -595,6 +597,7 @@
 				FB89461D19F646E200339C8A /* VideoDecoderRenderer.m */,
 				A2C100012E10000100000001 /* MetalVideoRenderer.h */,
 				A2C100022E10000100000001 /* MetalVideoRenderer.m */,
+				A2C100042E10000100000001 /* MetalTexturePresenter.metal */,
 				9803CCAB254F9EAF00EE185E /* ConnectionCallbacks.h */,
 			);
 			path = Stream;
@@ -935,6 +938,7 @@
 				FB1A67A7213245BD00507771 /* StreamManager.m in Sources */,
 				FB1A67A9213245BD00507771 /* VideoDecoderRenderer.m in Sources */,
 				A2C100032E10000100000001 /* MetalVideoRenderer.m in Sources */,
+				A2C100052E10000100000001 /* MetalTexturePresenter.metal in Sources */,
 				FB1A67A12132458C00507771 /* main.m in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

@@ -17,5 +17,6 @@
 
 - (NSString*) getStatsOverlayText;
 - (NSString*) getStatsOverlayTextWithExtendedMetrics:(BOOL)showsExtendedMetrics;
+- (NSString*) getBandwidthOverlayText;
 
 @end

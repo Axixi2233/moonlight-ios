@@ -24,6 +24,8 @@ NSString * const StreamPreferenceRumbleModeSelectionKey = @"StreamPreferenceRumb
 NSString * const StreamPreferenceRemoteMouseModeKey = @"StreamPreferenceRemoteMouseMode";
 NSString * const StreamPreferenceRelativeMouseSensitivityKey = @"StreamPreferenceRelativeMouseSensitivity";
 NSString * const StreamPreferenceRendererSelectionKey = @"StreamPreferenceRendererSelection";
+NSString * const StreamPreferenceMetalFxScalingSelectionKey = @"StreamPreferenceMetalFxScalingSelection";
+NSString * const StreamPreferenceMetalFxSharpenSelectionKey = @"StreamPreferenceMetalFxSharpenSelection";
 
 @implementation TemporarySettings
 
@@ -100,6 +102,29 @@ NSString * const StreamPreferenceRendererSelectionKey = @"StreamPreferenceRender
     }
 }
 
+- (NSInteger)normalizedMetalFxScalingSelection:(NSInteger)metalFxScalingSelection {
+    switch (metalFxScalingSelection) {
+        case StreamMetalFxScalingSelectionOnePointFiveX:
+        case StreamMetalFxScalingSelectionTwoX:
+        case StreamMetalFxScalingSelectionDisabled:
+            return metalFxScalingSelection;
+        case StreamMetalFxScalingSelectionAutomatic:
+        default:
+            return StreamMetalFxScalingSelectionAutomatic;
+    }
+}
+
+- (NSInteger)normalizedMetalFxSharpenSelection:(NSInteger)metalFxSharpenSelection {
+    switch (metalFxSharpenSelection) {
+        case StreamMetalFxSharpenSelectionDisabled:
+        case StreamMetalFxSharpenSelectionStrong:
+            return metalFxSharpenSelection;
+        case StreamMetalFxSharpenSelectionStandard:
+        default:
+            return StreamMetalFxSharpenSelectionStandard;
+    }
+}
+
 - (id) initFromSettings:(Settings*)settings {
     self = [self init];
     
@@ -121,7 +146,9 @@ NSString * const StreamPreferenceRendererSelectionKey = @"StreamPreferenceRender
         StreamPreferenceRumbleModeSelectionKey: @(StreamRumbleModeSelectionController),
         StreamPreferenceRemoteMouseModeKey: @(NO),
         StreamPreferenceRelativeMouseSensitivityKey: @(100),
-        StreamPreferenceRendererSelectionKey: @(0)
+        StreamPreferenceRendererSelectionKey: @(0),
+        StreamPreferenceMetalFxScalingSelectionKey: @(StreamMetalFxScalingSelectionAutomatic),
+        StreamPreferenceMetalFxSharpenSelectionKey: @(StreamMetalFxSharpenSelectionStandard)
     };
     [[NSUserDefaults standardUserDefaults] registerDefaults:streamPreferenceDefaults];
     
@@ -207,6 +234,8 @@ NSString * const StreamPreferenceRendererSelectionKey = @"StreamPreferenceRender
     self.captureMouseCursor = [defaults boolForKey:StreamPreferenceCaptureMouseCursorKey];
     self.relativeMouseSensitivity = [self normalizedRelativeMouseSensitivity:[defaults integerForKey:StreamPreferenceRelativeMouseSensitivityKey]];
     self.rendererSelection = [self normalizedRendererSelection:[defaults integerForKey:StreamPreferenceRendererSelectionKey]];
+    self.metalFxScalingSelection = [self normalizedMetalFxScalingSelection:[defaults integerForKey:StreamPreferenceMetalFxScalingSelectionKey]];
+    self.metalFxSharpenSelection = [self normalizedMetalFxSharpenSelection:[defaults integerForKey:StreamPreferenceMetalFxSharpenSelectionKey]];
     id storedRumbleMode = [defaults objectForKey:StreamPreferenceRumbleModeSelectionKey];
     if ([storedRumbleMode isKindOfClass:[NSNumber class]]) {
         self.rumbleModeSelection = [storedRumbleMode integerValue];

@@ -29,6 +29,8 @@ typedef NS_ENUM(NSInteger, StreamVideoRendererSelection) {
                                      frames:(int *)frames
                                         min:(uint64_t *)min
                                         max:(uint64_t *)max;
+- (BOOL)isMetalFxActive;
+- (CGFloat)currentMetalFxScale;
 
 @end
 

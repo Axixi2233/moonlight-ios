@@ -17,6 +17,7 @@ typedef struct {
     int totalFrames;
     int receivedFrames;
     int networkDroppedFrames;
+    uint64_t totalVideoBytes;
     int totalHostProcessingLatency;
     int framesWithHostProcessingLatency;
     int maxHostProcessingLatency;
@@ -39,4 +40,5 @@ typedef struct {
 -(BOOL) getVideoStats:(video_stats_t*)stats;
 -(NSString*) getActiveCodecName;
 -(NSString*) getActiveCodecNameLite;
+-(CGFloat) getActiveMetalFxScale;
 @end

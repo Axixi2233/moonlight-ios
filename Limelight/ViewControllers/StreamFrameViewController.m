@@ -671,8 +671,6 @@ static const CGFloat kStreamFloatingMenuExpandedAlpha = 0.96f;
     
     [UIApplication sharedApplication].idleTimerDisabled = YES;
     
-    self.previousBytes = 0;  // 初始化上次字节数为 0
-    
     _settings = [[[DataManager alloc] init] getSettings];
     _currentSessionVirtualButtonSchemeSelection = _settings.virtualButtonSchemeSelection;
     _currentSessionVirtualGamepadSchemeSelection = _settings.virtualGamepadSchemeSelection;
@@ -962,7 +960,7 @@ static const CGFloat kStreamFloatingMenuExpandedAlpha = 0.96f;
 - (void)updateStatsOverlay {
     //    NSString* overlayText = [self->_streamMan getStatsOverlayText];
     NSString* overlayText = [NSString stringWithFormat:@"%@ %@",
-                             [self getInternetface],
+                             [self->_streamMan getBandwidthOverlayText],
                              [self->_streamMan getStatsOverlayTextWithExtendedMetrics:_extendedPerformanceMetricsEnabled]];
     NSAttributedString *attributedText = [self statsOverlayAttributedTextForText:overlayText];
     
@@ -2788,65 +2786,6 @@ static const CGFloat kStreamFloatingMenuExpandedAlpha = 0.96f;
     return !_settings.captureMouseCursor && [GCMouse mice].count > 0;
 }
 #endif
-
-- (NSString*)getInternetface {
-    long long currentBytes = [self getInterfaceBytes];  // 获取当前流量
-    long long deltaBytes = currentBytes - self.previousBytes;  // 计算差值
-
-    // 转换为 KB/s
-    float kbPerSecond = deltaBytes / 1024.0;  // 将字节转换为千字节（KB）
-    self.previousBytes = currentBytes;  // 更新上次字节数
-
-    // 判断是否超过 1000 KB/s，转换为 MB/s
-    if (kbPerSecond > 1000) {
-        float mbPerSecond = kbPerSecond / 1024.0;  // 转换为兆字节每秒（MB/s）
-//        NSLog(@"Network speed: %.2f MB/s", mbPerSecond);  // 输出 MB/s
-        return [NSString stringWithFormat:StreamMenuLocalized(@"stream.bandwidth.mb"), mbPerSecond];
-    } else {
-//        NSLog(@"Network speed: %.2f KB/s", kbPerSecond);  // 输出 KB/s
-        return [NSString stringWithFormat:StreamMenuLocalized(@"stream.bandwidth.kb"), kbPerSecond];
-    }
-    return @"";
-}
-
-/* 获取所有接口的网络流量信息 */
-- (long long)getInterfaceBytes {
-    struct ifaddrs *ifa_list = NULL, *ifa;
-    if (getifaddrs(&ifa_list) == -1) {
-        return 0;  // 获取失败，返回 0
-    }
-
-    uint32_t iBytes = 0;  // 输入字节
-    uint32_t oBytes = 0;  // 输出字节
-
-    // 遍历所有接口
-    for (ifa = ifa_list; ifa; ifa = ifa->ifa_next) {
-        // 过滤掉非链路层接口
-        if (AF_LINK != ifa->ifa_addr->sa_family) {
-            continue;
-        }
-
-        // 仅统计活动接口
-        if (!(ifa->ifa_flags & IFF_UP) && !(ifa->ifa_flags & IFF_RUNNING)) {
-            continue;
-        }
-
-        // 如果没有相关的流量数据，跳过该接口
-        if (ifa->ifa_data == 0) {
-            continue;
-        }
-
-        // 获取接口的流量数据
-        struct if_data *if_data = (struct if_data *)ifa->ifa_data;
-        iBytes += if_data->ifi_ibytes;  // 累加输入字节
-        oBytes += if_data->ifi_obytes;  // 累加输出字节
-    }
-
-    freeifaddrs(ifa_list);  // 释放内存
-
-    // 返回输入字节和输出字节的总和
-    return iBytes + oBytes;
-}
 
 - (void)streamActionSheetHostingViewController:(StreamActionSheetHostingViewController *)controller didSelectActionWithIdentifier:(NSString *)identifier {
     _streamActionSheetHostingViewController = nil;

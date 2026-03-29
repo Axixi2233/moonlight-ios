@@ -7,8 +7,16 @@
 
 #import "MetalVideoRenderer.h"
 
+#import <TargetConditionals.h>
+
 @import CoreImage;
 @import MetalKit;
+#if !TARGET_OS_SIMULATOR && __has_include(<MetalFX/MetalFX.h>)
+@import MetalFX;
+#define MOONLIGHT_HAS_METALFX 1
+#else
+#define MOONLIGHT_HAS_METALFX 0
+#endif
 
 #import <VideoToolbox/VideoToolbox.h>
 #include <libavcodec/avcodec.h>
@@ -18,11 +26,13 @@
 #include <libavutil/mem.h>
 #include <float.h>
 
+#import "DataManager.h"
 #import "StreamView.h"
 
 static const size_t kMetalRendererNaluStartPrefixSize = 3;
 static const size_t kMetalRendererNalLengthPrefixSize = 4;
 static const NSUInteger kMetalRendererMaxOutstandingDecodeFrames = 2;
+static const BOOL kMetalRendererEnableMetalFxSpatial = YES;
 
 extern int ff_isom_write_av1c(AVIOContext *pb, const uint8_t *buf, int size,
                               int write_seq_header);
@@ -30,6 +40,17 @@ extern int ff_isom_write_av1c(AVIOContext *pb, const uint8_t *buf, int size,
 typedef struct {
     CFTimeInterval submitTime;
 } MetalDecodeFrameContext;
+
+typedef struct {
+    vector_float2 position;
+    vector_float2 texCoord;
+} MetalTexturePresenterVertex;
+
+typedef struct {
+    vector_float2 texelSize;
+    float sharpenAmount;
+    float padding;
+} MetalTexturePresenterUniforms;
 
 static void MetalVideoRendererDecompressionOutputCallback(void *decompressionOutputRefCon,
                                                           void *sourceFrameRefCon,
@@ -56,6 +77,13 @@ static void MetalVideoRendererDecompressionOutputCallback(void *decompressionOut
     MTKView *_metalView;
     CIContext *_ciContext;
     CGColorSpaceRef _colorSpace;
+    id<MTLRenderPipelineState> _texturePresentationPipelineState;
+    id<MTLSamplerState> _texturePresentationSamplerState;
+#if MOONLIGHT_HAS_METALFX
+    id<MTLFXSpatialScaler> _spatialScaler;
+    id<MTLTexture> _spatialScalerInputTexture;
+    id<MTLTexture> _spatialScalerOutputTexture;
+#endif
 
     NSLock *_decodedFrameLock;
     CVPixelBufferRef _latestPixelBuffer;
@@ -90,6 +118,11 @@ static void MetalVideoRendererDecompressionOutputCallback(void *decompressionOut
     CGAffineTransform _cachedPresentationTransform;
     CGRect _cachedDrawableBounds;
     BOOL _hasCachedPresentationTransform;
+    BOOL _metalFxAvailable;
+    StreamMetalFxScalingSelection _metalFxScalingSelection;
+    StreamMetalFxSharpenSelection _metalFxSharpenSelection;
+    BOOL _lastMetalFxActive;
+    CGFloat _lastMetalFxScale;
 }
 
 int DrSubmitDecodeUnit(PDECODE_UNIT decodeUnit);
@@ -111,14 +144,27 @@ int DrSubmitDecodeUnit(PDECODE_UNIT decodeUnit);
         _decodeSubmissionScheduled = NO;
         _outstandingDecodeFrames = 0;
         parameterSetBuffers = [[NSMutableArray alloc] init];
+        TemporarySettings *settings = [[[DataManager alloc] init] getSettings];
+        _metalFxScalingSelection = (StreamMetalFxScalingSelection)settings.metalFxScalingSelection;
+        _metalFxSharpenSelection = (StreamMetalFxSharpenSelection)settings.metalFxSharpenSelection;
 
         _metalDevice = MTLCreateSystemDefaultDevice();
         _commandQueue = [_metalDevice newCommandQueue];
         _metalEnabled = (_metalDevice != nil && _commandQueue != nil);
+#if MOONLIGHT_HAS_METALFX
+        if (@available(iOS 16.0, *)) {
+            _metalFxAvailable = _metalEnabled && [MTLFXSpatialScalerDescriptor supportsDevice:_metalDevice];
+        }
+        else {
+            _metalFxAvailable = NO;
+        }
+#else
+        _metalFxAvailable = NO;
+#endif
 
         if (_metalEnabled) {
             [self installMetalView];
-            [self applyMetalDisplayConfiguration];
+            [self applyMetalDisplayConfigurationSafely];
 
             if (_streamView != nil) {
                 [[NSNotificationCenter defaultCenter] addObserver:self
@@ -146,6 +192,129 @@ int DrSubmitDecodeUnit(PDECODE_UNIT decodeUnit);
         CGColorSpaceRelease(_colorSpace);
         _colorSpace = NULL;
     }
+}
+
+- (void)teardownSpatialScalerResources
+{
+#if MOONLIGHT_HAS_METALFX
+    _spatialScaler = nil;
+    _spatialScalerInputTexture = nil;
+    _spatialScalerOutputTexture = nil;
+#endif
+}
+
+- (BOOL)buildTexturePresentationResources
+{
+    if (!_metalEnabled || _metalDevice == nil || _texturePresentationPipelineState != nil) {
+        return _texturePresentationPipelineState != nil && _texturePresentationSamplerState != nil;
+    }
+
+    id<MTLLibrary> library = [_metalDevice newDefaultLibrary];
+    if (library == nil) {
+        Log(LOG_E, @"Failed to create default Metal library for texture presentation");
+        return NO;
+    }
+
+    id<MTLFunction> vertexFunction = [library newFunctionWithName:@"metalTexturePresenterVertex"];
+    id<MTLFunction> fragmentFunction = [library newFunctionWithName:@"metalTexturePresenterFragment"];
+    if (vertexFunction == nil || fragmentFunction == nil) {
+        Log(LOG_E, @"Failed to load Metal texture presentation shaders");
+        return NO;
+    }
+
+    MTLRenderPipelineDescriptor *descriptor = [[MTLRenderPipelineDescriptor alloc] init];
+    descriptor.label = @"MetalTexturePresenterPipeline";
+    descriptor.vertexFunction = vertexFunction;
+    descriptor.fragmentFunction = fragmentFunction;
+    descriptor.colorAttachments[0].pixelFormat = _metalView.colorPixelFormat;
+
+    NSError *error = nil;
+    _texturePresentationPipelineState = [_metalDevice newRenderPipelineStateWithDescriptor:descriptor error:&error];
+    if (_texturePresentationPipelineState == nil) {
+        Log(LOG_E, @"Failed to create Metal texture presentation pipeline: %@", error);
+        return NO;
+    }
+
+    MTLSamplerDescriptor *samplerDescriptor = [[MTLSamplerDescriptor alloc] init];
+    samplerDescriptor.minFilter = MTLSamplerMinMagFilterLinear;
+    samplerDescriptor.magFilter = MTLSamplerMinMagFilterLinear;
+    samplerDescriptor.sAddressMode = MTLSamplerAddressModeClampToEdge;
+    samplerDescriptor.tAddressMode = MTLSamplerAddressModeClampToEdge;
+    _texturePresentationSamplerState = [_metalDevice newSamplerStateWithDescriptor:samplerDescriptor];
+    return _texturePresentationSamplerState != nil;
+}
+
+- (BOOL)renderTexture:(id<MTLTexture>)texture
+         commandBuffer:(id<MTLCommandBuffer>)commandBuffer
+ renderPassDescriptor:(MTLRenderPassDescriptor *)renderPassDescriptor
+            targetRect:(CGRect)targetRect
+        sharpenAmount:(float)sharpenAmount
+{
+    if (texture == nil || commandBuffer == nil || renderPassDescriptor == nil || _metalView == nil) {
+        return NO;
+    }
+
+    if (![self buildTexturePresentationResources]) {
+        return NO;
+    }
+
+    CGSize drawableSize = _metalView.drawableSize;
+    if (drawableSize.width <= 0.0 || drawableSize.height <= 0.0) {
+        return NO;
+    }
+
+    float left = (float)((CGRectGetMinX(targetRect) / drawableSize.width) * 2.0 - 1.0);
+    float right = (float)((CGRectGetMaxX(targetRect) / drawableSize.width) * 2.0 - 1.0);
+    float top = (float)(1.0 - (CGRectGetMinY(targetRect) / drawableSize.height) * 2.0);
+    float bottom = (float)(1.0 - (CGRectGetMaxY(targetRect) / drawableSize.height) * 2.0);
+
+    MetalTexturePresenterVertex vertices[] = {
+        { { left,  top },    { 0.0f, 0.0f } },
+        { { right, top },    { 1.0f, 0.0f } },
+        { { left,  bottom }, { 0.0f, 1.0f } },
+        { { right, bottom }, { 1.0f, 1.0f } },
+    };
+    MetalTexturePresenterUniforms uniforms;
+    uniforms.texelSize = (vector_float2) {
+        1.0f / MAX((float)texture.width, 1.0f),
+        1.0f / MAX((float)texture.height, 1.0f)
+    };
+    uniforms.sharpenAmount = sharpenAmount;
+    uniforms.padding = 0.0f;
+
+    id<MTLRenderCommandEncoder> encoder = [commandBuffer renderCommandEncoderWithDescriptor:renderPassDescriptor];
+    if (encoder == nil) {
+        return NO;
+    }
+
+    [encoder setRenderPipelineState:_texturePresentationPipelineState];
+    [encoder setFragmentTexture:texture atIndex:0];
+    [encoder setFragmentSamplerState:_texturePresentationSamplerState atIndex:0];
+    [encoder setVertexBytes:vertices length:sizeof(vertices) atIndex:0];
+    [encoder setFragmentBytes:&uniforms length:sizeof(uniforms) atIndex:0];
+    [encoder drawPrimitives:MTLPrimitiveTypeTriangleStrip vertexStart:0 vertexCount:4];
+    [encoder endEncoding];
+    return YES;
+}
+
+- (float)spatialSharpenAmountForScale:(CGFloat)scale
+{
+    if (scale <= 1.0f || _metalFxSharpenSelection == StreamMetalFxSharpenSelectionDisabled) {
+        return 0.0f;
+    }
+
+    float baseAmount = _hdrOutputEnabled ? 0.08f : 0.12f;
+    float variableAmount = _hdrOutputEnabled ? 0.06f : 0.10f;
+    float normalizedScale = MIN(MAX((float)(scale - 1.0f), 0.0f), 1.0f);
+    float amount = baseAmount + normalizedScale * variableAmount;
+
+    if (_metalFxSharpenSelection == StreamMetalFxSharpenSelectionStrong) {
+        float strongMultiplier = _hdrOutputEnabled ? 1.8f : 2.0f;
+        float strongCap = _hdrOutputEnabled ? 0.32f : 0.45f;
+        amount = MIN(amount * strongMultiplier, strongCap);
+    }
+
+    return amount;
 }
 
 - (void)installMetalView
@@ -263,8 +432,40 @@ int DrSubmitDecodeUnit(PDECODE_UNIT decodeUnit);
     }
 
     [self rebuildCiContextForColorSpace:_colorSpace];
+    _texturePresentationPipelineState = nil;
+    _texturePresentationSamplerState = nil;
     [self invalidateCachedPresentationTransform];
+    [self teardownSpatialScalerResources];
     [_metalView releaseDrawables];
+}
+
+- (void)applyMetalDisplayConfigurationSafely
+{
+    if (!_metalEnabled || _metalView == nil) {
+        return;
+    }
+
+    void (^reconfigureBlock)(void) = ^{
+        if (!self->_metalEnabled || self->_metalView == nil) {
+            return;
+        }
+
+        BOOL wasPaused = self->_metalView.paused;
+        self->_metalView.paused = YES;
+        [self applyMetalDisplayConfiguration];
+        self->_metalView.paused = wasPaused;
+
+        if (!self->_metalView.hidden && !self->_metalView.paused) {
+            [self->_metalView draw];
+        }
+    };
+
+    if ([NSThread isMainThread]) {
+        reconfigureBlock();
+    }
+    else {
+        dispatch_sync(dispatch_get_main_queue(), reconfigureBlock);
+    }
 }
 
 - (void)updateMetalViewLayout
@@ -329,6 +530,7 @@ int DrSubmitDecodeUnit(PDECODE_UNIT decodeUnit);
 
     [parameterSetBuffers removeAllObjects];
     [self teardownDecompressionSession];
+    [self teardownSpatialScalerResources];
     [self clearLatestPixelBuffer];
 
     if (formatDesc != NULL) {
@@ -351,7 +553,7 @@ int DrSubmitDecodeUnit(PDECODE_UNIT decodeUnit);
         return;
     }
 
-    [self applyMetalDisplayConfiguration];
+    [self applyMetalDisplayConfigurationSafely];
 
     if (_metalView != nil) {
         _metalView.paused = NO;
@@ -359,6 +561,10 @@ int DrSubmitDecodeUnit(PDECODE_UNIT decodeUnit);
         NSInteger screenMaximumFramesPerSecond = MAX(screen.maximumFramesPerSecond, 1);
         _metalView.preferredFramesPerSecond = MAX(MIN(frameRate, (int)screenMaximumFramesPerSecond), 1);
     }
+
+    // Kick off decode submission before the first visible draw. Hidden MTKViews may
+    // not receive draw callbacks until they are unhidden by the first decoded frame.
+    [self scheduleDecodeSubmissionIfNeeded];
 }
 
 - (void)stop
@@ -374,6 +580,7 @@ int DrSubmitDecodeUnit(PDECODE_UNIT decodeUnit);
     _outstandingDecodeFrames = 0;
 
     [self teardownDecompressionSession];
+    [self teardownSpatialScalerResources];
     [self clearLatestPixelBuffer];
 
     if (_metalView != nil) {
@@ -449,7 +656,7 @@ int DrSubmitDecodeUnit(PDECODE_UNIT decodeUnit);
         LiRequestIdrFrame();
     }
 
-    [self applyMetalDisplayConfiguration];
+    [self applyMetalDisplayConfigurationSafely];
 }
 
 - (void)updateAnnexBBufferForRange:(CMBlockBufferRef)frameBuffer dataBlock:(CMBlockBufferRef)dataBuffer offset:(int)offset length:(int)nalLength
@@ -833,7 +1040,7 @@ int DrSubmitDecodeUnit(PDECODE_UNIT decodeUnit);
             }
 
             if (self->_hdrModeRequested != self->_hdrOutputEnabled) {
-                [self applyMetalDisplayConfiguration];
+                [self applyMetalDisplayConfigurationSafely];
             }
 
             if (!self->_videoContentShown) {
@@ -841,6 +1048,10 @@ int DrSubmitDecodeUnit(PDECODE_UNIT decodeUnit);
                 self->_metalView.hidden = NO;
                 [self->_callbacks videoContentShown];
             }
+
+            // Force a first draw after unhide so the first decoded frame is presented
+            // even if the MTKView hasn't resumed its regular draw cadence yet.
+            [self->_metalView draw];
         });
     }
 }
@@ -966,6 +1177,138 @@ int DrSubmitDecodeUnit(PDECODE_UNIT decodeUnit);
     }
 
     [self presentDecodedFrame:(CVPixelBufferRef)imageBuffer];
+}
+
+- (BOOL)shouldUseSpatialScalerForImageExtent:(CGRect)imageExtent targetRect:(CGRect)targetRect
+{
+    if (!_metalFxAvailable || !kMetalRendererEnableMetalFxSpatial) {
+        return NO;
+    }
+    if (_metalFxScalingSelection == StreamMetalFxScalingSelectionDisabled) {
+        return NO;
+    }
+
+    CGSize outputSize = [self spatialScalerOutputSizeForInputSize:imageExtent.size targetRect:targetRect];
+    CGFloat inputWidth = CGRectGetWidth(imageExtent);
+    CGFloat inputHeight = CGRectGetHeight(imageExtent);
+    CGFloat outputWidth = outputSize.width;
+    CGFloat outputHeight = outputSize.height;
+
+    if (inputWidth <= 0.0f || inputHeight <= 0.0f || outputWidth <= 0.0f || outputHeight <= 0.0f) {
+        return NO;
+    }
+
+    return outputWidth > inputWidth + 1.0f || outputHeight > inputHeight + 1.0f;
+}
+
+- (BOOL)isMetalFxActive
+{
+    @synchronized (self) {
+        return _lastMetalFxActive;
+    }
+}
+
+- (CGFloat)currentMetalFxScale
+{
+    @synchronized (self) {
+        return _lastMetalFxScale;
+    }
+}
+
+- (CGSize)spatialScalerOutputSizeForInputSize:(CGSize)inputSize targetRect:(CGRect)targetRect
+{
+    CGFloat displayOutputWidth = MAX(CGRectGetWidth(targetRect), 1.0f);
+    CGFloat displayOutputHeight = MAX(CGRectGetHeight(targetRect), 1.0f);
+    CGFloat inputWidth = MAX(inputSize.width, 1.0f);
+    CGFloat inputHeight = MAX(inputSize.height, 1.0f);
+
+    CGSize requestedOutputSize;
+    switch (_metalFxScalingSelection) {
+        case StreamMetalFxScalingSelectionOnePointFiveX:
+            requestedOutputSize = CGSizeMake(inputWidth * 1.5f, inputHeight * 1.5f);
+            break;
+        case StreamMetalFxScalingSelectionTwoX:
+            requestedOutputSize = CGSizeMake(inputWidth * 2.0f, inputHeight * 2.0f);
+            break;
+        case StreamMetalFxScalingSelectionDisabled:
+            requestedOutputSize = CGSizeMake(displayOutputWidth, displayOutputHeight);
+            break;
+        case StreamMetalFxScalingSelectionAutomatic:
+        default:
+            requestedOutputSize = CGSizeMake(displayOutputWidth, displayOutputHeight);
+            break;
+    }
+
+    requestedOutputSize.width = MAX(requestedOutputSize.width, displayOutputWidth);
+    requestedOutputSize.height = MAX(requestedOutputSize.height, displayOutputHeight);
+
+    return requestedOutputSize;
+}
+
+- (BOOL)ensureSpatialScalerForInputSize:(CGSize)inputSize outputSize:(CGSize)outputSize
+{
+#if MOONLIGHT_HAS_METALFX
+    if (!_metalFxAvailable) {
+        return NO;
+    }
+
+    if (@available(iOS 16.0, *)) {
+        NSUInteger inputWidth = MAX((NSUInteger)llround(inputSize.width), 1);
+        NSUInteger inputHeight = MAX((NSUInteger)llround(inputSize.height), 1);
+        NSUInteger outputWidth = MAX((NSUInteger)llround(outputSize.width), 1);
+        NSUInteger outputHeight = MAX((NSUInteger)llround(outputSize.height), 1);
+        MTLPixelFormat renderPixelFormat = _metalView.colorPixelFormat;
+
+        BOOL needsRebuild = (_spatialScaler == nil ||
+                             _spatialScaler.inputWidth != inputWidth ||
+                             _spatialScaler.inputHeight != inputHeight ||
+                             _spatialScaler.outputWidth != outputWidth ||
+                             _spatialScaler.outputHeight != outputHeight ||
+                             _spatialScaler.colorTextureFormat != renderPixelFormat ||
+                             _spatialScaler.outputTextureFormat != renderPixelFormat);
+        if (!needsRebuild) {
+            return (_spatialScalerInputTexture != nil && _spatialScalerOutputTexture != nil);
+        }
+
+        [self teardownSpatialScalerResources];
+
+        MTLFXSpatialScalerDescriptor *descriptor = [[MTLFXSpatialScalerDescriptor alloc] init];
+        descriptor.colorTextureFormat = renderPixelFormat;
+        descriptor.outputTextureFormat = renderPixelFormat;
+        descriptor.inputWidth = inputWidth;
+        descriptor.inputHeight = inputHeight;
+        descriptor.outputWidth = outputWidth;
+        descriptor.outputHeight = outputHeight;
+        descriptor.colorProcessingMode = _hdrOutputEnabled ?
+            MTLFXSpatialScalerColorProcessingModeHDR :
+            MTLFXSpatialScalerColorProcessingModePerceptual;
+
+        _spatialScaler = [descriptor newSpatialScalerWithDevice:_metalDevice];
+        if (_spatialScaler == nil) {
+            return NO;
+        }
+
+        MTLTextureDescriptor *inputDescriptor = [MTLTextureDescriptor texture2DDescriptorWithPixelFormat:renderPixelFormat
+                                                                                                    width:inputWidth
+                                                                                                   height:inputHeight
+                                                                                                mipmapped:NO];
+        inputDescriptor.storageMode = MTLStorageModePrivate;
+        inputDescriptor.usage = _spatialScaler.colorTextureUsage | MTLTextureUsageRenderTarget;
+        _spatialScalerInputTexture = [_metalDevice newTextureWithDescriptor:inputDescriptor];
+
+        MTLTextureDescriptor *outputDescriptor = [MTLTextureDescriptor texture2DDescriptorWithPixelFormat:renderPixelFormat
+                                                                                                     width:outputWidth
+                                                                                                    height:outputHeight
+                                                                                                 mipmapped:NO];
+        outputDescriptor.storageMode = MTLStorageModePrivate;
+        outputDescriptor.usage = _spatialScaler.outputTextureUsage | MTLTextureUsageShaderRead;
+        _spatialScalerOutputTexture = [_metalDevice newTextureWithDescriptor:outputDescriptor];
+
+        return (_spatialScalerInputTexture != nil && _spatialScalerOutputTexture != nil);
+    }
+#endif
+
+    return NO;
 }
 
 - (void)noteDecodeFrameCompleted
@@ -1201,18 +1544,83 @@ int DrSubmitDecodeUnit(PDECODE_UNIT decodeUnit);
     renderPassDescriptor.colorAttachments[0].storeAction = MTLStoreActionStore;
     renderPassDescriptor.colorAttachments[0].clearColor = MTLClearColorMake(0.0, 0.0, 0.0, 1.0);
 
-    id<MTLRenderCommandEncoder> encoder = [commandBuffer renderCommandEncoderWithDescriptor:renderPassDescriptor];
-    [encoder endEncoding];
-
     CIImage *image = [CIImage imageWithCVPixelBuffer:pixelBuffer];
     CGRect imageExtent = image.extent;
-    CGAffineTransform transform = [self presentationTransformForImageExtent:imageExtent drawableSize:view.drawableSize];
-    CIImage *transformedImage = [image imageByApplyingTransform:transform];
-    [_ciContext render:transformedImage
-          toMTLTexture:drawable.texture
-         commandBuffer:commandBuffer
-                bounds:_cachedDrawableBounds
-            colorSpace:_colorSpace];
+    CGRect targetRect = [self targetRectForDrawableSize:view.drawableSize];
+
+    BOOL usedSpatialScaler = NO;
+    float appliedSharpenAmount = 0.0f;
+    CGFloat appliedSpatialScale = 0.0f;
+#if MOONLIGHT_HAS_METALFX
+    CGSize scalerOutputSize = [self spatialScalerOutputSizeForInputSize:imageExtent.size targetRect:targetRect];
+    if ([self shouldUseSpatialScalerForImageExtent:imageExtent targetRect:targetRect] &&
+        [self ensureSpatialScalerForInputSize:imageExtent.size outputSize:scalerOutputSize]) {
+        CIImage *sourceImage = image;
+        if (CGRectGetMinX(imageExtent) != 0.0 || CGRectGetMinY(imageExtent) != 0.0) {
+            sourceImage = [image imageByApplyingTransform:CGAffineTransformMakeTranslation(-CGRectGetMinX(imageExtent),
+                                                                                           -CGRectGetMinY(imageExtent))];
+        }
+
+        CGRect sourceBounds = CGRectMake(0, 0,
+                                         _spatialScalerInputTexture.width,
+                                         _spatialScalerInputTexture.height);
+        [_ciContext render:sourceImage
+              toMTLTexture:_spatialScalerInputTexture
+             commandBuffer:commandBuffer
+                    bounds:sourceBounds
+                colorSpace:_colorSpace];
+
+#if MOONLIGHT_HAS_METALFX
+        if (@available(iOS 16.0, *)) {
+            _spatialScaler.colorTexture = _spatialScalerInputTexture;
+            _spatialScaler.outputTexture = _spatialScalerOutputTexture;
+            _spatialScaler.inputContentWidth = _spatialScalerInputTexture.width;
+            _spatialScaler.inputContentHeight = _spatialScalerInputTexture.height;
+            [_spatialScaler encodeToCommandBuffer:commandBuffer];
+            usedSpatialScaler = YES;
+        }
+#endif
+
+        if (usedSpatialScaler) {
+            CGFloat inputWidth = MAX(CGRectGetWidth(imageExtent), 1.0f);
+            CGFloat inputHeight = MAX(CGRectGetHeight(imageExtent), 1.0f);
+            CGFloat scaleX = (CGFloat)_spatialScalerOutputTexture.width / inputWidth;
+            CGFloat scaleY = (CGFloat)_spatialScalerOutputTexture.height / inputHeight;
+            appliedSpatialScale = MAX(scaleX, scaleY);
+            appliedSharpenAmount = [self spatialSharpenAmountForScale:appliedSpatialScale];
+            if (![self renderTexture:_spatialScalerOutputTexture
+                        commandBuffer:commandBuffer
+                renderPassDescriptor:renderPassDescriptor
+                           targetRect:targetRect
+                       sharpenAmount:appliedSharpenAmount]) {
+                usedSpatialScaler = NO;
+                appliedSharpenAmount = 0.0f;
+            }
+        }
+    }
+#endif
+
+    if (!usedSpatialScaler) {
+        [self teardownSpatialScalerResources];
+        CGAffineTransform transform = [self presentationTransformForImageExtent:imageExtent drawableSize:view.drawableSize];
+        CIImage *transformedImage = [image imageByApplyingTransform:transform];
+        [_ciContext render:transformedImage
+              toMTLTexture:drawable.texture
+             commandBuffer:commandBuffer
+                    bounds:_cachedDrawableBounds
+                colorSpace:_colorSpace];
+    }
+
+    @synchronized (self) {
+        if (usedSpatialScaler) {
+            _lastMetalFxActive = YES;
+            _lastMetalFxScale = appliedSpatialScale;
+        }
+        else {
+            _lastMetalFxActive = NO;
+            _lastMetalFxScale = 0.0f;
+        }
+    }
 
     [commandBuffer presentDrawable:drawable];
     [commandBuffer commit];

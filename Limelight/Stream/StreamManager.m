@@ -23,12 +23,65 @@
 
 #define StreamManagerLocalized(key) NSLocalizedString((key), nil)
 
+static NSString *MetalFxOverlayStringForSettings(TemporarySettings *settings, CGFloat activeScale)
+{
+    if (settings.rendererSelection != StreamVideoRendererSelectionMetal) {
+        return @"";
+    }
+
+    if (settings.metalFxScalingSelection == StreamMetalFxScalingSelectionDisabled) {
+        return StreamManagerLocalized(@"stream.stats.metal");
+    }
+
+    if (activeScale > 1.0f) {
+        return [NSString stringWithFormat:StreamManagerLocalized(@"stream.stats.mfx"), activeScale];
+    }
+
+    switch ((StreamMetalFxScalingSelection)settings.metalFxScalingSelection) {
+        case StreamMetalFxScalingSelectionOnePointFiveX:
+            return [NSString stringWithFormat:StreamManagerLocalized(@"stream.stats.mfx"), 1.5f];
+        case StreamMetalFxScalingSelectionTwoX:
+            return [NSString stringWithFormat:StreamManagerLocalized(@"stream.stats.mfx"), 2.0f];
+        case StreamMetalFxScalingSelectionAutomatic:
+            return StreamManagerLocalized(@"stream.stats.mfx_auto");
+        case StreamMetalFxScalingSelectionDisabled:
+        default:
+            return @"";
+    }
+}
+
 @implementation StreamManager {
     StreamConfiguration* _config;
 
     UIView* _renderView;
     id<ConnectionCallbacks> _callbacks;
     Connection* _connection;
+}
+
+- (NSString *)getBandwidthOverlayText
+{
+    video_stats_t stats;
+
+    if (!_connection) {
+        return @"";
+    }
+
+    if (![_connection getVideoStats:&stats]) {
+        return @"";
+    }
+
+    double interval = stats.endTime - stats.startTime;
+    if (interval <= 0.0) {
+        interval = 1.0;
+    }
+
+    double kbPerSecond = ((double)stats.totalVideoBytes / 1024.0) / interval;
+    if (kbPerSecond > 1000.0) {
+        double mbPerSecond = kbPerSecond / 1024.0;
+        return [NSString stringWithFormat:StreamManagerLocalized(@"stream.bandwidth.mb"), mbPerSecond];
+    }
+
+    return [NSString stringWithFormat:StreamManagerLocalized(@"stream.bandwidth.kb"), kbPerSecond];
 }
 
 - (id<VideoRendering>)makeRendererForCurrentSettings
@@ -191,16 +244,19 @@
     BOOL shouldShowDecoderLatency = settings.rendererSelection == StreamVideoRendererSelectionMetal;
     
     uint32_t rtt, variance;
-    NSString* latencyString;
     NSString* latencyStringLite;
+    NSString* jitterStringLite;
     if (LiGetEstimatedRttInfo(&rtt, &variance)) {
-        latencyString = [NSString stringWithFormat:@"%u ms (variance: %u ms)", rtt, variance];
-        latencyStringLite= [NSString stringWithFormat:StreamManagerLocalized(@"stream.stats.latency"), rtt, variance];
+        latencyStringLite= [NSString stringWithFormat:StreamManagerLocalized(@"stream.stats.latency"), rtt];
+        jitterStringLite = showsExtendedMetrics ? [NSString stringWithFormat:StreamManagerLocalized(@"stream.stats.jitter"), variance] : @"";
     }
     else {
-        latencyString = @"N/A";
         latencyStringLite= @"";
+        jitterStringLite = @"";
     }
+
+    CGFloat metalFxScale = [_connection getActiveMetalFxScale];
+    NSString *metalFxStringLite = MetalFxOverlayStringForSettings(settings, metalFxScale);
     
     NSString* hostProcessingStringLite;
     if (showsExtendedMetrics && stats.framesWithHostProcessingLatency != 0) {
@@ -229,12 +285,15 @@
         decoderLatencyStringLite = @"";
     }
 
-    float interval = stats.endTime - stats.startTime;
+    double interval = stats.endTime - stats.startTime;
+    double safeInterval = interval > 0.0 ? interval : 1.0;
+    double droppedFramesPerSecond = (double)stats.networkDroppedFrames / safeInterval;
+    double fps = (double)stats.totalFrames / safeInterval;
 
     NSString* droppedFramesStringLite;
     if (showsExtendedMetrics) {
         droppedFramesStringLite = [NSString stringWithFormat:StreamManagerLocalized(@"stream.stats.dropped"),
-                                   stats.networkDroppedFrames / interval];
+                                   droppedFramesPerSecond];
     }
     else {
         droppedFramesStringLite = @"";
@@ -244,12 +303,14 @@
             _config.width,
             _config.height,
             [_connection getActiveCodecNameLite],
+            metalFxStringLite,
             latencyStringLite,
             decoderLatencyStringLite,
             hostProcessingStringLite,
             clientLatencyStringLite,
+            jitterStringLite,
             droppedFramesStringLite,
-            stats.totalFrames / interval];
+            fps];
     
 //    return [NSString stringWithFormat:@"Video stream: %dx%d %.2f FPS (Codec: %@)\nFrames dropped by your network connection: %.2f%%\nAverage network latency: %@%@",
 //            _config.width,
