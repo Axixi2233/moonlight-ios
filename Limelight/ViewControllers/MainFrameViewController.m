@@ -1549,19 +1549,14 @@ static NSMutableSet* hostList;
     [self retrieveSavedHosts];
     _discMan = [[DiscoveryManager alloc] initWithHosts:[hostList allObjects] andCallback:self];
         
-    if ([hostList count] == 1) {
-        [self hostClicked:[hostList anyObject] view:nil];
-    }
-    else {
-        [self updateTitle];
+    [self updateTitle];
 #if !TARGET_OS_TV
-        [self installHostSelectionHostingControllerIfNeeded];
-        [self refreshHostSelectionSnapshot];
-        [self.view addSubview:_hostSelectionContainerView];
+    [self installHostSelectionHostingControllerIfNeeded];
+    [self refreshHostSelectionSnapshot];
+    [self.view addSubview:_hostSelectionContainerView];
 #else
-        [self.view addSubview:hostScrollView];
+    [self.view addSubview:hostScrollView];
 #endif
-    }
 }
 
 -(void)handleCollectionViewLongPress:(UILongPressGestureRecognizer *)gestureRecognizer
