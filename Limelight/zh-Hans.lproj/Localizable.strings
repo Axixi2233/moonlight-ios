@@ -1,10 +1,15 @@
 "about.title" = "关于";
 "about.find_developer" = "在这里找到开发者";
+"about.credits.heading" = "感谢一路同行的你们";
+"about.credits.list_title" = "鸣谢墙";
+"about.credits.message" = "这份名单献给每一位支持星光·阿西西的朋友。因为有你们，项目才得以持续前进。";
+"about.credits.subtitle" = "感谢每一位支持与陪伴的朋友";
+"about.credits.title" = "鸣谢";
 "about.gamepad_test.subtitle" = "实时查看摇杆、按键和扳机状态，手柄震动，体感测试。";
 "about.gamepad_test.title" = "手柄测试";
 "about.links.douyin" = "抖音";
 "about.links.xiaohongshu" = "小红书";
-"about.subtitle" = "随时随地，畅联你的电脑！";
+"about.subtitle" = "随时随地，畅连你的电脑！";
 "about.version" = "版本号：%@";
 "about.version_build" = "版本号：%@ (%@)";
 "discovery.connection_failed" = "无法连接到主机。\n\n如果您使用 GeForce Experience 托管服务器，请确保已在 SHIELD 选项卡上启用相应开关。\n\n如果您使用 Sunshine 托管服务器，请确保其运行正常。如果您使用的是非默认端口，则需要在此处添加该端口号。";
@@ -30,7 +35,7 @@
 "home.host_status.offline" = "离线";
 "home.host_status.online" = "在线";
 "home.host_status.online_unpaired" = "在线，未配对";
-"launch.subtitle" = "随时随地，畅联你的电脑！";
+"launch.subtitle" = "随时随地，畅连你的电脑！";
 "settings.audio_config.stereo" = "立体声";
 "settings.audio_config.surround_5_1" = "5.1";
 "settings.audio_config.surround_7_1" = "7.1";

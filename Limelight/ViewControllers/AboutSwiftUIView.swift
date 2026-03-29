@@ -191,14 +191,17 @@ private struct AboutActionCard: View {
     }
 }
 
+
 @available(iOS 13.0, *)
 private struct AboutRootView: View {
     let requestGamepadTest: () -> Void
+    let requestCredits: () -> Void
 
     private let links: [AboutLinkItem] = [
         AboutLinkItem(title: "Bilibili", systemIconName: "play.rectangle.fill", assetName: "AboutBilibiliIcon", urlString: "https://space.bilibili.com/16893379"),
         AboutLinkItem(title: AboutLocalized("about.links.xiaohongshu"), systemIconName: "book.closed.fill", assetName: "AboutXiaohongshuIcon", urlString: "https://www.xiaohongshu.com/user/profile/5d21be61000000001600b878"),
         AboutLinkItem(title: AboutLocalized("about.links.douyin"), systemIconName: "music.note.tv.fill", assetName: "AboutDouyinIcon", urlString: "https://v.douyin.com/zm9GLKUfBW8/"),
+        AboutLinkItem(title: "Youtube", systemIconName: "play.rectangle.fill", assetName: "AboutYoutube", urlString: "https://www.youtube.com/@AxixiTV"),
         AboutLinkItem(title: "Github", systemIconName: "book.note.tv.fill", assetName: "AboutGithub", urlString: "https://axixi2233.github.io/"),
     ]
 
@@ -238,6 +241,13 @@ private struct AboutRootView: View {
                         subtitle: AboutLocalized("about.gamepad_test.subtitle"),
                         iconName: "gamecontroller.fill",
                         action: requestGamepadTest
+                    )
+
+                    AboutActionCard(
+                        title: AboutLocalized("about.credits.title"),
+                        subtitle: AboutLocalized("about.credits.subtitle"),
+                        iconName: "heart.fill",
+                        action: requestCredits
                     )
 
                     VStack(alignment: .leading, spacing: 14) {
@@ -289,6 +299,10 @@ final class AboutHostingViewController: UIViewController {
         let rootView = AboutRootView(requestGamepadTest: { [weak self] in
             guard let self = self else { return }
             let controller = GamepadTestHostingViewController()
+            self.navigationController?.pushViewController(controller, animated: true)
+        }, requestCredits: { [weak self] in
+            guard let self = self else { return }
+            let controller = CreditsHostingViewController()
             self.navigationController?.pushViewController(controller, animated: true)
         })
         if let hostingController {
@@ -345,4 +359,5 @@ final class AboutHostingViewController: UIViewController {
         }
     }
 }
+
 #endif

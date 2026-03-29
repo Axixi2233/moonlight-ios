@@ -1,5 +1,10 @@
 "about.title" = "このアプリについて";
 "about.find_developer" = "開発者はこちら";
+"about.credits.heading" = "ここまで支えてくれた皆さまへ";
+"about.credits.list_title" = "クレジットウォール";
+"about.credits.message" = "この一覧は、星光・阿西西を支えてくださったすべての皆さまへ贈るものです。皆さまの応援が、プロジェクトを前へ進めてくれています。";
+"about.credits.subtitle" = "支えてくださった皆さまへ、心からの感謝を";
+"about.credits.title" = "謝辞";
 "about.gamepad_test.subtitle" = "スティック、ボタン、トリガー、振動、モーションをリアルタイムで確認します。";
 "about.gamepad_test.title" = "ゲームパッドテスト";
 "about.links.douyin" = "Douyin";

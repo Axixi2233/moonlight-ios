@@ -18,6 +18,7 @@
 		7F0A00072D00000100000001 /* AboutSwiftUIView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7F0A00072D00000100000002 /* AboutSwiftUIView.swift */; };
 		7F0A00082D00000100000001 /* GamepadTestSwiftUIView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7F0A00082D00000100000002 /* GamepadTestSwiftUIView.swift */; };
 		7F0A00092D00000100000001 /* MainFrameAddHostSheetHostingBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7F0A00092D00000100000002 /* MainFrameAddHostSheetHostingBridge.swift */; };
+		7F0A00132E00000100000001 /* CreditsSwiftUIView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7F0A00132E00000100000002 /* CreditsSwiftUIView.swift */; };
 		7F0A00102E00000100000001 /* PassThroughTouchHandler.m in Sources */ = {isa = PBXBuildFile; fileRef = 7F0A00122E00000100000001 /* PassThroughTouchHandler.m */; };
 		98181BE92791277400E43572 /* libSDL2.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 98181BE82791275D00E43572 /* libSDL2.a */; };
 		98181BEB2791278F00E43572 /* libSDL2.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 98181BEA2791278300E43572 /* libSDL2.a */; };
@@ -57,6 +58,7 @@
 		DC1F5A07206436B20037755F /* ConnectionHelper.m in Sources */ = {isa = PBXBuildFile; fileRef = DC1F5A06206436B20037755F /* ConnectionHelper.m */; };
 		F74BEF9C2C1A705600224667 /* OpenSSL in Frameworks */ = {isa = PBXBuildFile; productRef = F74BEF9B2C1A705600224667 /* OpenSSL */; };
 		F74BEFA42C1A80E400224667 /* OpenSSL in Frameworks */ = {isa = PBXBuildFile; productRef = F74BEFA32C1A80E400224667 /* OpenSSL */; };
+		F74C00112E00000300000001 /* Nuke in Frameworks */ = {isa = PBXBuildFile; productRef = F74C00102E00000300000001 /* Nuke */; };
 		F74C00012D00000200000001 /* SettingsSwiftUIView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F74C00012D00000200000002 /* SettingsSwiftUIView.swift */; };
 		FB1A674D2131E65900507771 /* KeyboardSupport.m in Sources */ = {isa = PBXBuildFile; fileRef = FB1A674C2131E65900507771 /* KeyboardSupport.m */; };
 		FB1A67602132419700507771 /* Main.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = FB1A675E2132419700507771 /* Main.storyboard */; };
@@ -194,6 +196,7 @@
 		7F0A00072D00000100000002 /* AboutSwiftUIView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AboutSwiftUIView.swift; sourceTree = "<group>"; };
 		7F0A00082D00000100000002 /* GamepadTestSwiftUIView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GamepadTestSwiftUIView.swift; sourceTree = "<group>"; };
 		7F0A00092D00000100000002 /* MainFrameAddHostSheetHostingBridge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MainFrameAddHostSheetHostingBridge.swift; sourceTree = "<group>"; };
+		7F0A00132E00000100000002 /* CreditsSwiftUIView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CreditsSwiftUIView.swift; sourceTree = "<group>"; };
 		7F0A00112E00000100000001 /* PassThroughTouchHandler.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = PassThroughTouchHandler.h; sourceTree = "<group>"; };
 		7F0A00122E00000100000001 /* PassThroughTouchHandler.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = PassThroughTouchHandler.m; sourceTree = "<group>"; };
 		9803CCAB254F9EAF00EE185E /* ConnectionCallbacks.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = ConnectionCallbacks.h; sourceTree = "<group>"; };
@@ -384,6 +387,7 @@
 				FB290CF819B2C406004C83CF /* CoreData.framework in Frameworks */,
 				98181BED2791281100E43572 /* CoreMotion.framework in Frameworks */,
 				F74BEF9C2C1A705600224667 /* OpenSSL in Frameworks */,
+				F74C00112E00000300000001 /* Nuke in Frameworks */,
 				98882A072AF60F7200C5A11C /* libavformat.a in Frameworks */,
 				FB290CF619B2C406004C83CF /* UIKit.framework in Frameworks */,
 				FB290CF219B2C406004C83CF /* Foundation.framework in Frameworks */,
@@ -610,6 +614,7 @@
 				FB89462419F646E200339C8A /* MainFrameViewController.h */,
 				FB89462519F646E200339C8A /* MainFrameViewController.m */,
 				7F0A00072D00000100000002 /* AboutSwiftUIView.swift */,
+				7F0A00132E00000100000002 /* CreditsSwiftUIView.swift */,
 				7F0A00082D00000100000002 /* GamepadTestSwiftUIView.swift */,
 				7F0A00092D00000100000002 /* MainFrameAddHostSheetHostingBridge.swift */,
 				7F0A00032D00000100000002 /* MainFrameAppCellHostingBridge.swift */,
@@ -769,6 +774,7 @@
 			name = Moonlight;
 			packageProductDependencies = (
 				F74BEF9B2C1A705600224667 /* OpenSSL */,
+				F74C00102E00000300000001 /* Nuke */,
 			);
 			productName = Limelight;
 			productReference = FB290CEE19B2C406004C83CF /* Starlight.app */;
@@ -813,6 +819,7 @@
 			mainGroup = FB290CE519B2C406004C83CF;
 			packageReferences = (
 				F74BEF9A2C1A705600224667 /* XCRemoteSwiftPackageReference "OpenSSL-Package" */,
+				F74C000F2E00000300000001 /* XCRemoteSwiftPackageReference "Nuke" */,
 			);
 			productRefGroup = FB290CEF19B2C406004C83CF /* Products */;
 			projectDirPath = "";
@@ -958,6 +965,7 @@
 				FB4678FA1A55FFAD00377732 /* DiscoveryManager.m in Sources */,
 				98D5856D1C0EA79600F6CC00 /* TemporaryHost.m in Sources */,
 				7F0A00072D00000100000001 /* AboutSwiftUIView.swift in Sources */,
+				7F0A00132E00000100000001 /* CreditsSwiftUIView.swift in Sources */,
 				7F0A00082D00000100000001 /* GamepadTestSwiftUIView.swift in Sources */,
 				791F0E632BF5E33500837217 /* SensitivityBean.m in Sources */,
 				FB89463519F646E200339C8A /* MainFrameViewController.m in Sources */,
@@ -1423,6 +1431,14 @@
 				minimumVersion = 3.1.5004;
 			};
 		};
+		F74C000F2E00000300000001 /* XCRemoteSwiftPackageReference "Nuke" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/kean/Nuke.git";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 12.8.0;
+			};
+		};
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
@@ -1435,6 +1451,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = F74BEF9A2C1A705600224667 /* XCRemoteSwiftPackageReference "OpenSSL-Package" */;
 			productName = OpenSSL;
+		};
+		F74C00102E00000300000001 /* Nuke */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = F74C000F2E00000300000001 /* XCRemoteSwiftPackageReference "Nuke" */;
+			productName = Nuke;
 		};
 /* End XCSwiftPackageProductDependency section */
 
