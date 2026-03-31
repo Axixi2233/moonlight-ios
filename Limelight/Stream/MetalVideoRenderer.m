@@ -121,6 +121,7 @@ static void MetalVideoRendererDecompressionOutputCallback(void *decompressionOut
     BOOL _metalFxAvailable;
     StreamMetalFxScalingSelection _metalFxScalingSelection;
     StreamMetalFxSharpenSelection _metalFxSharpenSelection;
+    StreamMetalFxColorModeSelection _metalFxColorModeSelection;
     BOOL _lastMetalFxActive;
     CGFloat _lastMetalFxScale;
 }
@@ -147,6 +148,7 @@ int DrSubmitDecodeUnit(PDECODE_UNIT decodeUnit);
         TemporarySettings *settings = [[[DataManager alloc] init] getSettings];
         _metalFxScalingSelection = (StreamMetalFxScalingSelection)settings.metalFxScalingSelection;
         _metalFxSharpenSelection = (StreamMetalFxSharpenSelection)settings.metalFxSharpenSelection;
+        _metalFxColorModeSelection = (StreamMetalFxColorModeSelection)settings.metalFxColorModeSelection;
 
         _metalDevice = MTLCreateSystemDefaultDevice();
         _commandQueue = [_metalDevice newCommandQueue];
@@ -1223,20 +1225,40 @@ int DrSubmitDecodeUnit(PDECODE_UNIT decodeUnit);
     CGFloat inputHeight = MAX(inputSize.height, 1.0f);
 
     CGSize requestedOutputSize;
-    switch (_metalFxScalingSelection) {
-        case StreamMetalFxScalingSelectionOnePointFiveX:
-            requestedOutputSize = CGSizeMake(inputWidth * 1.5f, inputHeight * 1.5f);
-            break;
-        case StreamMetalFxScalingSelectionTwoX:
-            requestedOutputSize = CGSizeMake(inputWidth * 2.0f, inputHeight * 2.0f);
-            break;
-        case StreamMetalFxScalingSelectionDisabled:
-            requestedOutputSize = CGSizeMake(displayOutputWidth, displayOutputHeight);
-            break;
-        case StreamMetalFxScalingSelectionAutomatic:
-        default:
-            requestedOutputSize = CGSizeMake(displayOutputWidth, displayOutputHeight);
-            break;
+    if (_hdrOutputEnabled) {
+        switch (_metalFxScalingSelection) {
+            case StreamMetalFxScalingSelectionOnePointFiveX:
+                requestedOutputSize = CGSizeMake(inputWidth * 1.5f, inputHeight * 1.5f);
+                break;
+            case StreamMetalFxScalingSelectionTwoX:
+                requestedOutputSize = CGSizeMake(inputWidth * 2.0f, inputHeight * 2.0f);
+                break;
+            case StreamMetalFxScalingSelectionDisabled:
+                requestedOutputSize = CGSizeMake(displayOutputWidth, displayOutputHeight);
+                break;
+            case StreamMetalFxScalingSelectionAutomatic:
+            default:
+                requestedOutputSize = CGSizeMake(MAX(displayOutputWidth, inputWidth * 1.15f),
+                                                 MAX(displayOutputHeight, inputHeight * 1.15f));
+                break;
+        }
+    }
+    else {
+        switch (_metalFxScalingSelection) {
+            case StreamMetalFxScalingSelectionOnePointFiveX:
+                requestedOutputSize = CGSizeMake(inputWidth * 1.5f, inputHeight * 1.5f);
+                break;
+            case StreamMetalFxScalingSelectionTwoX:
+                requestedOutputSize = CGSizeMake(inputWidth * 2.0f, inputHeight * 2.0f);
+                break;
+            case StreamMetalFxScalingSelectionDisabled:
+                requestedOutputSize = CGSizeMake(displayOutputWidth, displayOutputHeight);
+                break;
+            case StreamMetalFxScalingSelectionAutomatic:
+            default:
+                requestedOutputSize = CGSizeMake(displayOutputWidth, displayOutputHeight);
+                break;
+        }
     }
 
     requestedOutputSize.width = MAX(requestedOutputSize.width, displayOutputWidth);
@@ -1258,12 +1280,26 @@ int DrSubmitDecodeUnit(PDECODE_UNIT decodeUnit);
         NSUInteger outputWidth = MAX((NSUInteger)llround(outputSize.width), 1);
         NSUInteger outputHeight = MAX((NSUInteger)llround(outputSize.height), 1);
         MTLPixelFormat renderPixelFormat = _metalView.colorPixelFormat;
+        MTLFXSpatialScalerColorProcessingMode colorProcessingMode = MTLFXSpatialScalerColorProcessingModePerceptual;
+        switch (_metalFxColorModeSelection) {
+            case StreamMetalFxColorModeSelectionLinear:
+                colorProcessingMode = MTLFXSpatialScalerColorProcessingModeLinear;
+                break;
+            case StreamMetalFxColorModeSelectionHdr:
+                colorProcessingMode = MTLFXSpatialScalerColorProcessingModeHDR;
+                break;
+            case StreamMetalFxColorModeSelectionPerceptual:
+            default:
+                colorProcessingMode = MTLFXSpatialScalerColorProcessingModePerceptual;
+                break;
+        }
 
         BOOL needsRebuild = (_spatialScaler == nil ||
                              _spatialScaler.inputWidth != inputWidth ||
                              _spatialScaler.inputHeight != inputHeight ||
                              _spatialScaler.outputWidth != outputWidth ||
                              _spatialScaler.outputHeight != outputHeight ||
+                             _spatialScaler.colorProcessingMode != colorProcessingMode ||
                              _spatialScaler.colorTextureFormat != renderPixelFormat ||
                              _spatialScaler.outputTextureFormat != renderPixelFormat);
         if (!needsRebuild) {
@@ -1279,9 +1315,7 @@ int DrSubmitDecodeUnit(PDECODE_UNIT decodeUnit);
         descriptor.inputHeight = inputHeight;
         descriptor.outputWidth = outputWidth;
         descriptor.outputHeight = outputHeight;
-        descriptor.colorProcessingMode = _hdrOutputEnabled ?
-            MTLFXSpatialScalerColorProcessingModeHDR :
-            MTLFXSpatialScalerColorProcessingModePerceptual;
+        descriptor.colorProcessingMode = colorProcessingMode;
 
         _spatialScaler = [descriptor newSpatialScalerWithDevice:_metalDevice];
         if (_spatialScaler == nil) {

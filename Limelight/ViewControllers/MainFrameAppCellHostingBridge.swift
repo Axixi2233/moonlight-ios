@@ -8,6 +8,7 @@ private func MainFrameAppCellLocalized(_ key: String) -> String {
 
 @available(iOS 13.0, *)
 private struct MainFrameAppCardView: View {
+    @Environment(\.colorScheme) private var colorScheme
     let title: String
     let boxArt: UIImage?
     let hidden: Bool
@@ -19,7 +20,7 @@ private struct MainFrameAppCardView: View {
 
             ZStack(alignment: .bottomLeading) {
                 RoundedRectangle(cornerRadius: 16, style: .continuous)
-                    .fill(Color(red: 0.52, green: 0.44, blue: 0.74))
+                    .fill(colorScheme == .dark ? Color(red: 0.20, green: 0.18, blue: 0.28) : Color(red: 0.52, green: 0.44, blue: 0.74))
                     .frame(width: size.width, height: size.height)
 
                 if let boxArt {
@@ -31,8 +32,8 @@ private struct MainFrameAppCardView: View {
                 } else {
                     LinearGradient(
                         gradient: Gradient(colors: [
-                            Color(red: 0.64, green: 0.57, blue: 0.84),
-                            Color(red: 0.49, green: 0.42, blue: 0.71)
+                            colorScheme == .dark ? Color(red: 0.33, green: 0.28, blue: 0.51) : Color(red: 0.64, green: 0.57, blue: 0.84),
+                            colorScheme == .dark ? Color(red: 0.18, green: 0.16, blue: 0.31) : Color(red: 0.49, green: 0.42, blue: 0.71)
                         ]),
                         startPoint: .topLeading,
                         endPoint: .bottomTrailing
@@ -62,7 +63,7 @@ private struct MainFrameAppCardView: View {
                         .foregroundColor(.white)
                         .padding(.horizontal, 10)
                         .padding(.vertical, 6)
-                        .background(Color.black.opacity(0.45))
+                        .background(colorScheme == .dark ? Color.black.opacity(0.54) : Color.black.opacity(0.45))
                         .clipShape(Capsule())
                     }
 
@@ -78,10 +79,14 @@ private struct MainFrameAppCardView: View {
             }
             .frame(width: size.width, height: size.height, alignment: .bottomLeading)
             .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                    .stroke(colorScheme == .dark ? Color.white.opacity(0.08) : Color.white.opacity(0.16), lineWidth: 1)
+            )
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .opacity(hidden ? 0.45 : 1.0)
-        .shadow(color: Color.black.opacity(0.18), radius: 12, x: 0, y: 6)
+        .shadow(color: Color.black.opacity(colorScheme == .dark ? 0.28 : 0.18), radius: 12, x: 0, y: 6)
         .allowsHitTesting(false)
     }
 }

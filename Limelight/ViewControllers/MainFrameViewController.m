@@ -60,6 +60,9 @@ static void *MainFrameAppCellHostingBridgeAssociationKey = &MainFrameAppCellHost
     UINavigationController* _settingsNavigationController;
     UIView* _backgroundGradientView;
     CAGradientLayer* _backgroundGradientLayer;
+    UIView* _appListDecorationView;
+    CAGradientLayer* _appListPrimaryGlowLayer;
+    CAGradientLayer* _appListSecondaryGlowLayer;
     UIScrollView* hostScrollView;
 #if !TARGET_OS_TV
     UIView* _hostSelectionContainerView;
@@ -102,17 +105,13 @@ static NSMutableSet* hostList;
     _backgroundGradientView.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
 
     _backgroundGradientLayer = [CAGradientLayer layer];
-    _backgroundGradientLayer.colors = @[
-        (__bridge id)[UIColor colorWithRed:0.95 green:0.89 blue:0.99 alpha:1.0].CGColor,
-        (__bridge id)[UIColor colorWithRed:0.86 green:0.78 blue:0.98 alpha:1.0].CGColor,
-        (__bridge id)[UIColor colorWithRed:0.70 green:0.63 blue:0.93 alpha:1.0].CGColor
-    ];
     _backgroundGradientLayer.locations = @[@0.0, @0.45, @1.0];
     _backgroundGradientLayer.startPoint = CGPointMake(0.0, 0.0);
     _backgroundGradientLayer.endPoint = CGPointMake(1.0, 1.0);
     [_backgroundGradientView.layer addSublayer:_backgroundGradientLayer];
 
     [self.view insertSubview:_backgroundGradientView atIndex:0];
+    [self updateBackgroundGradientColors];
 }
 
 - (void)updateBackgroundGradientFrame {
@@ -121,7 +120,107 @@ static NSMutableSet* hostList;
     _backgroundGradientLayer.frame = _backgroundGradientView.bounds;
 }
 
+- (void)updateBackgroundGradientColors {
+    [self installBackgroundGradientIfNeeded];
+
+    UIColor *topColor = nil;
+    UIColor *middleColor = nil;
+    UIColor *bottomColor = nil;
+
+    if (self.traitCollection.userInterfaceStyle == UIUserInterfaceStyleDark) {
+        topColor = [UIColor colorWithRed:0.08 green:0.08 blue:0.12 alpha:1.0];
+        middleColor = [UIColor colorWithRed:0.10 green:0.09 blue:0.16 alpha:1.0];
+        bottomColor = [UIColor colorWithRed:0.07 green:0.07 blue:0.10 alpha:1.0];
+    }
+    else {
+        topColor = [UIColor colorWithRed:0.97 green:0.95 blue:1.0 alpha:1.0];
+        middleColor = [UIColor colorWithRed:0.95 green:0.93 blue:1.0 alpha:1.0];
+        bottomColor = [UIColor colorWithRed:0.94 green:0.92 blue:0.98 alpha:1.0];
+    }
+
+    _backgroundGradientLayer.colors = @[
+        (__bridge id)topColor.CGColor,
+        (__bridge id)middleColor.CGColor,
+        (__bridge id)bottomColor.CGColor
+    ];
+
+    [self updateAppListDecorationColors];
+}
+
+- (void)installAppListDecorationIfNeeded {
+    if (_appListDecorationView != nil) {
+        return;
+    }
+
+    _appListDecorationView = [[UIView alloc] initWithFrame:self.collectionView.bounds];
+    _appListDecorationView.userInteractionEnabled = NO;
+    _appListDecorationView.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
+    _appListDecorationView.backgroundColor = [UIColor clearColor];
+
+    _appListPrimaryGlowLayer = [CAGradientLayer layer];
+    _appListPrimaryGlowLayer.type = kCAGradientLayerRadial;
+    _appListPrimaryGlowLayer.locations = @[@0.0, @1.0];
+    _appListPrimaryGlowLayer.startPoint = CGPointMake(0.5, 0.5);
+    _appListPrimaryGlowLayer.endPoint = CGPointMake(1.0, 1.0);
+
+    _appListSecondaryGlowLayer = [CAGradientLayer layer];
+    _appListSecondaryGlowLayer.type = kCAGradientLayerRadial;
+    _appListSecondaryGlowLayer.locations = @[@0.0, @1.0];
+    _appListSecondaryGlowLayer.startPoint = CGPointMake(0.5, 0.5);
+    _appListSecondaryGlowLayer.endPoint = CGPointMake(1.0, 1.0);
+
+    [_appListDecorationView.layer addSublayer:_appListPrimaryGlowLayer];
+    [_appListDecorationView.layer addSublayer:_appListSecondaryGlowLayer];
+
+    self.collectionView.backgroundView = _appListDecorationView;
+    [self updateAppListDecorationFrame];
+    [self updateAppListDecorationColors];
+}
+
+- (void)updateAppListDecorationFrame {
+    [self installAppListDecorationIfNeeded];
+
+    _appListDecorationView.frame = self.collectionView.bounds;
+
+    CGFloat width = CGRectGetWidth(_appListDecorationView.bounds);
+    CGFloat height = CGRectGetHeight(_appListDecorationView.bounds);
+
+    _appListPrimaryGlowLayer.frame = CGRectMake(width - 270.0, -140.0, 320.0, 320.0);
+    _appListSecondaryGlowLayer.frame = CGRectMake(-120.0, height - 280.0, 260.0, 260.0);
+}
+
+- (void)updateAppListDecorationColors {
+    if (_appListDecorationView == nil) {
+        return;
+    }
+
+    if (self.traitCollection.userInterfaceStyle == UIUserInterfaceStyleDark) {
+        _appListPrimaryGlowLayer.colors = @[
+            (__bridge id)[UIColor colorWithRed:0.46 green:0.31 blue:0.82 alpha:0.18].CGColor,
+            (__bridge id)[UIColor colorWithRed:0.46 green:0.31 blue:0.82 alpha:0.0].CGColor
+        ];
+        _appListSecondaryGlowLayer.colors = @[
+            (__bridge id)[UIColor colorWithRed:0.18 green:0.56 blue:0.82 alpha:0.14].CGColor,
+            (__bridge id)[UIColor colorWithRed:0.18 green:0.56 blue:0.82 alpha:0.0].CGColor
+        ];
+    }
+    else {
+        _appListPrimaryGlowLayer.colors = @[
+            (__bridge id)[UIColor colorWithRed:0.72 green:0.61 blue:1.0 alpha:0.26].CGColor,
+            (__bridge id)[UIColor colorWithRed:0.72 green:0.61 blue:1.0 alpha:0.0].CGColor
+        ];
+        _appListSecondaryGlowLayer.colors = @[
+            (__bridge id)[UIColor colorWithRed:0.58 green:0.77 blue:1.0 alpha:0.22].CGColor,
+            (__bridge id)[UIColor colorWithRed:0.58 green:0.77 blue:1.0 alpha:0.0].CGColor
+        ];
+    }
+}
+
 - (UIColor *)navigationAccentColor {
+    if (self.traitCollection.userInterfaceStyle == UIUserInterfaceStyleDark) {
+        return [UIColor colorWithRed:0.90 green:0.85 blue:0.99 alpha:1.0];
+    }
+
     return [UIColor colorWithRed:0.31 green:0.23 blue:0.46 alpha:1.0];
 }
 
@@ -145,17 +244,9 @@ static NSMutableSet* hostList;
     if (@available(iOS 13.0, *)) {
         UINavigationBarAppearance *appearance = [[UINavigationBarAppearance alloc] init];
         appearance.titleTextAttributes = [self navigationTitleAttributes];
-
-        if (@available(iOS 26.0, *)) {
-            [appearance configureWithTransparentBackground];
-            appearance.backgroundColor = [UIColor clearColor];
-            appearance.shadowColor = [UIColor clearColor];
-        }
-        else {
-            [appearance configureWithOpaqueBackground];
-            appearance.backgroundColor = [UIColor colorWithRed:0.98 green:0.96 blue:1.0 alpha:0.96];
-            appearance.shadowColor = [UIColor colorWithRed:0.73 green:0.69 blue:0.82 alpha:0.22];
-        }
+        [appearance configureWithTransparentBackground];
+        appearance.backgroundColor = [UIColor clearColor];
+        appearance.shadowColor = [UIColor clearColor];
 
         navigationBar.standardAppearance = appearance;
         navigationBar.compactAppearance = appearance;
@@ -164,6 +255,8 @@ static NSMutableSet* hostList;
             navigationBar.compactScrollEdgeAppearance = appearance;
         }
     }
+
+    navigationBar.translucent = YES;
 }
 
 - (void)restorePrimaryNavigationButtons {
@@ -487,7 +580,6 @@ static NSMutableSet* hostList;
     SettingsViewController *settingsViewController = [[SettingsViewController alloc] init];
     UINavigationController *settingsNavigationController = [[UINavigationController alloc] initWithRootViewController:settingsViewController];
     settingsNavigationController.modalPresentationStyle = UIModalPresentationFullScreen;
-    settingsNavigationController.overrideUserInterfaceStyle = UIUserInterfaceStyleDark;
     [self presentViewController:settingsNavigationController animated:YES completion:nil];
     _settingsNavigationController = settingsNavigationController;
 #endif
@@ -1415,6 +1507,7 @@ static NSMutableSet* hostList;
     [super viewDidLayoutSubviews];
 
     [self updateBackgroundGradientFrame];
+    [self updateAppListDecorationFrame];
 
     CGSize previousCollectionSize = _lastCollectionViewSize;
     [self updateCollectionViewLayoutForCurrentBounds];
@@ -1479,12 +1572,14 @@ static NSMutableSet* hostList;
     [super viewDidLoad];
 
     [self installBackgroundGradientIfNeeded];
+    [self updateBackgroundGradientColors];
     self.view.backgroundColor = [UIColor clearColor];
     [self restorePrimaryNavigationButtons];
 
     [self.collectionView registerClass:[UICollectionViewCell class] forCellWithReuseIdentifier:@"AppCell"];
     self.collectionView.backgroundColor = [UIColor clearColor];
     self.collectionView.multipleTouchEnabled = YES;
+    [self installAppListDecorationIfNeeded];
         
 #if !TARGET_OS_TV
     [[NSNotificationCenter defaultCenter] addObserver:self
@@ -1690,6 +1785,18 @@ static NSMutableSet* hostList;
     // view, so we won't get a return to active notification
     // for that which would normally fire beginForegroundRefresh.
     [self beginForegroundRefresh];
+}
+
+- (void)traitCollectionDidChange:(UITraitCollection *)previousTraitCollection {
+    [super traitCollectionDidChange:previousTraitCollection];
+
+    if (@available(iOS 13.0, *)) {
+        if ([self.traitCollection hasDifferentColorAppearanceComparedToTraitCollection:previousTraitCollection]) {
+            [self updateBackgroundGradientColors];
+            [self applyNavigationBarAppearance];
+            [self updateAppListDecorationColors];
+        }
+    }
 }
 
 - (BOOL)prefersStatusBarHidden

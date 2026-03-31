@@ -27,6 +27,8 @@
     char _appVersionString[32];
     char _gfeVersionString[32];
     char _rtspSessionUrl[128];
+    id<VideoRendering> _rendererTarget;
+    id<ConnectionCallbacks> _callbackTarget;
 }
 
 static NSLock* initLock;
@@ -460,6 +462,12 @@ void ClSetControllerLED(uint16_t controllerNumber, uint8_t r, uint8_t g, uint8_t
     dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_HIGH, 0), ^{
         [initLock lock];
         LiStopConnection();
+        if (renderer == self->_rendererTarget) {
+            renderer = nil;
+        }
+        if (_callbacks == self->_callbackTarget) {
+            _callbacks = nil;
+        }
         [initLock unlock];
     });
 }
@@ -507,6 +515,8 @@ void ClSetControllerLED(uint16_t controllerNumber, uint8_t r, uint8_t g, uint8_t
     }
     _serverInfo.serverCodecModeSupport = config.serverCodecModeSupport;
 
+    _rendererTarget = myRenderer;
+    _callbackTarget = callbacks;
     renderer = myRenderer;
     _callbacks = callbacks;
 

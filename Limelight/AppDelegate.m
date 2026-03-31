@@ -35,6 +35,63 @@
     NSLayoutConstraint *_progressFillWidthConstraint;
 }
 
+- (UIColor *)resolvedColor:(UIColor *)color {
+    if (@available(iOS 13.0, *)) {
+        return [color resolvedColorWithTraitCollection:self.traitCollection];
+    }
+    return color;
+}
+
+- (void)applyResolvedColors {
+    UIColor *topColor;
+    UIColor *midColor;
+    UIColor *bottomColor;
+    UIColor *glowColor;
+    UIColor *iconBackgroundColor;
+    UIColor *iconShadowColor;
+
+    if (@available(iOS 13.0, *)) {
+        BOOL dark = self.traitCollection.userInterfaceStyle == UIUserInterfaceStyleDark;
+        if (dark) {
+            topColor = [UIColor colorWithWhite:0.03 alpha:1.0];
+            midColor = [UIColor colorWithWhite:0.07 alpha:1.0];
+            bottomColor = [UIColor colorWithWhite:0.11 alpha:1.0];
+            glowColor = [UIColor colorWithWhite:1.0 alpha:0.08];
+            iconBackgroundColor = [UIColor colorWithWhite:1.0 alpha:0.10];
+            iconShadowColor = [UIColor colorWithWhite:0.0 alpha:0.55];
+        }
+        else {
+            topColor = [UIColor colorWithWhite:1.0 alpha:1.0];
+            midColor = [UIColor colorWithWhite:0.985 alpha:1.0];
+            bottomColor = [UIColor colorWithWhite:0.95 alpha:1.0];
+            glowColor = [UIColor colorWithWhite:0.0 alpha:0.05];
+            iconBackgroundColor = [UIColor colorWithWhite:0.0 alpha:0.04];
+            iconShadowColor = [UIColor colorWithWhite:0.0 alpha:0.12];
+        }
+    }
+    else {
+        topColor = [UIColor colorWithWhite:1.0 alpha:1.0];
+        midColor = [UIColor colorWithWhite:0.985 alpha:1.0];
+        bottomColor = [UIColor colorWithWhite:0.95 alpha:1.0];
+        glowColor = [UIColor colorWithWhite:0.0 alpha:0.05];
+        iconBackgroundColor = [UIColor colorWithWhite:0.0 alpha:0.04];
+        iconShadowColor = [UIColor colorWithWhite:0.0 alpha:0.12];
+    }
+
+    _backgroundLayer.colors = @[
+        (__bridge id)topColor.CGColor,
+        (__bridge id)midColor.CGColor,
+        (__bridge id)bottomColor.CGColor
+    ];
+    _glowView.backgroundColor = glowColor;
+    _iconBackgroundView.backgroundColor = iconBackgroundColor;
+    _iconBackgroundView.layer.shadowColor = iconShadowColor.CGColor;
+    _titleLabel.textColor = [self resolvedColor:[UIColor labelColor]];
+    _subtitleLabel.textColor = [self resolvedColor:[UIColor secondaryLabelColor]];
+    _progressTrackView.backgroundColor = [self resolvedColor:[UIColor tertiarySystemFillColor]];
+    _progressFillView.backgroundColor = [self resolvedColor:[UIColor labelColor]];
+}
+
 - (instancetype)initWithFrame:(CGRect)frame title:(NSString *)title {
     self = [super initWithFrame:frame];
     if (self == nil) {
@@ -45,18 +102,12 @@
     self.backgroundColor = [UIColor clearColor];
 
     _backgroundLayer = [CAGradientLayer layer];
-    _backgroundLayer.colors = @[
-        (__bridge id)[UIColor colorWithRed:0.95 green:0.89 blue:0.99 alpha:1.0].CGColor,
-        (__bridge id)[UIColor colorWithRed:0.86 green:0.78 blue:0.98 alpha:1.0].CGColor,
-        (__bridge id)[UIColor colorWithRed:0.70 green:0.63 blue:0.93 alpha:1.0].CGColor
-    ];
     _backgroundLayer.startPoint = CGPointMake(0.0, 0.0);
     _backgroundLayer.endPoint = CGPointMake(1.0, 1.0);
     [self.layer addSublayer:_backgroundLayer];
 
     _glowView = [[UIView alloc] init];
     _glowView.translatesAutoresizingMaskIntoConstraints = NO;
-    _glowView.backgroundColor = [UIColor colorWithWhite:1.0 alpha:0.18];
     _glowView.layer.cornerRadius = 76.0;
     [self addSubview:_glowView];
 
@@ -67,9 +118,7 @@
 
     _iconBackgroundView = [[UIView alloc] init];
     _iconBackgroundView.translatesAutoresizingMaskIntoConstraints = NO;
-    _iconBackgroundView.backgroundColor = [UIColor colorWithWhite:1.0 alpha:0.28];
     _iconBackgroundView.layer.cornerRadius = 28.0;
-    _iconBackgroundView.layer.shadowColor = [UIColor colorWithRed:0.36 green:0.24 blue:0.55 alpha:1.0].CGColor;
     _iconBackgroundView.layer.shadowOpacity = 0.14;
     _iconBackgroundView.layer.shadowRadius = 20.0;
     _iconBackgroundView.layer.shadowOffset = CGSizeMake(0.0, 12.0);
@@ -84,7 +133,6 @@
     _titleLabel.translatesAutoresizingMaskIntoConstraints = NO;
     _titleLabel.text = title;
     _titleLabel.textAlignment = NSTextAlignmentCenter;
-    _titleLabel.textColor = [UIColor colorWithRed:0.29 green:0.21 blue:0.45 alpha:1.0];
     _titleLabel.font = [UIFont systemFontOfSize:28.0 weight:UIFontWeightSemibold];
     [self addSubview:_titleLabel];
 
@@ -92,20 +140,17 @@
     _subtitleLabel.translatesAutoresizingMaskIntoConstraints = NO;
     _subtitleLabel.text = AppDelegateLocalized(@"launch.subtitle");
     _subtitleLabel.textAlignment = NSTextAlignmentCenter;
-    _subtitleLabel.textColor = [UIColor colorWithRed:0.43 green:0.35 blue:0.60 alpha:0.92];
     _subtitleLabel.font = [UIFont systemFontOfSize:13.0 weight:UIFontWeightMedium];
     [self addSubview:_subtitleLabel];
 
     _progressTrackView = [[UIView alloc] init];
     _progressTrackView.translatesAutoresizingMaskIntoConstraints = NO;
-    _progressTrackView.backgroundColor = [UIColor colorWithRed:0.79 green:0.72 blue:0.91 alpha:0.45];
     _progressTrackView.layer.cornerRadius = 3.0;
     _progressTrackView.clipsToBounds = YES;
     [self addSubview:_progressTrackView];
 
     _progressFillView = [[UIView alloc] init];
     _progressFillView.translatesAutoresizingMaskIntoConstraints = NO;
-    _progressFillView.backgroundColor = [UIColor colorWithWhite:1.0 alpha:0.92];
     _progressFillView.layer.cornerRadius = 3.0;
     [_progressTrackView addSubview:_progressFillView];
 
@@ -148,12 +193,23 @@
         [_progressFillView.bottomAnchor constraintEqualToAnchor:_progressTrackView.bottomAnchor]
     ]];
 
+    [self applyResolvedColors];
+
     return self;
 }
 
 - (void)layoutSubviews {
     [super layoutSubviews];
     _backgroundLayer.frame = self.bounds;
+}
+
+- (void)traitCollectionDidChange:(UITraitCollection *)previousTraitCollection {
+    [super traitCollectionDidChange:previousTraitCollection];
+    if (@available(iOS 13.0, *)) {
+        if ([self.traitCollection hasDifferentColorAppearanceComparedToTraitCollection:previousTraitCollection]) {
+            [self applyResolvedColors];
+        }
+    }
 }
 
 - (void)playIntroAnimationWithCompletion:(dispatch_block_t)completion {
@@ -263,7 +319,38 @@ static NSString* DB_NAME = @"Limelight_iOS.sqlite";
 }
 
 #if !TARGET_OS_TV
+- (UIViewController *)topmostViewControllerFromRootViewController:(UIViewController *)rootViewController {
+    UIViewController *controller = rootViewController;
+    while (controller.presentedViewController != nil) {
+        controller = controller.presentedViewController;
+    }
+
+    if ([controller isKindOfClass:[UINavigationController class]]) {
+        UINavigationController *navigationController = (UINavigationController *)controller;
+        UIViewController *visibleController = navigationController.visibleViewController;
+        if (visibleController != nil && visibleController != controller) {
+            return [self topmostViewControllerFromRootViewController:visibleController];
+        }
+    }
+
+    if ([controller isKindOfClass:[UITabBarController class]]) {
+        UITabBarController *tabBarController = (UITabBarController *)controller;
+        UIViewController *selectedController = tabBarController.selectedViewController;
+        if (selectedController != nil && selectedController != controller) {
+            return [self topmostViewControllerFromRootViewController:selectedController];
+        }
+    }
+
+    return controller;
+}
+
 - (UIInterfaceOrientationMask)application:(UIApplication *)application supportedInterfaceOrientationsForWindow:(UIWindow *)window {
+    UIViewController *rootViewController = window.rootViewController ?: self.window.rootViewController;
+    UIViewController *topViewController = [self topmostViewControllerFromRootViewController:rootViewController];
+    if (topViewController != nil) {
+        return [topViewController supportedInterfaceOrientations];
+    }
+
     if ([UIDevice currentDevice].userInterfaceIdiom == UIUserInterfaceIdiomPad) {
         return UIInterfaceOrientationMaskAll;
     }

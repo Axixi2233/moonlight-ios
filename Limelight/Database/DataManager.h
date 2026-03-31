@@ -33,6 +33,11 @@
                rendererSelection:(NSInteger)rendererSelection
          metalFxScalingSelection:(NSInteger)metalFxScalingSelection
          metalFxSharpenSelection:(NSInteger)metalFxSharpenSelection
+       metalFxColorModeSelection:(NSInteger)metalFxColorModeSelection
+          pictureInPictureEnabled:(BOOL)pictureInPictureEnabled
+        streamOrientationSelection:(NSInteger)streamOrientationSelection
+      gameMenuShortcutSelection:(NSInteger)gameMenuShortcutSelection
+ longPressStartForGameMenuEnabled:(BOOL)longPressStartForGameMenuEnabled
               touchModeSelection:(NSInteger)touchModeSelection
                     statsOverlay:(BOOL)statsOverlay
              rumbleModeSelection:(NSInteger)rumbleModeSelection

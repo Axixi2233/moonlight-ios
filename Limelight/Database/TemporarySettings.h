@@ -26,6 +26,11 @@ FOUNDATION_EXTERN NSString * const StreamPreferenceRelativeMouseSensitivityKey;
 FOUNDATION_EXTERN NSString * const StreamPreferenceRendererSelectionKey;
 FOUNDATION_EXTERN NSString * const StreamPreferenceMetalFxScalingSelectionKey;
 FOUNDATION_EXTERN NSString * const StreamPreferenceMetalFxSharpenSelectionKey;
+FOUNDATION_EXTERN NSString * const StreamPreferenceMetalFxColorModeSelectionKey;
+FOUNDATION_EXTERN NSString * const StreamPreferencePictureInPictureEnabledKey;
+FOUNDATION_EXTERN NSString * const StreamPreferenceStreamOrientationSelectionKey;
+FOUNDATION_EXTERN NSString * const StreamPreferenceGameMenuShortcutSelectionKey;
+FOUNDATION_EXTERN NSString * const StreamPreferenceLongPressStartForGameMenuEnabledKey;
 
 typedef NS_ENUM(NSInteger, StreamTouchModeSelection) {
     StreamTouchModeSelectionTrackpad = 0,
@@ -51,6 +56,24 @@ typedef NS_ENUM(NSInteger, StreamMetalFxSharpenSelection) {
     StreamMetalFxSharpenSelectionDisabled = 0,
     StreamMetalFxSharpenSelectionStandard = 1,
     StreamMetalFxSharpenSelectionStrong = 2
+};
+
+typedef NS_ENUM(NSInteger, StreamMetalFxColorModeSelection) {
+    StreamMetalFxColorModeSelectionPerceptual = 0,
+    StreamMetalFxColorModeSelectionLinear = 1,
+    StreamMetalFxColorModeSelectionHdr = 2
+};
+
+typedef NS_ENUM(NSInteger, StreamOrientationSelection) {
+    StreamOrientationSelectionAutomatic = 0,
+    StreamOrientationSelectionLandscape = 1,
+    StreamOrientationSelectionPortrait = 2
+};
+
+typedef NS_ENUM(NSInteger, StreamGameMenuShortcutSelection) {
+    StreamGameMenuShortcutSelectionNone = 0,
+    StreamGameMenuShortcutSelectionEscape = 1,
+    StreamGameMenuShortcutSelectionCtrlAltShiftQ = 2
 };
 
 @interface TemporarySettings : NSObject
@@ -105,6 +128,11 @@ typedef NS_ENUM(NSInteger, StreamMetalFxSharpenSelection) {
 @property (nonatomic) NSInteger rendererSelection;
 @property (nonatomic) NSInteger metalFxScalingSelection;
 @property (nonatomic) NSInteger metalFxSharpenSelection;
+@property (nonatomic) NSInteger metalFxColorModeSelection;
+@property (nonatomic) BOOL pictureInPictureEnabled;
+@property (nonatomic) NSInteger streamOrientationSelection;
+@property (nonatomic) NSInteger gameMenuShortcutSelection;
+@property (nonatomic) BOOL longPressStartForGameMenuEnabled;
 
 - (id) initFromSettings:(Settings*)settings;
 - (BOOL)usesAbsoluteTouchMode;

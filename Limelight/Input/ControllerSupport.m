@@ -52,6 +52,8 @@ static float MouseSensitivityScaleForPercentage(NSInteger relativeMouseSensitivi
     return MAX(0.5f, MIN((float)relativeMouseSensitivity / 100.0f, 3.0f));
 }
 
+static const NSTimeInterval kStartButtonHoldDurationForGameMenu = 0.6;
+
 @implementation ControllerSupport {
     id _controllerConnectObserver;
     id _controllerDisconnectObserver;
@@ -84,6 +86,7 @@ static float MouseSensitivityScaleForPercentage(NSInteger relativeMouseSensitivi
     NSInteger _rumbleMode;
     BOOL _remoteMouseMode;
     float _relativeMouseSensitivityScale;
+    BOOL _longPressStartForGameMenuEnabled;
 }
 
 // UPDATE_BUTTON_FLAG(controller, flag, pressed)
@@ -516,6 +519,88 @@ static float MouseSensitivityScaleForPercentage(NSInteger relativeMouseSensitivi
     @synchronized(controller) {
         controller.lastButtonFlags &= ~flags;
         [self handleSpecialCombosReleased:controller releasedButtons:flags];
+    }
+}
+
+-(void) resetPendingGameMenuHoldStateForController:(Controller*)controller
+{
+    [controller.menuHoldTimer invalidate];
+    controller.menuHoldTimer = nil;
+    controller.suppressPlayButtonUntilRelease = NO;
+    controller.didTriggerGameMenuFromHold = NO;
+}
+
+-(void) triggerPendingStartButtonTapForController:(Controller*)controller
+{
+    dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_HIGH, 0), ^{
+        [self setButtonFlag:controller flags:PLAY_FLAG];
+        [self updateFinished:controller];
+        usleep(100 * 1000);
+        [self clearButtonFlag:controller flags:PLAY_FLAG];
+        [self updateFinished:controller];
+    });
+}
+
+-(void) handleGameMenuStartHoldTimerFired:(NSTimer*)timer
+{
+    Controller *controller = (Controller *)timer.userInfo;
+    if (controller == nil) {
+        return;
+    }
+
+    @synchronized(controller) {
+        controller.menuHoldTimer = nil;
+        if (!controller.suppressPlayButtonUntilRelease || controller.didTriggerGameMenuFromHold) {
+            return;
+        }
+        controller.didTriggerGameMenuFromHold = YES;
+    }
+
+    dispatch_async(dispatch_get_main_queue(), ^{
+        [self->_delegate gameMenuRequested];
+    });
+}
+
+-(BOOL) shouldUseLongPressStartForGameMenuForController:(Controller*)controller pressed:(BOOL)pressed
+{
+    if (!_longPressStartForGameMenuEnabled || controller == nil) {
+        return NO;
+    }
+
+    if (!pressed) {
+        return controller.suppressPlayButtonUntilRelease;
+    }
+
+    int comboMask = LB_FLAG | RB_FLAG | BACK_FLAG | SPECIAL_FLAG;
+    return (controller.lastButtonFlags & comboMask) == 0;
+}
+
+-(void) updateMenuButtonLongPressStateForController:(Controller*)controller pressed:(BOOL)pressed
+{
+    if (controller == nil) {
+        return;
+    }
+
+    if (pressed) {
+        if (controller.suppressPlayButtonUntilRelease || controller.didTriggerGameMenuFromHold) {
+            return;
+        }
+
+        controller.suppressPlayButtonUntilRelease = YES;
+        controller.didTriggerGameMenuFromHold = NO;
+        [controller.menuHoldTimer invalidate];
+        controller.menuHoldTimer = [NSTimer scheduledTimerWithTimeInterval:kStartButtonHoldDurationForGameMenu
+                                                                    target:self
+                                                                  selector:@selector(handleGameMenuStartHoldTimerFired:)
+                                                                  userInfo:controller
+                                                                   repeats:NO];
+        return;
+    }
+
+    BOOL shouldSendPlayTap = controller.suppressPlayButtonUntilRelease && !controller.didTriggerGameMenuFromHold;
+    [self resetPendingGameMenuHoldStateForController:controller];
+    if (shouldSendPlayTap) {
+        [self triggerPendingStartButtonTapForController:controller];
     }
 }
 
@@ -972,7 +1057,16 @@ static float MouseSensitivityScaleForPercentage(NSInteger relativeMouseSensitivi
 
                         // For older MFi gamepads, the menu button will already be handled by
                         // the controllerPausedHandler.
-                        UPDATE_BUTTON_FLAG(limeController, PLAY_FLAG, gamepad.buttonMenu.pressed);
+                        if ([self shouldUseLongPressStartForGameMenuForController:limeController pressed:gamepad.buttonMenu.pressed]) {
+                            [self updateMenuButtonLongPressStateForController:limeController pressed:gamepad.buttonMenu.pressed];
+                        }
+                        else {
+                            if (!gamepad.buttonMenu.pressed &&
+                                (limeController.suppressPlayButtonUntilRelease || limeController.didTriggerGameMenuFromHold)) {
+                                [self updateMenuButtonLongPressStateForController:limeController pressed:NO];
+                            }
+                            UPDATE_BUTTON_FLAG(limeController, PLAY_FLAG, gamepad.buttonMenu.pressed);
+                        }
                     }
                 }
                 
@@ -1274,6 +1368,7 @@ static float MouseSensitivityScaleForPercentage(NSInteger relativeMouseSensitivi
     _rumbleMode = currentSettings.rumbleModeSelection;
     _remoteMouseMode = currentSettings.remoteMouseMode;
     _relativeMouseSensitivityScale = MouseSensitivityScaleForPercentage(currentSettings.relativeMouseSensitivity);
+    _longPressStartForGameMenuEnabled = currentSettings.longPressStartForGameMenuEnabled;
     
     Log(LOG_I, @"Number of supported controllers connected: %d", [ControllerSupport getGamepadCount]);
     Log(LOG_I, @"Multi-controller: %d", _multiController);
@@ -1417,6 +1512,8 @@ static float MouseSensitivityScaleForPercentage(NSInteger relativeMouseSensitivi
     _controllerNumbers = 0;
     
     for (Controller* controller in [_controllers allValues]) {
+        [controller.menuHoldTimer invalidate];
+        controller.menuHoldTimer = nil;
         [self cleanupControllerHaptics:controller];
         [self cleanupControllerMotion:controller];
         [self cleanupControllerBattery:controller];

@@ -31,6 +31,7 @@ typedef NS_ENUM(NSInteger, StreamVideoRendererSelection) {
                                         max:(uint64_t *)max;
 - (BOOL)isMetalFxActive;
 - (CGFloat)currentMetalFxScale;
+- (AVSampleBufferDisplayLayer *)pictureInPictureDisplayLayer;
 
 @end
 

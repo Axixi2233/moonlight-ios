@@ -13,6 +13,7 @@
 
 #import <VideoToolbox/VideoToolbox.h>
 #import <AVFoundation/AVFoundation.h>
+#import <AVKit/AVKit.h>
 #import <Metal/Metal.h>
 #import <TargetConditionals.h>
 #if !TARGET_OS_SIMULATOR && __has_include(<MetalFX/MetalFX.h>)
@@ -91,7 +92,25 @@ static BOOL SupportsMetalFx(void) {
     return NO;
 }
 
+static BOOL SupportsPictureInPicture(void) {
+#if !TARGET_OS_TV
+    if (@available(iOS 15.0, *)) {
+        return [AVPictureInPictureController isPictureInPictureSupported];
+    }
+#endif
+    return NO;
+}
+
 - (UIColor *)navigationAccentColor {
+    if (@available(iOS 13.0, *)) {
+        return [UIColor colorWithDynamicProvider:^UIColor * _Nonnull(UITraitCollection * _Nonnull traitCollection) {
+            if (traitCollection.userInterfaceStyle == UIUserInterfaceStyleDark) {
+                return [UIColor colorWithRed:0.86 green:0.79 blue:0.98 alpha:1.0];
+            }
+            return [UIColor colorWithRed:0.31 green:0.23 blue:0.46 alpha:1.0];
+        }];
+    }
+
     return [UIColor colorWithRed:0.31 green:0.23 blue:0.46 alpha:1.0];
 }
 
@@ -123,8 +142,24 @@ static BOOL SupportsMetalFx(void) {
         }
         else {
             [appearance configureWithOpaqueBackground];
-            appearance.backgroundColor = [UIColor colorWithRed:0.98 green:0.96 blue:1.0 alpha:0.96];
-            appearance.shadowColor = [UIColor colorWithRed:0.73 green:0.69 blue:0.82 alpha:0.22];
+            if (@available(iOS 13.0, *)) {
+                appearance.backgroundColor = [UIColor colorWithDynamicProvider:^UIColor * _Nonnull(UITraitCollection * _Nonnull traitCollection) {
+                    if (traitCollection.userInterfaceStyle == UIUserInterfaceStyleDark) {
+                        return [UIColor colorWithRed:0.14 green:0.12 blue:0.20 alpha:0.96];
+                    }
+                    return [UIColor colorWithRed:0.98 green:0.96 blue:1.0 alpha:0.96];
+                }];
+                appearance.shadowColor = [UIColor colorWithDynamicProvider:^UIColor * _Nonnull(UITraitCollection * _Nonnull traitCollection) {
+                    if (traitCollection.userInterfaceStyle == UIUserInterfaceStyleDark) {
+                        return [UIColor colorWithRed:0.05 green:0.05 blue:0.09 alpha:0.35];
+                    }
+                    return [UIColor colorWithRed:0.73 green:0.69 blue:0.82 alpha:0.22];
+                }];
+            }
+            else {
+                appearance.backgroundColor = [UIColor colorWithRed:0.98 green:0.96 blue:1.0 alpha:0.96];
+                appearance.shadowColor = [UIColor colorWithRed:0.73 green:0.69 blue:0.82 alpha:0.22];
+            }
         }
 
         navigationBar.standardAppearance = appearance;
@@ -139,7 +174,6 @@ static BOOL SupportsMetalFx(void) {
 - (void)viewDidLoad {
     [super viewDidLoad];
 
-    self.overrideUserInterfaceStyle = UIUserInterfaceStyleLight;
     self.view.backgroundColor = [UIColor clearColor];
     self.title = SettingsLocalized(@"settings.title");
     UIImage *backImage = nil;
@@ -190,6 +224,16 @@ static BOOL SupportsMetalFx(void) {
 
     [self applyNavigationBarAppearance];
     [self setNeedsStatusBarAppearanceUpdate];
+}
+
+- (void)traitCollectionDidChange:(UITraitCollection *)previousTraitCollection {
+    [super traitCollectionDidChange:previousTraitCollection];
+
+    if (@available(iOS 13.0, *)) {
+        if ([self.traitCollection hasDifferentColorAppearanceComparedToTraitCollection:previousTraitCollection]) {
+            [self applyNavigationBarAppearance];
+        }
+    }
 }
 
 - (void)viewWillDisappear:(BOOL)animated {
@@ -434,9 +478,15 @@ static BOOL SupportsMetalFx(void) {
     snapshot.relativeMouseSensitivity = currentSettings.relativeMouseSensitivity;
     snapshot.supportsMetalRenderer = SupportsMetalRenderer();
     snapshot.supportsMetalFx = SupportsMetalFx();
+    snapshot.supportsPictureInPicture = SupportsPictureInPicture();
     snapshot.rendererSelection = snapshot.supportsMetalRenderer ? currentSettings.rendererSelection : 0;
     snapshot.metalFxScalingSelection = currentSettings.metalFxScalingSelection;
     snapshot.metalFxSharpenSelection = currentSettings.metalFxSharpenSelection;
+    snapshot.metalFxColorModeSelection = currentSettings.metalFxColorModeSelection;
+    snapshot.pictureInPictureEnabled = snapshot.supportsPictureInPicture ? currentSettings.pictureInPictureEnabled : NO;
+    snapshot.streamOrientationSelection = currentSettings.streamOrientationSelection;
+    snapshot.gameMenuShortcutSelection = currentSettings.gameMenuShortcutSelection;
+    snapshot.longPressStartForGameMenuEnabled = currentSettings.longPressStartForGameMenuEnabled;
     snapshot.statsOverlay = currentSettings.statsOverlay;
     snapshot.rumbleModeSelection = currentSettings.rumbleModeSelection;
     snapshot.externalMonitor = currentSettings.externalMonitor;
@@ -505,6 +555,11 @@ static BOOL SupportsMetalFx(void) {
                 rendererSelection:snapshot.rendererSelection
            metalFxScalingSelection:snapshot.metalFxScalingSelection
            metalFxSharpenSelection:snapshot.metalFxSharpenSelection
+        metalFxColorModeSelection:snapshot.metalFxColorModeSelection
+         pictureInPictureEnabled:snapshot.pictureInPictureEnabled
+       streamOrientationSelection:snapshot.streamOrientationSelection
+      gameMenuShortcutSelection:snapshot.gameMenuShortcutSelection
+ longPressStartForGameMenuEnabled:snapshot.longPressStartForGameMenuEnabled
                   touchModeSelection:snapshot.touchModeSelection
                         statsOverlay:snapshot.statsOverlay
                  rumbleModeSelection:snapshot.rumbleModeSelection

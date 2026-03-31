@@ -76,6 +76,28 @@ static NSInteger NormalizedRendererSelection(NSInteger rendererSelection) {
     }
 }
 
+static NSInteger NormalizedStreamOrientationSelection(NSInteger streamOrientationSelection) {
+    switch (streamOrientationSelection) {
+        case StreamOrientationSelectionLandscape:
+        case StreamOrientationSelectionPortrait:
+            return streamOrientationSelection;
+        case StreamOrientationSelectionAutomatic:
+        default:
+            return StreamOrientationSelectionAutomatic;
+    }
+}
+
+static NSInteger NormalizedGameMenuShortcutSelection(NSInteger gameMenuShortcutSelection) {
+    switch (gameMenuShortcutSelection) {
+        case StreamGameMenuShortcutSelectionEscape:
+        case StreamGameMenuShortcutSelectionCtrlAltShiftQ:
+            return gameMenuShortcutSelection;
+        case StreamGameMenuShortcutSelectionNone:
+        default:
+            return StreamGameMenuShortcutSelectionNone;
+    }
+}
+
 static NSInteger NormalizedMetalFxScalingSelection(NSInteger metalFxScalingSelection) {
     switch (metalFxScalingSelection) {
         case StreamMetalFxScalingSelectionOnePointFiveX:
@@ -96,6 +118,17 @@ static NSInteger NormalizedMetalFxSharpenSelection(NSInteger metalFxSharpenSelec
         case StreamMetalFxSharpenSelectionStandard:
         default:
             return StreamMetalFxSharpenSelectionStandard;
+    }
+}
+
+static NSInteger NormalizedMetalFxColorModeSelection(NSInteger metalFxColorModeSelection) {
+    switch (metalFxColorModeSelection) {
+        case StreamMetalFxColorModeSelectionLinear:
+        case StreamMetalFxColorModeSelectionHdr:
+            return metalFxColorModeSelection;
+        case StreamMetalFxColorModeSelectionPerceptual:
+        default:
+            return StreamMetalFxColorModeSelectionPerceptual;
     }
 }
 
@@ -156,6 +189,11 @@ static NSInteger NormalizedMetalFxSharpenSelection(NSInteger metalFxSharpenSelec
                rendererSelection:(NSInteger)rendererSelection
          metalFxScalingSelection:(NSInteger)metalFxScalingSelection
          metalFxSharpenSelection:(NSInteger)metalFxSharpenSelection
+       metalFxColorModeSelection:(NSInteger)metalFxColorModeSelection
+       pictureInPictureEnabled:(BOOL)pictureInPictureEnabled
+     streamOrientationSelection:(NSInteger)streamOrientationSelection
+   gameMenuShortcutSelection:(NSInteger)gameMenuShortcutSelection
+longPressStartForGameMenuEnabled:(BOOL)longPressStartForGameMenuEnabled
               touchModeSelection:(NSInteger)touchModeSelection
                     statsOverlay:(BOOL)statsOverlay
              rumbleModeSelection:(NSInteger)rumbleModeSelection
@@ -196,6 +234,9 @@ performanceOverlayPositionSelection:(NSInteger)performanceOverlayPositionSelecti
         NSInteger normalizedRendererSelection = NormalizedRendererSelection(rendererSelection);
         NSInteger normalizedMetalFxScalingSelection = NormalizedMetalFxScalingSelection(metalFxScalingSelection);
         NSInteger normalizedMetalFxSharpenSelection = NormalizedMetalFxSharpenSelection(metalFxSharpenSelection);
+        NSInteger normalizedMetalFxColorModeSelection = NormalizedMetalFxColorModeSelection(metalFxColorModeSelection);
+        NSInteger normalizedStreamOrientationSelection = NormalizedStreamOrientationSelection(streamOrientationSelection);
+        NSInteger normalizedGameMenuShortcutSelection = NormalizedGameMenuShortcutSelection(gameMenuShortcutSelection);
         StreamTouchModeSelection normalizedTouchModeSelection = NormalizedTouchModeSelection(touchModeSelection);
         StreamRumbleModeSelection normalizedRumbleModeSelection = NormalizedRumbleModeSelection(rumbleModeSelection);
         settingsToSave.absoluteTouchMode = (normalizedTouchModeSelection == StreamTouchModeSelectionMouse ||
@@ -223,6 +264,11 @@ performanceOverlayPositionSelection:(NSInteger)performanceOverlayPositionSelecti
         [defaults setInteger:normalizedRendererSelection forKey:StreamPreferenceRendererSelectionKey];
         [defaults setInteger:normalizedMetalFxScalingSelection forKey:StreamPreferenceMetalFxScalingSelectionKey];
         [defaults setInteger:normalizedMetalFxSharpenSelection forKey:StreamPreferenceMetalFxSharpenSelectionKey];
+        [defaults setInteger:normalizedMetalFxColorModeSelection forKey:StreamPreferenceMetalFxColorModeSelectionKey];
+        [defaults setBool:pictureInPictureEnabled forKey:StreamPreferencePictureInPictureEnabledKey];
+        [defaults setInteger:normalizedStreamOrientationSelection forKey:StreamPreferenceStreamOrientationSelectionKey];
+        [defaults setInteger:normalizedGameMenuShortcutSelection forKey:StreamPreferenceGameMenuShortcutSelectionKey];
+        [defaults setBool:longPressStartForGameMenuEnabled forKey:StreamPreferenceLongPressStartForGameMenuEnabledKey];
         [defaults setInteger:normalizedTouchModeSelection forKey:StreamPreferenceTouchModeSelectionKey];
         [defaults setInteger:normalizedRumbleModeSelection forKey:StreamPreferenceRumbleModeSelectionKey];
         [defaults setInteger:MAX(0, MIN(virtualButtonSchemeSelection, 4)) forKey:StreamPreferenceVirtualButtonSchemeSelectionKey];
@@ -424,6 +470,10 @@ performanceOverlayPositionSelection:(NSInteger)performanceOverlayPositionSelecti
             StreamPreferenceRendererSelectionKey,
             StreamPreferenceMetalFxScalingSelectionKey,
             StreamPreferenceMetalFxSharpenSelectionKey,
+            StreamPreferencePictureInPictureEnabledKey,
+            StreamPreferenceStreamOrientationSelectionKey,
+            StreamPreferenceGameMenuShortcutSelectionKey,
+            StreamPreferenceLongPressStartForGameMenuEnabledKey,
             StreamPreferenceTouchModeSelectionKey,
             StreamPreferenceRumbleModeSelectionKey,
             StreamPreferenceVirtualButtonSchemeSelectionKey,

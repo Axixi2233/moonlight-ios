@@ -26,6 +26,11 @@ NSString * const StreamPreferenceRelativeMouseSensitivityKey = @"StreamPreferenc
 NSString * const StreamPreferenceRendererSelectionKey = @"StreamPreferenceRendererSelection";
 NSString * const StreamPreferenceMetalFxScalingSelectionKey = @"StreamPreferenceMetalFxScalingSelection";
 NSString * const StreamPreferenceMetalFxSharpenSelectionKey = @"StreamPreferenceMetalFxSharpenSelection";
+NSString * const StreamPreferenceMetalFxColorModeSelectionKey = @"StreamPreferenceMetalFxColorModeSelection";
+NSString * const StreamPreferencePictureInPictureEnabledKey = @"StreamPreferencePictureInPictureEnabled";
+NSString * const StreamPreferenceStreamOrientationSelectionKey = @"StreamPreferenceStreamOrientationSelection";
+NSString * const StreamPreferenceGameMenuShortcutSelectionKey = @"StreamPreferenceGameMenuShortcutSelection";
+NSString * const StreamPreferenceLongPressStartForGameMenuEnabledKey = @"StreamPreferenceLongPressStartForGameMenuEnabled";
 
 @implementation TemporarySettings
 
@@ -125,6 +130,39 @@ NSString * const StreamPreferenceMetalFxSharpenSelectionKey = @"StreamPreference
     }
 }
 
+- (NSInteger)normalizedMetalFxColorModeSelection:(NSInteger)metalFxColorModeSelection {
+    switch (metalFxColorModeSelection) {
+        case StreamMetalFxColorModeSelectionLinear:
+        case StreamMetalFxColorModeSelectionHdr:
+            return metalFxColorModeSelection;
+        case StreamMetalFxColorModeSelectionPerceptual:
+        default:
+            return StreamMetalFxColorModeSelectionPerceptual;
+    }
+}
+
+- (NSInteger)normalizedStreamOrientationSelection:(NSInteger)streamOrientationSelection {
+    switch (streamOrientationSelection) {
+        case StreamOrientationSelectionLandscape:
+        case StreamOrientationSelectionPortrait:
+            return streamOrientationSelection;
+        case StreamOrientationSelectionAutomatic:
+        default:
+            return StreamOrientationSelectionAutomatic;
+    }
+}
+
+- (NSInteger)normalizedGameMenuShortcutSelection:(NSInteger)gameMenuShortcutSelection {
+    switch (gameMenuShortcutSelection) {
+        case StreamGameMenuShortcutSelectionEscape:
+        case StreamGameMenuShortcutSelectionCtrlAltShiftQ:
+            return gameMenuShortcutSelection;
+        case StreamGameMenuShortcutSelectionNone:
+        default:
+            return StreamGameMenuShortcutSelectionNone;
+    }
+}
+
 - (id) initFromSettings:(Settings*)settings {
     self = [self init];
     
@@ -148,7 +186,12 @@ NSString * const StreamPreferenceMetalFxSharpenSelectionKey = @"StreamPreference
         StreamPreferenceRelativeMouseSensitivityKey: @(100),
         StreamPreferenceRendererSelectionKey: @(0),
         StreamPreferenceMetalFxScalingSelectionKey: @(StreamMetalFxScalingSelectionAutomatic),
-        StreamPreferenceMetalFxSharpenSelectionKey: @(StreamMetalFxSharpenSelectionStandard)
+        StreamPreferenceMetalFxSharpenSelectionKey: @(StreamMetalFxSharpenSelectionStandard),
+        StreamPreferenceMetalFxColorModeSelectionKey: @(StreamMetalFxColorModeSelectionPerceptual),
+        StreamPreferencePictureInPictureEnabledKey: @(NO),
+        StreamPreferenceStreamOrientationSelectionKey: @(StreamOrientationSelectionAutomatic),
+        StreamPreferenceGameMenuShortcutSelectionKey: @(StreamGameMenuShortcutSelectionNone),
+        StreamPreferenceLongPressStartForGameMenuEnabledKey: @(NO)
     };
     [[NSUserDefaults standardUserDefaults] registerDefaults:streamPreferenceDefaults];
     
@@ -236,6 +279,11 @@ NSString * const StreamPreferenceMetalFxSharpenSelectionKey = @"StreamPreference
     self.rendererSelection = [self normalizedRendererSelection:[defaults integerForKey:StreamPreferenceRendererSelectionKey]];
     self.metalFxScalingSelection = [self normalizedMetalFxScalingSelection:[defaults integerForKey:StreamPreferenceMetalFxScalingSelectionKey]];
     self.metalFxSharpenSelection = [self normalizedMetalFxSharpenSelection:[defaults integerForKey:StreamPreferenceMetalFxSharpenSelectionKey]];
+    self.metalFxColorModeSelection = [self normalizedMetalFxColorModeSelection:[defaults integerForKey:StreamPreferenceMetalFxColorModeSelectionKey]];
+    self.pictureInPictureEnabled = [defaults boolForKey:StreamPreferencePictureInPictureEnabledKey];
+    self.streamOrientationSelection = [self normalizedStreamOrientationSelection:[defaults integerForKey:StreamPreferenceStreamOrientationSelectionKey]];
+    self.gameMenuShortcutSelection = [self normalizedGameMenuShortcutSelection:[defaults integerForKey:StreamPreferenceGameMenuShortcutSelectionKey]];
+    self.longPressStartForGameMenuEnabled = [defaults boolForKey:StreamPreferenceLongPressStartForGameMenuEnabledKey];
     id storedRumbleMode = [defaults objectForKey:StreamPreferenceRumbleModeSelectionKey];
     if ([storedRumbleMode isKindOfClass:[NSNumber class]]) {
         self.rumbleModeSelection = [storedRumbleMode integerValue];

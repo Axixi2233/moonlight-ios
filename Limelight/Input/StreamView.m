@@ -679,6 +679,74 @@ typedef NS_OPTIONS(NSUInteger, StreamVirtualDirectionMask) {
 #endif
 }
 
+- (BOOL)shouldHandleGameMenuShortcutForInput:(NSString *)input modifierFlags:(UIKeyModifierFlags)modifierFlags {
+#if !TARGET_OS_TV
+    switch (settings.gameMenuShortcutSelection) {
+        case StreamGameMenuShortcutSelectionEscape:
+            return modifierFlags == 0 && [input isEqualToString:UIKeyInputEscape];
+        case StreamGameMenuShortcutSelectionCtrlAltShiftQ:
+            return [input.lowercaseString isEqualToString:@"q"] &&
+                   modifierFlags == (UIKeyModifierControl | UIKeyModifierAlternate | UIKeyModifierShift);
+        case StreamGameMenuShortcutSelectionNone:
+        default:
+            return NO;
+    }
+#else
+    (void)input;
+    (void)modifierFlags;
+    return NO;
+#endif
+}
+
+- (BOOL)handleGameMenuShortcutIfNeededForInput:(NSString *)input modifierFlags:(UIKeyModifierFlags)modifierFlags {
+    if (![self shouldHandleGameMenuShortcutForInput:input modifierFlags:modifierFlags]) {
+        return NO;
+    }
+
+    [interactionDelegate streamViewDidRequestGameMenu];
+    return YES;
+}
+
+- (BOOL)handleGameMenuShortcutIfNeededForPress:(UIPress *)press {
+#if !TARGET_OS_TV
+    if (@available(iOS 13.4, *)) {
+        UIKey *key = press.key;
+        if (key == nil) {
+            return NO;
+        }
+
+        NSString *input = key.charactersIgnoringModifiers ?: key.characters;
+        if (input.length == 0) {
+            return NO;
+        }
+
+        return [self handleGameMenuShortcutIfNeededForInput:input modifierFlags:key.modifierFlags];
+    }
+#endif
+    (void)press;
+    return NO;
+}
+
+- (BOOL)matchesGameMenuShortcutForPress:(UIPress *)press {
+#if !TARGET_OS_TV
+    if (@available(iOS 13.4, *)) {
+        UIKey *key = press.key;
+        if (key == nil) {
+            return NO;
+        }
+
+        NSString *input = key.charactersIgnoringModifiers ?: key.characters;
+        if (input.length == 0) {
+            return NO;
+        }
+
+        return [self shouldHandleGameMenuShortcutForInput:input modifierFlags:key.modifierFlags];
+    }
+#endif
+    (void)press;
+    return NO;
+}
+
 - (void)resetAfterTemporaryTouchModeChange {
 #if !TARGET_OS_TV
     if (isInputingText) {
@@ -2974,6 +3042,11 @@ typedef NS_OPTIONS(NSUInteger, StreamVirtualDirectionMask) {
     
     if (@available(iOS 13.4, tvOS 13.4, *)) {
         for (UIPress* press in presses) {
+            if ([self handleGameMenuShortcutIfNeededForPress:press]) {
+                handled = YES;
+                continue;
+            }
+
             // For now, we'll treated it as handled if we handle at least one of the
             // UIPress events inside the set.
             if ([KeyboardSupport sendKeyEventForPress:press down:YES]) {
@@ -2993,6 +3066,11 @@ typedef NS_OPTIONS(NSUInteger, StreamVirtualDirectionMask) {
     
     if (@available(iOS 13.4, tvOS 13.4, *)) {
         for (UIPress* press in presses) {
+            if ([self matchesGameMenuShortcutForPress:press]) {
+                handled = YES;
+                continue;
+            }
+
             // For now, we'll treated it as handled if we handle at least one of the
             // UIPress events inside the set.
             if ([KeyboardSupport sendKeyEventForPress:press down:NO]) {
@@ -3256,12 +3334,20 @@ typedef NS_OPTIONS(NSUInteger, StreamVirtualDirectionMask) {
 }
 
 - (void)specialCharPressed:(UIKeyCommand *)cmd {
+    if ([self handleGameMenuShortcutIfNeededForInput:[cmd input] modifierFlags:[cmd modifierFlags]]) {
+        return;
+    }
+
     struct KeyEvent event = [KeyboardSupport translateKeyEvent:0x20 withModifierFlags:[cmd modifierFlags]];
     event.keycode = [[dictCodes valueForKey:[cmd input]] intValue];
     [self sendLowLevelEvent:event];
 }
 
 - (void)keyPressed:(UIKeyCommand *)cmd {
+    if ([self handleGameMenuShortcutIfNeededForInput:[cmd input] modifierFlags:[cmd modifierFlags]]) {
+        return;
+    }
+
     struct KeyEvent event = [KeyboardSupport translateKeyEvent:[[cmd input] characterAtIndex:0] withModifierFlags:[cmd modifierFlags]];
     [self sendLowLevelEvent:event];
 }
@@ -3302,6 +3388,10 @@ typedef NS_OPTIONS(NSUInteger, StreamVirtualDirectionMask) {
                                  [commands addObject:[UIKeyCommand keyCommandWithInput:substring modifierFlags:UIKeyModifierControl action:@selector(keyPressed:)]];
                                  [commands addObject:[UIKeyCommand keyCommandWithInput:substring modifierFlags:UIKeyModifierAlternate action:@selector(keyPressed:)]];
                              }];
+
+    [commands addObject:[UIKeyCommand keyCommandWithInput:@"q"
+                                            modifierFlags:UIKeyModifierControl | UIKeyModifierAlternate | UIKeyModifierShift
+                                                   action:@selector(keyPressed:)]];
     
     for (NSString *c in [dictCodes keyEnumerator]) {
         [commands addObject:[UIKeyCommand keyCommandWithInput:c

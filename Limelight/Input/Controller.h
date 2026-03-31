@@ -58,6 +58,9 @@ typedef struct {
 @property (nonatomic)                   NSTimer* _Nullable batteryTimer;
 @property (nonatomic)                   GCDeviceBatteryState lastBatteryState;
 @property (nonatomic)                   float lastBatteryLevel;
+@property (nonatomic)                   NSTimer* _Nullable menuHoldTimer;
+@property (nonatomic)                   BOOL suppressPlayButtonUntilRelease;
+@property (nonatomic)                   BOOL didTriggerGameMenuFromHold;
 
 @property (nonatomic)                   BOOL reportedArrival;
 @property (nonatomic)                   Controller* _Nullable mergedWithController;

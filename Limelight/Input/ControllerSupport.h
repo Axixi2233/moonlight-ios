@@ -14,6 +14,7 @@
 - (void) gamepadPresenceChanged;
 - (void) mousePresenceChanged;
 - (void) streamExitRequested;
+- (void) gameMenuRequested;
 
 @end
 

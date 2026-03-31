@@ -28,6 +28,7 @@ typedef NS_ENUM(NSInteger, StreamViewVideoAlignmentMode) {
 
 - (void) userInteractionBegan;
 - (void) userInteractionEnded;
+- (void) streamViewDidRequestGameMenu;
 
 @end
 

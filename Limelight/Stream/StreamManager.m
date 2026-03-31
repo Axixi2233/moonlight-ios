@@ -56,6 +56,7 @@ static NSString *MetalFxOverlayStringForSettings(TemporarySettings *settings, CG
     UIView* _renderView;
     id<ConnectionCallbacks> _callbacks;
     Connection* _connection;
+    id<VideoRendering> _renderer;
 }
 
 - (NSString *)getBandwidthOverlayText
@@ -103,6 +104,11 @@ static NSString *MetalFxOverlayStringForSettings(TemporarySettings *settings, CG
                                             streamAspectRatio:aspectRatio
                                                useFramePacing:self->_config.useFramePacing];
     }
+}
+
+- (id<VideoRendering>)currentRenderer
+{
+    return _renderer;
 }
 
 - (id) initWithConfig:(StreamConfiguration*)config renderView:(UIView*)view connectionCallbacks:(id<ConnectionCallbacks>)callbacks {
@@ -177,8 +183,8 @@ static NSString *MetalFxOverlayStringForSettings(TemporarySettings *settings, CG
     
     // Initializing the renderer must be done on the main thread
     dispatch_async(dispatch_get_main_queue(), ^{
-        id<VideoRendering> renderer = [self makeRendererForCurrentSettings];
-        self->_connection = [[Connection alloc] initWithConfig:self->_config renderer:renderer connectionCallbacks:self->_callbacks];
+        self->_renderer = [self makeRendererForCurrentSettings];
+        self->_connection = [[Connection alloc] initWithConfig:self->_config renderer:self->_renderer connectionCallbacks:self->_callbacks];
         NSOperationQueue* opQueue = [[NSOperationQueue alloc] init];
         [opQueue addOperation:self->_connection];
     });
@@ -187,6 +193,8 @@ static NSString *MetalFxOverlayStringForSettings(TemporarySettings *settings, CG
 - (void) stopStream
 {
     [_connection terminate];
+    _connection = nil;
+    _renderer = nil;
 }
 
 - (BOOL) launchApp:(HttpManager*)hMan receiveSessionUrl:(NSString**)sessionUrl {

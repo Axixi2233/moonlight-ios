@@ -23,6 +23,10 @@
 
 #define StreamMenuLocalized(key) NSLocalizedString((key), nil)
 
+#if !TARGET_OS_TV
+#import <AVKit/AVKit.h>
+#endif
+
 #if TARGET_OS_TV
 #import <AVFoundation/AVDisplayCriteria.h>
 #import <AVKit/AVDisplayManager.h>
@@ -35,7 +39,11 @@
 - (id)initWithRefreshRate:(float)arg1 videoDynamicRange:(int)arg2;
 @end
 
-@interface StreamFrameViewController () <StreamActionSheetHostingViewControllerDelegate, StreamShortcutPanelHostingViewControllerDelegate, StreamVirtualKeyboardPanelHostingViewControllerDelegate, StreamVirtualButtonsPanelHostingViewControllerDelegate, UIGestureRecognizerDelegate>
+@interface StreamFrameViewController () <StreamActionSheetHostingViewControllerDelegate, StreamShortcutPanelHostingViewControllerDelegate, StreamVirtualKeyboardPanelHostingViewControllerDelegate, StreamVirtualButtonsPanelHostingViewControllerDelegate, UIGestureRecognizerDelegate
+#if !TARGET_OS_TV
+, AVPictureInPictureControllerDelegate, AVPictureInPictureSampleBufferPlaybackDelegate
+#endif
+>
 @end
 
 static const CGFloat kStreamFloatingMenuPhoneButtonSize = 44.0f;
@@ -123,6 +131,12 @@ static const CGFloat kStreamFloatingMenuExpandedAlpha = 0.96f;
     StreamView *_renderView;
     UIWindow *_deviceWindow;
     //外接显示器-----------end
+#if !TARGET_OS_TV
+    AVPictureInPictureController *_pictureInPictureController;
+    AVPictureInPictureController *_observedPictureInPictureController;
+    BOOL _pictureInPictureActive;
+    BOOL _pictureInPictureStartingForBackground;
+#endif
 }
 
 - (NSAttributedString *)statsOverlayAttributedTextForText:(NSString *)text {
@@ -215,6 +229,143 @@ static const CGFloat kStreamFloatingMenuExpandedAlpha = 0.96f;
 - (BOOL)prefersStatusBarHidden {
     return YES;
 }
+
+#if !TARGET_OS_TV
+- (void)stopObservingPictureInPictureController
+{
+    if (_observedPictureInPictureController == nil) {
+        return;
+    }
+
+    @try {
+        [_observedPictureInPictureController removeObserver:self forKeyPath:@"pictureInPicturePossible"];
+    }
+    @catch (__unused NSException *exception) {
+    }
+
+    _observedPictureInPictureController = nil;
+}
+
+- (void)startObservingPictureInPictureControllerIfNeeded
+{
+    if (_pictureInPictureController == nil || _observedPictureInPictureController == _pictureInPictureController) {
+        return;
+    }
+
+    [self stopObservingPictureInPictureController];
+    [_pictureInPictureController addObserver:self
+                                  forKeyPath:@"pictureInPicturePossible"
+                                     options:(NSKeyValueObservingOptionInitial | NSKeyValueObservingOptionNew)
+                                     context:NULL];
+    _observedPictureInPictureController = _pictureInPictureController;
+}
+
+- (BOOL)supportsPictureInPictureForCurrentSession
+{
+    if (!_settings.pictureInPictureEnabled) {
+        return NO;
+    }
+
+    if (_settings.externalMonitor) {
+        return NO;
+    }
+
+    if (_settings.rendererSelection != StreamVideoRendererSelectionSystem) {
+        return NO;
+    }
+
+    if (@available(iOS 15.0, *)) {
+        return [AVPictureInPictureController isPictureInPictureSupported];
+    }
+
+    return NO;
+}
+
+- (void)prepareAudioSessionForPictureInPicture
+{
+    if (@available(iOS 15.0, *)) {
+        AVAudioSession *audioSession = [AVAudioSession sharedInstance];
+        NSError *audioError = nil;
+        [audioSession setCategory:AVAudioSessionCategoryPlayback error:&audioError];
+        if (audioError != nil) {
+            Log(LOG_W, @"Failed to set AVAudioSession category for Picture in Picture: %@", audioError);
+        }
+
+        audioError = nil;
+        [audioSession setActive:YES error:&audioError];
+        if (audioError != nil) {
+            Log(LOG_W, @"Failed to activate AVAudioSession for Picture in Picture: %@", audioError);
+        }
+    }
+}
+
+- (void)configurePictureInPictureIfNeeded
+{
+    if (![self supportsPictureInPictureForCurrentSession]) {
+        [self stopObservingPictureInPictureController];
+        _pictureInPictureController = nil;
+        return;
+    }
+
+    if (@available(iOS 15.0, *)) {
+        AVSampleBufferDisplayLayer *displayLayer = nil;
+        id<VideoRendering> renderer = [_streamMan currentRenderer];
+        if ([renderer respondsToSelector:@selector(pictureInPictureDisplayLayer)]) {
+            displayLayer = [renderer pictureInPictureDisplayLayer];
+        }
+
+        if (displayLayer == nil) {
+            return;
+        }
+
+        if (_pictureInPictureController != nil) {
+            if (_pictureInPictureController.isPictureInPictureActive) {
+                return;
+            }
+            [self stopObservingPictureInPictureController];
+            _pictureInPictureController.delegate = nil;
+            _pictureInPictureController = nil;
+        }
+
+        AVPictureInPictureControllerContentSource *contentSource =
+            [[AVPictureInPictureControllerContentSource alloc] initWithSampleBufferDisplayLayer:displayLayer
+                                                                               playbackDelegate:self];
+        _pictureInPictureController = [[AVPictureInPictureController alloc] initWithContentSource:contentSource];
+        _pictureInPictureController.delegate = self;
+        if ([_pictureInPictureController respondsToSelector:@selector(setCanStartPictureInPictureAutomaticallyFromInline:)]) {
+            _pictureInPictureController.canStartPictureInPictureAutomaticallyFromInline = YES;
+        }
+        [self startObservingPictureInPictureControllerIfNeeded];
+    }
+}
+
+- (BOOL)shouldKeepStreamAliveForPictureInPicture
+{
+    return _pictureInPictureActive || _pictureInPictureStartingForBackground;
+}
+
+- (void)resetPictureInPictureState
+{
+    if (![NSThread isMainThread]) {
+        dispatch_sync(dispatch_get_main_queue(), ^{
+            [self resetPictureInPictureState];
+        });
+        return;
+    }
+
+    if (@available(iOS 15.0, *)) {
+        if (_pictureInPictureController.isPictureInPictureActive) {
+            [_pictureInPictureController stopPictureInPicture];
+        }
+    }
+
+    [self stopObservingPictureInPictureController];
+    _pictureInPictureController.delegate = nil;
+    _pictureInPictureController = nil;
+    _pictureInPictureActive = NO;
+    _pictureInPictureStartingForBackground = NO;
+}
+#endif
 
 - (void)layoutOverlayViewForCurrentBounds {
     if (_overlayView == nil || _overlayView.hidden) {
@@ -621,6 +772,7 @@ static const CGFloat kStreamFloatingMenuExpandedAlpha = 0.96f;
 - (void)viewDidAppear:(BOOL)animated
 {
     [super viewDidAppear:animated];
+    [self applyPreferredOrientationIfNeeded];
 #if defined(__IPHONE_14_0)
     if (@available(iOS 14.0, *)) {
         [self setNeedsUpdateOfPrefersPointerLocked];
@@ -1058,6 +1210,9 @@ static const CGFloat kStreamFloatingMenuExpandedAlpha = 0.96f;
 }
 
 - (void) returnToMainFrame {
+#if !TARGET_OS_TV
+    [self resetPictureInPictureState];
+#endif
     // Reset display mode back to default
     [self updatePreferredDisplayMode:NO];
     
@@ -1068,6 +1223,47 @@ static const CGFloat kStreamFloatingMenuExpandedAlpha = 0.96f;
     [self.navigationController popToRootViewControllerAnimated:YES];
     _extWindow = nil;
     
+}
+
+- (void)presentConnectionAlertWithTitle:(NSString *)title message:(NSString *)message {
+    if (title.length == 0 && message.length == 0) {
+        [self returnToMainFrame];
+        return;
+    }
+
+    __weak typeof(self) weakSelf = self;
+    void (^showAlert)(void) = ^{
+        __strong typeof(weakSelf) strongSelf = weakSelf;
+        if (strongSelf == nil) {
+            return;
+        }
+
+        UIViewController *presenter = strongSelf.navigationController ?: strongSelf;
+        if (presenter.view.window == nil) {
+            [strongSelf returnToMainFrame];
+            return;
+        }
+
+        UIAlertController* conTermAlert = [UIAlertController alertControllerWithTitle:title
+                                                                              message:message
+                                                                       preferredStyle:UIAlertControllerStyleAlert];
+        [Utils addHelpOptionToDialog:conTermAlert];
+        [conTermAlert addAction:[UIAlertAction actionWithTitle:StreamMenuLocalized(@"common.ok")
+                                                         style:UIAlertActionStyleDefault
+                                                       handler:^(UIAlertAction* action){
+            [strongSelf returnToMainFrame];
+        }]];
+        [presenter presentViewController:conTermAlert animated:YES completion:nil];
+    };
+
+    UIViewController *presenter = self.navigationController ?: self;
+    UIViewController *presentedController = presenter.presentedViewController;
+    if (presentedController != nil && !presentedController.isBeingDismissed) {
+        [presentedController dismissViewControllerAnimated:NO completion:showAlert];
+    }
+    else {
+        showAlert();
+    }
 }
 
 // This will fire if the user opens control center or gets a low battery message
@@ -1096,6 +1292,9 @@ static const CGFloat kStreamFloatingMenuExpandedAlpha = 0.96f;
 }
 
 - (void)applicationDidBecomeActive:(NSNotification *)notification {
+#if !TARGET_OS_TV
+    _pictureInPictureStartingForBackground = NO;
+#endif
     // Stop the background timer, since we're foregrounded again
     if (_inactivityTimer != nil) {
         Log(LOG_I, @"Stopping inactivity timer after becoming active again");
@@ -1106,6 +1305,16 @@ static const CGFloat kStreamFloatingMenuExpandedAlpha = 0.96f;
 
 // This fires when the home button is pressed
 - (void)applicationDidEnterBackground:(UIApplication *)application {
+#if !TARGET_OS_TV
+    if ([self shouldKeepStreamAliveForPictureInPicture]) {
+        Log(LOG_I, @"Keeping stream alive for Picture in Picture");
+        if (_inactivityTimer != nil) {
+            [_inactivityTimer invalidate];
+            _inactivityTimer = nil;
+        }
+        return;
+    }
+#endif
     Log(LOG_I, @"Terminating stream immediately for backgrounding");
     
     if (_inactivityTimer != nil) {
@@ -2434,6 +2643,10 @@ static const CGFloat kStreamFloatingMenuExpandedAlpha = 0.96f;
         self->_tipLabel.hidden = YES;
         
         [self->_controllerSupport connectionEstablished];
+
+#if !TARGET_OS_TV
+        [self configurePictureInPictureIfNeeded];
+#endif
         
         if (self->_settings.statsOverlay) {
             self->_statsUpdateTimer = [NSTimer scheduledTimerWithTimeInterval:1.0f
@@ -2447,6 +2660,10 @@ static const CGFloat kStreamFloatingMenuExpandedAlpha = 0.96f;
 
 - (void)connectionTerminated:(int)errorCode {
     Log(LOG_I, @"Connection terminated: %d", errorCode);
+
+#if !TARGET_OS_TV
+    [self resetPictureInPictureState];
+#endif
 
     if (_suppressTerminationAlertForManualExit) {
         dispatch_async(dispatch_get_main_queue(), ^{
@@ -2522,14 +2739,7 @@ static const CGFloat kStreamFloatingMenuExpandedAlpha = 0.96f;
             }
         }
         
-        UIAlertController* conTermAlert = [UIAlertController alertControllerWithTitle:title
-                                                                              message:message
-                                                                       preferredStyle:UIAlertControllerStyleAlert];
-        [Utils addHelpOptionToDialog:conTermAlert];
-        [conTermAlert addAction:[UIAlertAction actionWithTitle:StreamMenuLocalized(@"common.ok") style:UIAlertActionStyleDefault handler:^(UIAlertAction* action){
-            [self returnToMainFrame];
-        }]];
-        [self presentViewController:conTermAlert animated:YES completion:nil];
+        [self presentConnectionAlertWithTitle:title message:message];
     });
 
     [_streamMan stopStream];
@@ -2569,14 +2779,7 @@ static const CGFloat kStreamFloatingMenuExpandedAlpha = 0.96f;
             message = [message stringByAppendingString:StreamMenuLocalized(@"stream.connection.restricted_network")];
         }
         
-        UIAlertController* alert = [UIAlertController alertControllerWithTitle:StreamMenuLocalized(@"stream.connection.failed_title")
-                                                                       message:message
-                                                                preferredStyle:UIAlertControllerStyleAlert];
-        [Utils addHelpOptionToDialog:alert];
-        [alert addAction:[UIAlertAction actionWithTitle:StreamMenuLocalized(@"common.ok") style:UIAlertActionStyleDefault handler:^(UIAlertAction* action){
-            [self returnToMainFrame];
-        }]];
-        [self presentViewController:alert animated:YES completion:nil];
+        [self presentConnectionAlertWithTitle:StreamMenuLocalized(@"stream.connection.failed_title") message:message];
     });
     
     [_streamMan stopStream];
@@ -2588,15 +2791,8 @@ static const CGFloat kStreamFloatingMenuExpandedAlpha = 0.96f;
     dispatch_async(dispatch_get_main_queue(), ^{
         // Allow the display to go to sleep now
         [UIApplication sharedApplication].idleTimerDisabled = NO;
-        
-        UIAlertController* alert = [UIAlertController alertControllerWithTitle:StreamMenuLocalized(@"stream.connection.error_title")
-                                                                       message:message
-                                                                preferredStyle:UIAlertControllerStyleAlert];
-        [Utils addHelpOptionToDialog:alert];
-        [alert addAction:[UIAlertAction actionWithTitle:StreamMenuLocalized(@"common.ok") style:UIAlertActionStyleDefault handler:^(UIAlertAction* action){
-            [self returnToMainFrame];
-        }]];
-        [self presentViewController:alert animated:YES completion:nil];
+
+        [self presentConnectionAlertWithTitle:StreamMenuLocalized(@"stream.connection.error_title") message:message];
     });
 }
 
@@ -2689,12 +2885,22 @@ static const CGFloat kStreamFloatingMenuExpandedAlpha = 0.96f;
 - (void) videoContentShown {
     [_spinner stopAnimating];
     [self.view setBackgroundColor:[UIColor blackColor]];
+#if !TARGET_OS_TV
+    [self configurePictureInPictureIfNeeded];
+#endif
 }
 
 - (void)didReceiveMemoryWarning
 {
     [super didReceiveMemoryWarning];
     // Dispose of any resources that can be recreated.
+}
+
+- (void)dealloc
+{
+#if !TARGET_OS_TV
+    [self stopObservingPictureInPictureController];
+#endif
 }
 
 - (void)gamepadPresenceChanged {
@@ -2742,6 +2948,14 @@ static const CGFloat kStreamFloatingMenuExpandedAlpha = 0.96f;
 #endif
 }
 
+- (void)streamViewDidRequestGameMenu {
+    [self showActionSheetWithTitle:StreamMenuLocalized(@"stream.menu.title") options:nil];
+}
+
+- (void)gameMenuRequested {
+    [self showActionSheetWithTitle:StreamMenuLocalized(@"stream.menu.title") options:nil];
+}
+
 #if !TARGET_OS_TV
 // Require a confirmation when streaming to activate a system gesture
 - (UIRectEdge)preferredScreenEdgesDeferringSystemGestures {
@@ -2764,16 +2978,66 @@ static const CGFloat kStreamFloatingMenuExpandedAlpha = 0.96f;
     return NO;
 }
 
+- (UIInterfaceOrientationMask)preferredStreamOrientationMask {
+    switch (_settings.streamOrientationSelection) {
+        case StreamOrientationSelectionLandscape:
+            return UIInterfaceOrientationMaskLandscape;
+        case StreamOrientationSelectionPortrait:
+            return UIInterfaceOrientationMaskPortrait;
+        case StreamOrientationSelectionAutomatic:
+        default:
+            if ([UIDevice currentDevice].userInterfaceIdiom == UIUserInterfaceIdiomPad) {
+                return UIInterfaceOrientationMaskAll;
+            }
+            return UIInterfaceOrientationMaskAllButUpsideDown;
+    }
+}
+
+- (void)applyPreferredOrientationIfNeeded {
+    UIInterfaceOrientationMask mask = [self preferredStreamOrientationMask];
+    if (mask == UIInterfaceOrientationMaskPortrait || mask == UIInterfaceOrientationMaskLandscape) {
+        if (@available(iOS 16.0, *)) {
+            UIWindowScene *windowScene = self.view.window.windowScene;
+            if (windowScene != nil) {
+                UIWindowSceneGeometryPreferencesIOS *preferences = [[UIWindowSceneGeometryPreferencesIOS alloc] initWithInterfaceOrientations:mask];
+                [windowScene requestGeometryUpdateWithPreferences:preferences errorHandler:nil];
+            }
+        }
+        else {
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdeprecated-declarations"
+            UIInterfaceOrientation targetOrientation = (mask == UIInterfaceOrientationMaskPortrait) ? UIInterfaceOrientationPortrait : UIInterfaceOrientationLandscapeRight;
+            [[UIDevice currentDevice] setValue:@(targetOrientation) forKey:@"orientation"];
+            [UIViewController attemptRotationToDeviceOrientation];
+#pragma clang diagnostic pop
+        }
+    }
+    else {
+        if (@available(iOS 16.0, *)) {
+            [self setNeedsUpdateOfSupportedInterfaceOrientations];
+        }
+        [UIViewController attemptRotationToDeviceOrientation];
+    }
+}
+
 - (BOOL)shouldAutorotate {
     return YES;
 }
 
 - (UIInterfaceOrientationMask)supportedInterfaceOrientations {
-    if ([UIDevice currentDevice].userInterfaceIdiom == UIUserInterfaceIdiomPad) {
-        return UIInterfaceOrientationMaskAll;
-    }
+    return [self preferredStreamOrientationMask];
+}
 
-    return UIInterfaceOrientationMaskAllButUpsideDown;
+- (UIInterfaceOrientation)preferredInterfaceOrientationForPresentation {
+    switch (_settings.streamOrientationSelection) {
+        case StreamOrientationSelectionLandscape:
+            return UIInterfaceOrientationLandscapeRight;
+        case StreamOrientationSelectionPortrait:
+            return UIInterfaceOrientationPortrait;
+        case StreamOrientationSelectionAutomatic:
+        default:
+            return UIInterfaceOrientationUnknown;
+    }
 }
 
 - (BOOL)prefersPointerLocked {
@@ -3098,5 +3362,116 @@ static const CGFloat kStreamFloatingMenuExpandedAlpha = 0.96f;
     [self refreshVirtualButtonEditorForCurrentSelection];
     [self persistCurrentVirtualGamepadScheme];
 }
+
+#if !TARGET_OS_TV
+- (void)pictureInPictureControllerWillStartPictureInPicture:(AVPictureInPictureController *)pictureInPictureController API_AVAILABLE(ios(15.0))
+{
+    (void)pictureInPictureController;
+    _pictureInPictureStartingForBackground = YES;
+}
+
+- (void)pictureInPictureControllerDidStartPictureInPicture:(AVPictureInPictureController *)pictureInPictureController API_AVAILABLE(ios(15.0))
+{
+    (void)pictureInPictureController;
+    _pictureInPictureActive = YES;
+    _pictureInPictureStartingForBackground = NO;
+    if (_inactivityTimer != nil) {
+        [_inactivityTimer invalidate];
+        _inactivityTimer = nil;
+    }
+}
+
+- (void)pictureInPictureController:(AVPictureInPictureController *)pictureInPictureController
+ failedToStartPictureInPictureWithError:(NSError *)error API_AVAILABLE(ios(15.0))
+{
+    (void)pictureInPictureController;
+    Log(LOG_E, @"Picture in Picture failed to start: %@", error);
+    _pictureInPictureActive = NO;
+    _pictureInPictureStartingForBackground = NO;
+
+    if ([UIApplication sharedApplication].applicationState == UIApplicationStateBackground) {
+        [self returnToMainFrame];
+    }
+}
+
+- (void)pictureInPictureControllerWillStopPictureInPicture:(AVPictureInPictureController *)pictureInPictureController API_AVAILABLE(ios(15.0))
+{
+    (void)pictureInPictureController;
+    _pictureInPictureStartingForBackground = NO;
+}
+
+- (void)pictureInPictureControllerDidStopPictureInPicture:(AVPictureInPictureController *)pictureInPictureController API_AVAILABLE(ios(15.0))
+{
+    (void)pictureInPictureController;
+    _pictureInPictureActive = NO;
+    _pictureInPictureStartingForBackground = NO;
+
+    if ([UIApplication sharedApplication].applicationState == UIApplicationStateBackground) {
+        [self returnToMainFrame];
+    }
+}
+
+- (void)observeValueForKeyPath:(NSString *)keyPath
+                      ofObject:(id)object
+                        change:(NSDictionary<NSKeyValueChangeKey,id> *)change
+                       context:(void *)context
+{
+    (void)change;
+    (void)context;
+
+#if !TARGET_OS_TV
+    if (@available(iOS 15.0, *)) {
+        if (object == _pictureInPictureController &&
+            [keyPath isEqualToString:@"pictureInPicturePossible"]) {
+            return;
+        }
+    }
+#endif
+
+    [super observeValueForKeyPath:keyPath ofObject:object change:change context:context];
+}
+
+- (void)pictureInPictureController:(AVPictureInPictureController *)pictureInPictureController
+restoreUserInterfaceForPictureInPictureStopWithCompletionHandler:(void (^)(BOOL restored))completionHandler API_AVAILABLE(ios(15.0))
+{
+    (void)pictureInPictureController;
+    completionHandler(YES);
+}
+
+- (CMTimeRange)pictureInPictureControllerTimeRangeForPlayback:(AVPictureInPictureController *)pictureInPictureController API_AVAILABLE(ios(15.0))
+{
+    (void)pictureInPictureController;
+    return CMTimeRangeMake(kCMTimeZero, kCMTimePositiveInfinity);
+}
+
+- (BOOL)pictureInPictureControllerIsPlaybackPaused:(AVPictureInPictureController *)pictureInPictureController API_AVAILABLE(ios(15.0))
+{
+    (void)pictureInPictureController;
+    return NO;
+}
+
+- (void)pictureInPictureController:(AVPictureInPictureController *)pictureInPictureController
+                        setPlaying:(BOOL)playing API_AVAILABLE(ios(15.0))
+{
+    (void)pictureInPictureController;
+    (void)playing;
+}
+
+- (void)pictureInPictureController:(AVPictureInPictureController *)pictureInPictureController
+          didTransitionToRenderSize:(CMVideoDimensions)newRenderSize API_AVAILABLE(ios(15.0))
+{
+    (void)pictureInPictureController;
+    (void)newRenderSize;
+}
+
+- (void)pictureInPictureController:(AVPictureInPictureController *)pictureInPictureController
+                    skipByInterval:(CMTime)skipInterval
+                 completionHandler:(void (^)(void))completionHandler API_AVAILABLE(ios(15.0))
+{
+    (void)pictureInPictureController;
+    (void)skipInterval;
+    completionHandler();
+}
+#endif
 
 @end

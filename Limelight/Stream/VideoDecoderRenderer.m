@@ -194,6 +194,11 @@ int DrSubmitDecodeUnit(PDECODE_UNIT decodeUnit);
     [_displayLink invalidate];
 }
 
+- (AVSampleBufferDisplayLayer *)pictureInPictureDisplayLayer
+{
+    return displayLayer;
+}
+
 #define NALU_START_PREFIX_SIZE 3
 #define NAL_LENGTH_PREFIX_SIZE 4
 

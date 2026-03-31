@@ -21,6 +21,7 @@ final class MainFrameHostActionSheetItem: NSObject {
 
 @available(iOS 13.0, *)
 private struct MainFrameHostActionSheetRootView: View {
+    @Environment(\.colorScheme) private var colorScheme
     let title: String
     let subtitle: String
     let items: [MainFrameHostActionSheetItem]
@@ -36,7 +37,7 @@ private struct MainFrameHostActionSheetRootView: View {
 
                 VStack(spacing: 0) {
                     Capsule()
-                        .fill(Color.black.opacity(0.14))
+                        .fill(colorScheme == .dark ? Color.white.opacity(0.18) : Color.black.opacity(0.14))
                         .frame(width: 44, height: 5)
                         .padding(.top, 10)
                         .padding(.bottom, 18)
@@ -44,13 +45,13 @@ private struct MainFrameHostActionSheetRootView: View {
                     VStack(spacing: 6) {
                         Text(title)
                             .font(.system(size: 20, weight: .bold))
-                            .foregroundColor(.primary)
+                            .foregroundColor(colorScheme == .dark ? Color.white.opacity(0.96) : .primary)
                             .multilineTextAlignment(.center)
 
                         if !subtitle.isEmpty {
                             Text(subtitle)
                                 .font(.system(size: 14, weight: .medium))
-                                .foregroundColor(.secondary)
+                                .foregroundColor(colorScheme == .dark ? Color.white.opacity(0.70) : .secondary)
                                 .multilineTextAlignment(.center)
                         }
                     }
@@ -67,12 +68,12 @@ private struct MainFrameHostActionSheetRootView: View {
                                         VStack(alignment: .leading, spacing: item.subtitle.isEmpty ? 0 : 4) {
                                             Text(item.title)
                                                 .font(.system(size: 17, weight: .semibold))
-                                                .foregroundColor(item.destructive ? Color(red: 0.78, green: 0.18, blue: 0.14) : .primary)
+                                                .foregroundColor(item.destructive ? (colorScheme == .dark ? Color(red: 1.0, green: 0.48, blue: 0.42) : Color(red: 0.78, green: 0.18, blue: 0.14)) : (colorScheme == .dark ? Color.white.opacity(0.95) : .primary))
 
                                             if !item.subtitle.isEmpty {
                                                 Text(item.subtitle)
                                                     .font(.system(size: 13, weight: .medium))
-                                                    .foregroundColor(.secondary)
+                                                    .foregroundColor(colorScheme == .dark ? Color.white.opacity(0.68) : .secondary)
                                             }
                                         }
 
@@ -80,13 +81,17 @@ private struct MainFrameHostActionSheetRootView: View {
 
                                         Image(systemName: "chevron.right")
                                             .font(.system(size: 13, weight: .semibold))
-                                            .foregroundColor(Color.black.opacity(0.22))
+                                            .foregroundColor(colorScheme == .dark ? Color.white.opacity(0.24) : Color.black.opacity(0.22))
                                     }
                                     .padding(.horizontal, 16)
                                     .padding(.vertical, 16)
                                     .background(
                                         RoundedRectangle(cornerRadius: 18, style: .continuous)
-                                            .fill(Color.white.opacity(0.94))
+                                            .fill(colorScheme == .dark ? Color.white.opacity(0.08) : Color.white.opacity(0.94))
+                                    )
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: 18, style: .continuous)
+                                            .stroke(colorScheme == .dark ? Color.white.opacity(0.10) : Color.clear, lineWidth: 1)
                                     )
                                 }
                                 .buttonStyle(PlainButtonStyle())
@@ -100,12 +105,16 @@ private struct MainFrameHostActionSheetRootView: View {
                     Button(action: onCancel) {
                         Text(MainFrameHostActionLocalized("common.cancel"))
                             .font(.system(size: 17, weight: .semibold))
-                            .foregroundColor(.primary)
+                            .foregroundColor(colorScheme == .dark ? Color.white.opacity(0.95) : .primary)
                             .frame(maxWidth: .infinity)
                             .padding(.vertical, 16)
                             .background(
                                 RoundedRectangle(cornerRadius: 18, style: .continuous)
-                                    .fill(Color.white.opacity(0.96))
+                                    .fill(colorScheme == .dark ? Color.white.opacity(0.10) : Color.white.opacity(0.96))
+                            )
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 18, style: .continuous)
+                                    .stroke(colorScheme == .dark ? Color.white.opacity(0.10) : Color.clear, lineWidth: 1)
                             )
                     }
                     .buttonStyle(PlainButtonStyle())
@@ -116,15 +125,19 @@ private struct MainFrameHostActionSheetRootView: View {
                 .background(
                     LinearGradient(
                         gradient: Gradient(colors: [
-                            Color(red: 0.97, green: 0.94, blue: 1.0),
-                            Color(red: 0.90, green: 0.85, blue: 0.99)
+                            colorScheme == .dark ? Color(red: 0.15, green: 0.13, blue: 0.22) : Color(red: 0.97, green: 0.94, blue: 1.0),
+                            colorScheme == .dark ? Color(red: 0.22, green: 0.19, blue: 0.31) : Color(red: 0.90, green: 0.85, blue: 0.99)
                         ]),
                         startPoint: .topLeading,
                         endPoint: .bottomTrailing
                     )
                 )
                 .clipShape(RoundedRectangle(cornerRadius: 28, style: .continuous))
-                .shadow(color: .black.opacity(0.18), radius: 18, x: 0, y: -2)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 28, style: .continuous)
+                        .stroke(colorScheme == .dark ? Color.white.opacity(0.10) : Color.clear, lineWidth: 1)
+                )
+                .shadow(color: .black.opacity(colorScheme == .dark ? 0.34 : 0.18), radius: 18, x: 0, y: -2)
                 .padding(.horizontal, 12)
                 .padding(.bottom, 8)
             }

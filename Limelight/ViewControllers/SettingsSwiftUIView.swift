@@ -1,6 +1,7 @@
 import UIKit
 #if canImport(SwiftUI)
 import SwiftUI
+import VideoToolbox
 
 private func SettingsLocalized(_ key: String) -> String {
     NSLocalizedString(key, comment: "")
@@ -49,8 +50,14 @@ final class SettingsFormSnapshot: NSObject {
     var rendererSelection: Int = 0
     var supportsMetalRenderer: Bool = false
     var supportsMetalFx: Bool = false
+    var supportsPictureInPicture: Bool = false
     var metalFxScalingSelection: Int = 0
     var metalFxSharpenSelection: Int = 1
+    var metalFxColorModeSelection: Int = 0
+    var pictureInPictureEnabled: Bool = false
+    var streamOrientationSelection: Int = 0
+    var gameMenuShortcutSelection: Int = 0
+    var longPressStartForGameMenuEnabled: Bool = false
     var statsOverlay: Bool = false
     var rumbleModeSelection: Int = 0
     var externalMonitor: Bool = false
@@ -116,8 +123,14 @@ private final class SettingsFormViewModel: ObservableObject {
     @Published var rendererSelection: Int = 0
     @Published var supportsMetalRenderer: Bool = false
     @Published var supportsMetalFx: Bool = false
+    @Published var supportsPictureInPicture: Bool = false
     @Published var metalFxScalingSelection: Int = 0
     @Published var metalFxSharpenSelection: Int = 1
+    @Published var metalFxColorModeSelection: Int = 0
+    @Published var pictureInPictureEnabled: Bool = false
+    @Published var streamOrientationSelection: Int = 0
+    @Published var gameMenuShortcutSelection: Int = 0
+    @Published var longPressStartForGameMenuEnabled: Bool = false
     @Published var statsOverlay: Bool = false
     @Published var rumbleModeSelection: Int = 0
     @Published var externalMonitor: Bool = false
@@ -175,8 +188,14 @@ private final class SettingsFormViewModel: ObservableObject {
         rendererSelection = snapshot.rendererSelection
         supportsMetalRenderer = snapshot.supportsMetalRenderer
         supportsMetalFx = snapshot.supportsMetalFx
+        supportsPictureInPicture = snapshot.supportsPictureInPicture
         metalFxScalingSelection = snapshot.metalFxScalingSelection
         metalFxSharpenSelection = snapshot.metalFxSharpenSelection
+        metalFxColorModeSelection = snapshot.metalFxColorModeSelection
+        pictureInPictureEnabled = snapshot.pictureInPictureEnabled
+        streamOrientationSelection = snapshot.streamOrientationSelection
+        gameMenuShortcutSelection = snapshot.gameMenuShortcutSelection
+        longPressStartForGameMenuEnabled = snapshot.longPressStartForGameMenuEnabled
         statsOverlay = snapshot.statsOverlay
         rumbleModeSelection = snapshot.rumbleModeSelection
         externalMonitor = snapshot.externalMonitor
@@ -230,8 +249,14 @@ private final class SettingsFormViewModel: ObservableObject {
         snapshot.rendererSelection = rendererSelection
         snapshot.supportsMetalRenderer = supportsMetalRenderer
         snapshot.supportsMetalFx = supportsMetalFx
+        snapshot.supportsPictureInPicture = supportsPictureInPicture
         snapshot.metalFxScalingSelection = metalFxScalingSelection
         snapshot.metalFxSharpenSelection = metalFxSharpenSelection
+        snapshot.metalFxColorModeSelection = metalFxColorModeSelection
+        snapshot.pictureInPictureEnabled = pictureInPictureEnabled
+        snapshot.streamOrientationSelection = streamOrientationSelection
+        snapshot.gameMenuShortcutSelection = gameMenuShortcutSelection
+        snapshot.longPressStartForGameMenuEnabled = longPressStartForGameMenuEnabled
         snapshot.statsOverlay = statsOverlay
         snapshot.rumbleModeSelection = rumbleModeSelection
         snapshot.externalMonitor = externalMonitor
@@ -348,12 +373,20 @@ private final class SettingsFormViewModel: ObservableObject {
 
 @available(iOS 13.0, *)
 private struct SettingsPurpleBackground: View {
+    @Environment(\.colorScheme) private var colorScheme
+
     var body: some View {
         LinearGradient(
             gradient: Gradient(colors: [
-                Color(red: 0.95, green: 0.89, blue: 0.99),
-                Color(red: 0.86, green: 0.78, blue: 0.98),
-                Color(red: 0.70, green: 0.63, blue: 0.93)
+                colorScheme == .dark
+                    ? Color(red: 0.14, green: 0.12, blue: 0.20)
+                    : Color(red: 0.95, green: 0.89, blue: 0.99),
+                colorScheme == .dark
+                    ? Color(red: 0.18, green: 0.15, blue: 0.27)
+                    : Color(red: 0.86, green: 0.78, blue: 0.98),
+                colorScheme == .dark
+                    ? Color(red: 0.26, green: 0.22, blue: 0.39)
+                    : Color(red: 0.70, green: 0.63, blue: 0.93)
             ]),
             startPoint: .topLeading,
             endPoint: .bottomTrailing
@@ -435,6 +468,7 @@ private struct ChoiceSectionRow: View {
     let isDisabled: (Int) -> Bool
 
     @State private var isPresentingSelectionSheet = false
+    @State private var pendingSelectionIndex: Int?
 
     var body: some View {
         Button(action: {
@@ -460,13 +494,24 @@ private struct ChoiceSectionRow: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(PlainButtonStyle())
-        .sheet(isPresented: $isPresentingSelectionSheet) {
+        .sheet(
+            isPresented: $isPresentingSelectionSheet,
+            onDismiss: {
+                guard let pendingSelectionIndex else { return }
+                self.pendingSelectionIndex = nil
+                DispatchQueue.main.async {
+                    onSelect(pendingSelectionIndex)
+                }
+            }
+        ) {
             ChoiceSelectionSheet(
                 title: title,
                 subtitle: subtitle,
                 options: options,
                 selectedIndex: selectedIndex,
-                onSelect: onSelect,
+                onSelect: { index in
+                    pendingSelectionIndex = index
+                },
                 isDisabled: isDisabled
             )
         }
@@ -474,10 +519,229 @@ private struct ChoiceSectionRow: View {
 }
 
 @available(iOS 13.0, *)
+private struct CustomResolutionSheet: View {
+    @Environment(\.presentationMode) private var presentationMode
+    @Environment(\.colorScheme) private var colorScheme
+
+    @Binding var widthText: String
+    @Binding var heightText: String
+    let currentResolutionLabel: String
+    let maxDimension: Int
+    let onApply: (Int, Int) -> Void
+
+    private var parsedWidth: Int? {
+        Int(widthText.trimmingCharacters(in: .whitespacesAndNewlines))
+    }
+
+    private var parsedHeight: Int? {
+        Int(heightText.trimmingCharacters(in: .whitespacesAndNewlines))
+    }
+
+    private var canApply: Bool {
+        guard let parsedWidth, let parsedHeight else {
+            return false
+        }
+        return parsedWidth > 0 && parsedHeight > 0
+    }
+
+    private var titleColor: Color {
+        colorScheme == .dark
+            ? Color(red: 0.95, green: 0.92, blue: 1.00)
+            : Color(red: 0.20, green: 0.15, blue: 0.31)
+    }
+
+    private var subtitleColor: Color {
+        colorScheme == .dark
+            ? Color(red: 0.78, green: 0.74, blue: 0.88)
+            : Color(red: 0.36, green: 0.31, blue: 0.47)
+    }
+
+    private var accentLabelColor: Color {
+        colorScheme == .dark
+            ? Color(red: 0.78, green: 0.70, blue: 0.96)
+            : Color(red: 0.42, green: 0.36, blue: 0.54)
+    }
+
+    private var cardFillColor: Color {
+        colorScheme == .dark ? Color.white.opacity(0.08) : Color.white.opacity(0.72)
+    }
+
+    private var noteCardFillColor: Color {
+        colorScheme == .dark ? Color.white.opacity(0.06) : Color.white.opacity(0.68)
+    }
+
+    private var cardStrokeColor: Color {
+        colorScheme == .dark ? Color.white.opacity(0.12) : Color.white.opacity(0.55)
+    }
+
+    private var textFieldFillColor: Color {
+        colorScheme == .dark
+            ? Color(red: 0.17, green: 0.15, blue: 0.24)
+            : Color.white.opacity(0.94)
+    }
+
+    private var textFieldStrokeColor: Color {
+        colorScheme == .dark
+            ? Color(red: 0.43, green: 0.37, blue: 0.58)
+            : Color(red: 0.79, green: 0.73, blue: 0.90)
+    }
+
+    private var cardShadowColor: Color {
+        colorScheme == .dark ? Color.black.opacity(0.28) : Color.black.opacity(0.06)
+    }
+
+    var body: some View {
+        NavigationView {
+            ZStack {
+                SettingsPurpleBackground()
+
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 18) {
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text(SettingsLocalized("settings.custom_resolution.alert_title"))
+                                .font(.system(size: 26, weight: .bold))
+                                .foregroundColor(titleColor)
+
+                            Text(SettingsLocalized("settings.custom_resolution.subtitle"))
+                                .font(.subheadline)
+                                .foregroundColor(subtitleColor)
+                        }
+
+                        VStack(alignment: .leading, spacing: 12) {
+                            Text(SettingsLocalized("settings.custom_resolution.current"))
+                                .font(.caption.weight(.semibold))
+                                .foregroundColor(accentLabelColor)
+
+                            Text(currentResolutionLabel)
+                                .font(.system(size: 28, weight: .heavy, design: .rounded))
+                                .foregroundColor(titleColor)
+
+                            Text(SettingsLocalizedFormat("settings.custom_resolution.range", maxDimension))
+                                .font(.footnote)
+                                .foregroundColor(.secondary)
+                        }
+                        .padding(18)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .background(
+                            RoundedRectangle(cornerRadius: 20, style: .continuous)
+                                .fill(cardFillColor)
+                        )
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 20, style: .continuous)
+                                .stroke(cardStrokeColor, lineWidth: 1)
+                        )
+                        .shadow(color: cardShadowColor, radius: 12, x: 0, y: 6)
+
+                        HStack(alignment: .top, spacing: 12) {
+                            resolutionField(
+                                title: SettingsLocalized("settings.custom_resolution.width_label"),
+                                placeholder: SettingsLocalized("settings.custom_resolution.width_placeholder"),
+                                text: $widthText
+                            )
+
+                            resolutionField(
+                                title: SettingsLocalized("settings.custom_resolution.height_label"),
+                                placeholder: SettingsLocalized("settings.custom_resolution.height_placeholder"),
+                                text: $heightText
+                            )
+                        }
+
+                        VStack(alignment: .leading, spacing: 10) {
+                            HStack(spacing: 8) {
+                                Image(systemName: "info.circle.fill")
+                                Text(SettingsLocalized("settings.custom_resolution.note_title"))
+                            }
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundColor(accentLabelColor)
+
+                            Text(SettingsLocalized("settings.custom_resolution.note_body"))
+                                .font(.footnote)
+                                .foregroundColor(.secondary)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                        .padding(18)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .background(
+                            RoundedRectangle(cornerRadius: 20, style: .continuous)
+                                .fill(noteCardFillColor)
+                        )
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 20, style: .continuous)
+                                .stroke(cardStrokeColor, lineWidth: 1)
+                        )
+                        .shadow(color: cardShadowColor, radius: 12, x: 0, y: 6)
+                    }
+                    .padding(.horizontal, 18)
+                    .padding(.vertical, 20)
+                }
+            }
+            .navigationBarTitle(Text(SettingsLocalized("settings.custom_resolution.alert_title")), displayMode: .inline)
+            .navigationBarItems(
+                leading: Button(SettingsLocalized("common.cancel")) {
+                    presentationMode.wrappedValue.dismiss()
+                },
+                trailing: Button(SettingsLocalized("common.done")) {
+                    guard let parsedWidth, let parsedHeight else { return }
+                    let clampedWidth = min(max(parsedWidth, 256), maxDimension)
+                    let clampedHeight = min(max(parsedHeight, 256), maxDimension)
+                    onApply(clampedWidth, clampedHeight)
+                    presentationMode.wrappedValue.dismiss()
+                }
+                .disabled(!canApply)
+            )
+        }
+    }
+
+    private func resolutionField(title: String, placeholder: String, text: Binding<String>) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text(title)
+                .font(.caption.weight(.semibold))
+                .foregroundColor(accentLabelColor)
+
+            TextField(placeholder, text: text)
+                .keyboardType(.numberPad)
+                .padding(.horizontal, 14)
+                .padding(.vertical, 12)
+                .foregroundColor(titleColor)
+                .background(
+                    RoundedRectangle(cornerRadius: 16, style: .continuous)
+                        .fill(textFieldFillColor)
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 16, style: .continuous)
+                        .stroke(textFieldStrokeColor, lineWidth: 1)
+                )
+                .font(.system(size: 18, weight: .semibold, design: .rounded))
+        }
+        .padding(16)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(
+            RoundedRectangle(cornerRadius: 20, style: .continuous)
+                .fill(cardFillColor)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 20, style: .continuous)
+                .stroke(cardStrokeColor, lineWidth: 1)
+        )
+        .shadow(color: cardShadowColor, radius: 12, x: 0, y: 6)
+    }
+}
+
+@available(iOS 13.0, *)
 private struct SettingsRootView: View {
     @ObservedObject var model: SettingsFormViewModel
-    let requestCustomResolution: () -> Void
     let openExternalURL: (String) -> Void
+
+    @State private var isPresentingCustomResolutionSheet = false
+    @State private var customResolutionWidthText = ""
+    @State private var customResolutionHeightText = ""
+
+    private var maxCustomResolutionDimension: Int {
+        if #available(iOS 11.0, tvOS 11.0, *), VTIsHardwareDecodeSupported(kCMVideoCodecType_HEVC) {
+            return 8192
+        }
+        return 4096
+    }
 
     var body: some View {
         ZStack {
@@ -492,7 +756,7 @@ private struct SettingsRootView: View {
                         selectedIndex: model.selectedResolutionIndex
                     ) { index in
                         if index == model.resolutionTitles.count - 1 {
-                            requestCustomResolution()
+                            presentCustomResolutionSheet()
                         } else {
                             model.selectedResolutionIndex = index
                         }
@@ -500,11 +764,6 @@ private struct SettingsRootView: View {
                         index == 5 && !model.isFourKResolutionEnabled
                     }
 
-                    Button(action: {
-                        requestCustomResolution()
-                    }) {
-                        Text(SettingsLocalizedFormat("settings.custom_resolution.button", model.customResolutionLabel))
-                    }
                     segmentedSection(title: SettingsLocalized("settings.framerate.title"), selection: bindingForFramerate(), labels: model.framerateOptions.map { "\($0) FPS" })
 
                     VStack(alignment: .leading, spacing: 8) {
@@ -519,6 +778,7 @@ private struct SettingsRootView: View {
                     if model.supportsMetalRenderer {
                         segmentedSection(
                             title: SettingsLocalized("settings.renderer.title"),
+                            description: SettingsLocalized("settings.renderer.description"),
                             selection: $model.rendererSelection,
                             labels: model.rendererTitles
                         )
@@ -526,12 +786,21 @@ private struct SettingsRootView: View {
                         if model.rendererSelection == 1 && model.supportsMetalFx {
                             segmentedSection(
                                 title: SettingsLocalized("settings.metalfx_scaling.title"),
+                                description: SettingsLocalized("settings.metalfx_scaling.description"),
                                 selection: metalFxScalingSelection(),
                                 labels: model.metalFxScalingTitles
                             )
 
                             segmentedSection(
+                                title: SettingsLocalized("settings.metalfx_color_mode.title"),
+                                description: SettingsLocalized("settings.metalfx_color_mode.description"),
+                                selection: $model.metalFxColorModeSelection,
+                                labels: model.metalFxColorModeTitles
+                            )
+
+                            segmentedSection(
                                 title: SettingsLocalized("settings.metalfx_sharpen.title"),
+                                description: SettingsLocalized("settings.metalfx_sharpen.description"),
                                 selection: $model.metalFxSharpenSelection,
                                 labels: model.metalFxSharpenTitles
                             )
@@ -546,6 +815,12 @@ private struct SettingsRootView: View {
                     }
 
                     segmentedSection(title: SettingsLocalized("settings.frame_pacing.title"), selection: boolSelection($model.useFramePacing), labels: [SettingsLocalized("settings.frame_pacing.low_latency"), SettingsLocalized("settings.frame_pacing.smooth_video")])
+
+                    segmentedSection(
+                        title: SettingsLocalized("settings.stream_orientation.title"),
+                        selection: $model.streamOrientationSelection,
+                        labels: model.streamOrientationTitles
+                    )
 
                     segmentedSection(title: SettingsLocalized("settings.video_alignment.title"), selection: $model.videoAlignmentSelection, labels: model.videoAlignmentTitles)
 
@@ -573,8 +848,12 @@ private struct SettingsRootView: View {
                     Toggle(SettingsLocalized("settings.multi_controller.toggle"), isOn: $model.multiController).font(.headline)
                     Toggle(SettingsLocalized("settings.swap_abxy.toggle"), isOn: $model.swapABXYButtons).font(.headline)
                     Toggle(SettingsLocalized("settings.bt_mouse_support.toggle"), isOn: $model.btMouseSupport).font(.headline)
-                    Toggle(SettingsLocalized("settings.capture_mouse_cursor.toggle"), isOn: $model.captureMouseCursor).font(.headline)
-                    Toggle(SettingsLocalized("settings.remote_mouse_mode.toggle"), isOn: $model.remoteMouseMode).font(.headline)
+                    descriptiveToggle(title: SettingsLocalized("settings.capture_mouse_cursor.toggle"),
+                                      description: SettingsLocalized("settings.capture_mouse_cursor.description"),
+                                      isOn: $model.captureMouseCursor)
+                    descriptiveToggle(title: SettingsLocalized("settings.remote_mouse_mode.toggle"),
+                                      description: SettingsLocalized("settings.remote_mouse_mode.description"),
+                                      isOn: $model.remoteMouseMode)
                     if !model.remoteMouseMode {
                         VStack(alignment: .leading, spacing: 8) {
                             Text(model.relativeMouseSensitivityLabel)
@@ -582,6 +861,15 @@ private struct SettingsRootView: View {
                             Slider(value: $model.relativeMouseSensitivity, in: 50...300, step: 1)
                         }
                     }
+                    segmentedSection(
+                        title: SettingsLocalized("settings.game_menu_shortcut.title"),
+                        description: SettingsLocalized("settings.game_menu_shortcut.description"),
+                        selection: $model.gameMenuShortcutSelection,
+                        labels: model.gameMenuShortcutTitles
+                    )
+                    descriptiveToggle(title: SettingsLocalized("settings.game_menu_start_hold.toggle"),
+                                      description: SettingsLocalized("settings.game_menu_start_hold.description"),
+                                      isOn: $model.longPressStartForGameMenuEnabled)
                 }
 
                 Section(header: Text(SettingsLocalized("settings.section.advanced"))) {
@@ -596,7 +884,14 @@ private struct SettingsRootView: View {
                     Toggle(SettingsLocalized("settings.play_audio_on_pc.toggle"), isOn: $model.playAudioOnPC).font(.headline)
                     Toggle(SettingsLocalized("settings.optimize_games.toggle"), isOn: $model.optimizeGames).font(.headline)
                     Toggle(SettingsLocalized("settings.floating_menu.toggle"), isOn: $model.floatingMenuEnabled).font(.headline)
-                    Toggle(SettingsLocalized("settings.external_monitor.toggle"), isOn: $model.externalMonitor).font(.headline)
+                    if model.supportsPictureInPicture {
+                        descriptiveToggle(title: SettingsLocalized("settings.picture_in_picture.toggle"),
+                                          description: SettingsLocalized("settings.picture_in_picture.description"),
+                                          isOn: $model.pictureInPictureEnabled)
+                    }
+                    descriptiveToggle(title: SettingsLocalized("settings.external_monitor.toggle"),
+                                      description: SettingsLocalized("settings.external_monitor.description"),
+                                      isOn: $model.externalMonitor)
                     Toggle(SettingsLocalized("settings.virtual_display.toggle"), isOn: virtualDisplayToggle()).font(.headline)
                 }
 
@@ -627,7 +922,9 @@ private struct SettingsRootView: View {
                 }
 
                 Section(header: Text(SettingsLocalized("settings.section.performance_overlay"))) {
-                    Toggle(SettingsLocalized("settings.stats_overlay.toggle"), isOn: $model.statsOverlay).font(.headline)
+                    descriptiveToggle(title: SettingsLocalized("settings.stats_overlay.toggle"),
+                                      description: SettingsLocalized("settings.stats_overlay.description"),
+                                      isOn: $model.statsOverlay)
                     choiceSection(
                         title: SettingsLocalized("settings.performance_overlay_position.title"),
                         subtitle: model.performanceOverlayPositionTitle,
@@ -648,6 +945,22 @@ private struct SettingsRootView: View {
                 configureSettingsTableAppearance()
             }
         }
+        .sheet(isPresented: $isPresentingCustomResolutionSheet) {
+            CustomResolutionSheet(
+                widthText: $customResolutionWidthText,
+                heightText: $customResolutionHeightText,
+                currentResolutionLabel: model.customResolutionLabel,
+                maxDimension: maxCustomResolutionDimension
+            ) { width, height in
+                model.updateCustomResolution(width: width, height: height)
+            }
+        }
+    }
+
+    private func presentCustomResolutionSheet() {
+        customResolutionWidthText = model.customResolutionWidth > 0 ? String(model.customResolutionWidth) : ""
+        customResolutionHeightText = model.customResolutionHeight > 0 ? String(model.customResolutionHeight) : ""
+        isPresentingCustomResolutionSheet = true
     }
 
     private func bindingForFramerate() -> Binding<Int> {
@@ -738,16 +1051,35 @@ private struct SettingsRootView: View {
         )
     }
 
-    private func segmentedSection(title: String, selection: Binding<Int>, labels: [String], falseLabelIsEnabled: Bool = false, reverseBoolMeaning: Bool = false) -> some View {
+    private func segmentedSection(title: String, description: String? = nil, selection: Binding<Int>, labels: [String], falseLabelIsEnabled: Bool = false, reverseBoolMeaning: Bool = false) -> some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text(title)
-                .font(.headline)
+            settingHeader(title: title, description: description)
             Picker(title, selection: selection) {
                 ForEach(Array(labels.enumerated()), id: \.offset) { index, label in
                     Text(label).tag(index)
                 }
             }
             .pickerStyle(SegmentedPickerStyle())
+        }
+    }
+
+    @ViewBuilder
+    private func settingHeader(title: String, description: String? = nil) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(title)
+                .font(.headline)
+            if let description, !description.isEmpty {
+                Text(description)
+                    .font(.footnote)
+                    .foregroundColor(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+    }
+
+    private func descriptiveToggle(title: String, description: String, isOn: Binding<Bool>) -> some View {
+        Toggle(isOn: isOn) {
+            settingHeader(title: title, description: description)
         }
     }
 
@@ -828,6 +1160,22 @@ private extension SettingsFormViewModel {
         ]
     }
 
+    var streamOrientationTitles: [String] {
+        [
+            SettingsLocalized("common.auto"),
+            SettingsLocalized("settings.stream_orientation.landscape"),
+            SettingsLocalized("settings.stream_orientation.portrait")
+        ]
+    }
+
+    var gameMenuShortcutTitles: [String] {
+        [
+            SettingsLocalized("settings.game_menu_shortcut.none"),
+            SettingsLocalized("settings.game_menu_shortcut.escape"),
+            SettingsLocalized("settings.game_menu_shortcut.ctrl_alt_shift_q")
+        ]
+    }
+
     var rendererTitle: String {
         guard rendererTitles.indices.contains(rendererSelection) else {
             return SettingsLocalized("settings.renderer.system")
@@ -870,6 +1218,14 @@ private extension SettingsFormViewModel {
             SettingsLocalized("common.off"),
             SettingsLocalized("settings.metalfx_sharpen.standard"),
             SettingsLocalized("settings.metalfx_sharpen.strong")
+        ]
+    }
+
+    var metalFxColorModeTitles: [String] {
+        [
+            SettingsLocalized("settings.metalfx_color_mode.perceptual"),
+            SettingsLocalized("settings.metalfx_color_mode.linear"),
+            SettingsLocalized("settings.metalfx_color_mode.hdr")
         ]
     }
 
@@ -939,7 +1295,6 @@ final class SettingsHostingViewController: UIViewController {
     override func viewDidLoad() {
         super.viewDidLoad()
         view.backgroundColor = .clear
-        overrideUserInterfaceStyle = .light
         installHostingControllerIfNeeded()
     }
 
@@ -961,10 +1316,6 @@ final class SettingsHostingViewController: UIViewController {
     private func installHostingControllerIfNeeded() {
         let rootView = SettingsRootView(
             model: model,
-            requestCustomResolution: { [weak self] in
-                guard let self = self else { return }
-                self.delegate?.settingsHostingViewControllerDidRequestCustomResolution(self)
-            },
             openExternalURL: { [weak self] urlString in
                 guard let self = self else { return }
                 self.delegate?.settingsHostingViewController(self, didRequestOpenExternalURL: urlString)

@@ -18,5 +18,6 @@
 - (NSString*) getStatsOverlayText;
 - (NSString*) getStatsOverlayTextWithExtendedMetrics:(BOOL)showsExtendedMetrics;
 - (NSString*) getBandwidthOverlayText;
+- (id<VideoRendering>)currentRenderer;
 
 @end

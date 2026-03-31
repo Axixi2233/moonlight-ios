@@ -12,16 +12,32 @@ private func AboutLocalizedFormat(_ key: String, _ args: CVarArg...) -> String {
 
 @available(iOS 13.0, *)
 private struct AboutPurpleBackground: View {
+    @Environment(\.colorScheme) private var colorScheme
+
     var body: some View {
-        LinearGradient(
-            gradient: Gradient(colors: [
-                Color(red: 0.95, green: 0.89, blue: 0.99),
-                Color(red: 0.86, green: 0.78, blue: 0.98),
-                Color(red: 0.70, green: 0.63, blue: 0.93)
-            ]),
-            startPoint: .topLeading,
-            endPoint: .bottomTrailing
-        )
+        ZStack {
+            LinearGradient(
+                gradient: Gradient(colors: [
+                    colorScheme == .dark ? Color(red: 0.08, green: 0.08, blue: 0.12) : Color(red: 0.97, green: 0.95, blue: 1.0),
+                    colorScheme == .dark ? Color(red: 0.10, green: 0.09, blue: 0.16) : Color(red: 0.95, green: 0.93, blue: 1.0),
+                    colorScheme == .dark ? Color(red: 0.07, green: 0.07, blue: 0.10) : Color(red: 0.94, green: 0.92, blue: 0.98)
+                ]),
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+
+            Circle()
+                .fill(colorScheme == .dark ? Color(red: 0.46, green: 0.31, blue: 0.82).opacity(0.18) : Color(red: 0.72, green: 0.61, blue: 1.0).opacity(0.24))
+                .frame(width: 240, height: 240)
+                .blur(radius: 20)
+                .offset(x: 110, y: -190)
+
+            Circle()
+                .fill(colorScheme == .dark ? Color(red: 0.18, green: 0.56, blue: 0.82).opacity(0.14) : Color(red: 0.58, green: 0.77, blue: 1.0).opacity(0.18))
+                .frame(width: 190, height: 190)
+                .blur(radius: 22)
+                .offset(x: -130, y: 250)
+        }
         .edgesIgnoringSafeArea(.all)
     }
 }
@@ -37,6 +53,7 @@ private struct AboutLinkItem: Identifiable {
 
 @available(iOS 13.0, *)
 private struct AboutInfoCard: View {
+    @Environment(\.colorScheme) private var colorScheme
     let appName: String
     let subtitle: String
     let versionText: String
@@ -48,22 +65,22 @@ private struct AboutInfoCard: View {
                 .scaledToFill()
                 .frame(width: 78, height: 78)
                 .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
-                .shadow(color: .black.opacity(0.10), radius: 12, x: 0, y: 6)
+                .shadow(color: .black.opacity(colorScheme == .dark ? 0.22 : 0.10), radius: 12, x: 0, y: 6)
                 .padding(.top, 22)
 
             Text(appName)
                 .font(.system(size: 24, weight: .bold))
-                .foregroundColor(Color(red: 0.27, green: 0.20, blue: 0.40))
+                .foregroundColor(colorScheme == .dark ? Color.white.opacity(0.96) : Color(red: 0.27, green: 0.20, blue: 0.40))
                 .padding(.top, 14)
 
             Text(subtitle)
                 .font(.system(size: 13, weight: .medium))
-                .foregroundColor(Color(red: 0.43, green: 0.35, blue: 0.60))
+                .foregroundColor(colorScheme == .dark ? Color.white.opacity(0.68) : Color(red: 0.43, green: 0.35, blue: 0.60))
                 .padding(.top, 8)
 
             Text(versionText)
                 .font(.system(size: 14, weight: .semibold))
-                .foregroundColor(Color(red: 0.36, green: 0.30, blue: 0.50))
+                .foregroundColor(colorScheme == .dark ? Color(red: 0.87, green: 0.82, blue: 1.0) : Color(red: 0.36, green: 0.30, blue: 0.50))
                 .padding(.top, 18)
                 .padding(.bottom, 22)
         }
@@ -73,8 +90,8 @@ private struct AboutInfoCard: View {
                 .fill(
                     LinearGradient(
                         gradient: Gradient(colors: [
-                            Color.white.opacity(0.90),
-                            Color(red: 0.96, green: 0.93, blue: 1.00).opacity(0.80)
+                            colorScheme == .dark ? Color.white.opacity(0.10) : Color.white.opacity(0.90),
+                            colorScheme == .dark ? Color(red: 0.16, green: 0.14, blue: 0.24).opacity(0.92) : Color(red: 0.96, green: 0.93, blue: 1.00).opacity(0.80)
                         ]),
                         startPoint: .topLeading,
                         endPoint: .bottomTrailing
@@ -83,14 +100,15 @@ private struct AboutInfoCard: View {
         )
         .overlay(
             RoundedRectangle(cornerRadius: 24, style: .continuous)
-                .stroke(Color.white.opacity(0.72), lineWidth: 1)
+                .stroke(colorScheme == .dark ? Color.white.opacity(0.10) : Color.white.opacity(0.72), lineWidth: 1)
         )
-        .shadow(color: .black.opacity(0.06), radius: 16, x: 0, y: 8)
+        .shadow(color: .black.opacity(colorScheme == .dark ? 0.24 : 0.06), radius: 16, x: 0, y: 8)
     }
 }
 
 @available(iOS 13.0, *)
 private struct AboutLinkButton: View {
+    @Environment(\.colorScheme) private var colorScheme
     let item: AboutLinkItem
 
     var body: some View {
@@ -100,7 +118,7 @@ private struct AboutLinkButton: View {
         }) {
             ZStack {
                 RoundedRectangle(cornerRadius: 14, style: .continuous)
-                    .fill(Color.white.opacity(0.88))
+                    .fill(colorScheme == .dark ? Color.white.opacity(0.10) : Color.white.opacity(0.88))
 
                 Group {
                     if UIImage(named: item.assetName) != nil {
@@ -111,16 +129,16 @@ private struct AboutLinkButton: View {
                     } else {
                         Image(systemName: item.systemIconName)
                             .font(.system(size: 18, weight: .semibold))
-                            .foregroundColor(Color(red: 0.28, green: 0.22, blue: 0.42))
+                            .foregroundColor(colorScheme == .dark ? Color.white.opacity(0.88) : Color(red: 0.28, green: 0.22, blue: 0.42))
                     }
                 }
             }
             .frame(width: 44, height: 44)
             .overlay(
                 RoundedRectangle(cornerRadius: 14, style: .continuous)
-                    .stroke(Color.white.opacity(0.68), lineWidth: 1)
+                    .stroke(colorScheme == .dark ? Color.white.opacity(0.10) : Color.white.opacity(0.68), lineWidth: 1)
             )
-            .shadow(color: .black.opacity(0.05), radius: 8, x: 0, y: 4)
+            .shadow(color: .black.opacity(colorScheme == .dark ? 0.16 : 0.05), radius: 8, x: 0, y: 4)
         }
         .buttonStyle(PlainButtonStyle())
     }
@@ -142,6 +160,7 @@ private struct AboutPlatformRow: View {
 
 @available(iOS 13.0, *)
 private struct AboutActionCard: View {
+    @Environment(\.colorScheme) private var colorScheme
     let title: String
     let subtitle: String
     let iconName: String
@@ -152,40 +171,40 @@ private struct AboutActionCard: View {
             HStack(spacing: 14) {
                 ZStack {
                     RoundedRectangle(cornerRadius: 16, style: .continuous)
-                        .fill(Color.white.opacity(0.84))
+                        .fill(colorScheme == .dark ? Color.white.opacity(0.10) : Color.white.opacity(0.84))
                         .frame(width: 52, height: 52)
 
                     Image(systemName: iconName)
                         .font(.system(size: 20, weight: .semibold))
-                        .foregroundColor(Color(red: 0.31, green: 0.23, blue: 0.46))
+                        .foregroundColor(colorScheme == .dark ? Color(red: 0.88, green: 0.82, blue: 1.0) : Color(red: 0.31, green: 0.23, blue: 0.46))
                 }
 
                 VStack(alignment: .leading, spacing: 4) {
                     Text(title)
                         .font(.system(size: 16, weight: .semibold))
-                        .foregroundColor(Color(red: 0.28, green: 0.22, blue: 0.42))
+                        .foregroundColor(colorScheme == .dark ? Color.white.opacity(0.94) : Color(red: 0.28, green: 0.22, blue: 0.42))
 
                     Text(subtitle)
                         .font(.system(size: 12, weight: .medium))
-                        .foregroundColor(Color(red: 0.43, green: 0.35, blue: 0.60))
+                        .foregroundColor(colorScheme == .dark ? Color.white.opacity(0.68) : Color(red: 0.43, green: 0.35, blue: 0.60))
                 }
 
                 Spacer()
 
                 Image(systemName: "chevron.right")
                     .font(.system(size: 13, weight: .semibold))
-                    .foregroundColor(Color.black.opacity(0.22))
+                    .foregroundColor(colorScheme == .dark ? Color.white.opacity(0.24) : Color.black.opacity(0.22))
             }
             .padding(18)
             .background(
                 RoundedRectangle(cornerRadius: 24, style: .continuous)
-                    .fill(Color.white.opacity(0.76))
+                    .fill(colorScheme == .dark ? Color.white.opacity(0.08) : Color.white.opacity(0.76))
             )
             .overlay(
                 RoundedRectangle(cornerRadius: 24, style: .continuous)
-                    .stroke(Color.white.opacity(0.62), lineWidth: 1)
+                    .stroke(colorScheme == .dark ? Color.white.opacity(0.10) : Color.white.opacity(0.62), lineWidth: 1)
             )
-            .shadow(color: .black.opacity(0.05), radius: 14, x: 0, y: 8)
+            .shadow(color: .black.opacity(colorScheme == .dark ? 0.24 : 0.05), radius: 14, x: 0, y: 8)
         }
         .buttonStyle(PlainButtonStyle())
     }
@@ -194,6 +213,7 @@ private struct AboutActionCard: View {
 
 @available(iOS 13.0, *)
 private struct AboutRootView: View {
+    @Environment(\.colorScheme) private var colorScheme
     let requestGamepadTest: () -> Void
     let requestCredits: () -> Void
 
@@ -253,7 +273,7 @@ private struct AboutRootView: View {
                     VStack(alignment: .leading, spacing: 14) {
                         Text(AboutLocalized("about.find_developer"))
                             .font(.system(size: 14, weight: .semibold))
-                            .foregroundColor(Color(red: 0.35, green: 0.29, blue: 0.50))
+                            .foregroundColor(colorScheme == .dark ? Color.white.opacity(0.74) : Color(red: 0.35, green: 0.29, blue: 0.50))
 
                         AboutPlatformRow(items: links)
                     }
@@ -261,13 +281,13 @@ private struct AboutRootView: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .background(
                         RoundedRectangle(cornerRadius: 24, style: .continuous)
-                            .fill(Color.white.opacity(0.76))
+                            .fill(colorScheme == .dark ? Color.white.opacity(0.08) : Color.white.opacity(0.76))
                     )
                     .overlay(
                         RoundedRectangle(cornerRadius: 24, style: .continuous)
-                            .stroke(Color.white.opacity(0.62), lineWidth: 1)
+                            .stroke(colorScheme == .dark ? Color.white.opacity(0.10) : Color.white.opacity(0.62), lineWidth: 1)
                     )
-                    .shadow(color: .black.opacity(0.05), radius: 14, x: 0, y: 8)
+                    .shadow(color: .black.opacity(colorScheme == .dark ? 0.24 : 0.05), radius: 14, x: 0, y: 8)
                 }
                 .padding(.horizontal, 18)
                 .padding(.top, 18)
@@ -329,7 +349,8 @@ final class AboutHostingViewController: UIViewController {
         let navigationBar = navigationController?.navigationBar
         guard let navigationBar else { return }
 
-        let accentColor = UIColor(red: 0.31, green: 0.23, blue: 0.46, alpha: 1.0)
+        let darkMode = traitCollection.userInterfaceStyle == .dark
+        let accentColor = darkMode ? UIColor(red: 0.90, green: 0.85, blue: 0.99, alpha: 1.0) : UIColor(red: 0.31, green: 0.23, blue: 0.46, alpha: 1.0)
         let titleAttributes: [NSAttributedString.Key: Any] = [
             .foregroundColor: accentColor,
             .font: UIFont.systemFont(ofSize: 17.0, weight: .semibold)
@@ -341,21 +362,25 @@ final class AboutHostingViewController: UIViewController {
         let appearance = UINavigationBarAppearance()
         appearance.titleTextAttributes = titleAttributes
 
-        if #available(iOS 26.0, *) {
-            appearance.configureWithTransparentBackground()
-            appearance.backgroundColor = .clear
-            appearance.shadowColor = .clear
-        } else {
-            appearance.configureWithOpaqueBackground()
-            appearance.backgroundColor = UIColor(red: 0.98, green: 0.96, blue: 1.0, alpha: 0.96)
-            appearance.shadowColor = UIColor(red: 0.73, green: 0.69, blue: 0.82, alpha: 0.22)
-        }
+        appearance.configureWithTransparentBackground()
+        appearance.backgroundColor = .clear
+        appearance.shadowColor = .clear
 
         navigationBar.standardAppearance = appearance
         navigationBar.compactAppearance = appearance
         navigationBar.scrollEdgeAppearance = appearance
         if #available(iOS 15.0, *) {
             navigationBar.compactScrollEdgeAppearance = appearance
+        }
+        navigationBar.isTranslucent = true
+    }
+
+    override func traitCollectionDidChange(_ previousTraitCollection: UITraitCollection?) {
+        super.traitCollectionDidChange(previousTraitCollection)
+
+        if let previousTraitCollection,
+           traitCollection.hasDifferentColorAppearance(comparedTo: previousTraitCollection) {
+            applyNavigationBarAppearance()
         }
     }
 }

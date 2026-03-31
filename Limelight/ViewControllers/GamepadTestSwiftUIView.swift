@@ -1094,22 +1094,39 @@ private final class GamepadTestViewModel: NSObject, ObservableObject {
 
 @available(iOS 13.0, *)
 private struct GamepadTestBackground: View {
+    @Environment(\.colorScheme) private var colorScheme
+
     var body: some View {
-        LinearGradient(
-            gradient: Gradient(colors: [
-                Color(red: 0.95, green: 0.89, blue: 0.99),
-                Color(red: 0.86, green: 0.78, blue: 0.98),
-                Color(red: 0.70, green: 0.63, blue: 0.93)
-            ]),
-            startPoint: .topLeading,
-            endPoint: .bottomTrailing
-        )
+        ZStack {
+            LinearGradient(
+                gradient: Gradient(colors: [
+                    colorScheme == .dark ? Color(red: 0.08, green: 0.08, blue: 0.12) : Color(red: 0.97, green: 0.95, blue: 1.0),
+                    colorScheme == .dark ? Color(red: 0.10, green: 0.09, blue: 0.16) : Color(red: 0.95, green: 0.93, blue: 1.0),
+                    colorScheme == .dark ? Color(red: 0.07, green: 0.07, blue: 0.10) : Color(red: 0.94, green: 0.92, blue: 0.98)
+                ]),
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+
+            Circle()
+                .fill(colorScheme == .dark ? Color(red: 0.46, green: 0.31, blue: 0.82).opacity(0.18) : Color(red: 0.72, green: 0.61, blue: 1.0).opacity(0.24))
+                .frame(width: 260, height: 260)
+                .blur(radius: 20)
+                .offset(x: 120, y: -200)
+
+            Circle()
+                .fill(colorScheme == .dark ? Color(red: 0.18, green: 0.56, blue: 0.82).opacity(0.14) : Color(red: 0.58, green: 0.77, blue: 1.0).opacity(0.18))
+                .frame(width: 210, height: 210)
+                .blur(radius: 24)
+                .offset(x: -140, y: 290)
+        }
         .edgesIgnoringSafeArea(.all)
     }
 }
 
 @available(iOS 13.0, *)
 private struct GamepadCard<Content: View>: View {
+    @Environment(\.colorScheme) private var colorScheme
     let content: Content
 
     init(@ViewBuilder content: () -> Content) {
@@ -1121,18 +1138,19 @@ private struct GamepadCard<Content: View>: View {
             .padding(14)
             .background(
                 RoundedRectangle(cornerRadius: 24, style: .continuous)
-                    .fill(Color.white.opacity(0.80))
+                    .fill(colorScheme == .dark ? Color.white.opacity(0.08) : Color.white.opacity(0.80))
             )
             .overlay(
                 RoundedRectangle(cornerRadius: 24, style: .continuous)
-                    .stroke(Color.white.opacity(0.68), lineWidth: 1)
+                    .stroke(colorScheme == .dark ? Color.white.opacity(0.10) : Color.white.opacity(0.68), lineWidth: 1)
             )
-            .shadow(color: .black.opacity(0.05), radius: 14, x: 0, y: 8)
+            .shadow(color: .black.opacity(colorScheme == .dark ? 0.24 : 0.05), radius: 14, x: 0, y: 8)
     }
 }
 
 @available(iOS 13.0, *)
 private struct GamepadStatusCard: View {
+    @Environment(\.colorScheme) private var colorScheme
     let title: String
     let subtitle: String
 
@@ -1141,11 +1159,11 @@ private struct GamepadStatusCard: View {
             VStack(alignment: .leading, spacing: 6) {
                 Text(title)
                     .font(.system(size: 20, weight: .bold))
-                    .foregroundColor(Color(red: 0.27, green: 0.20, blue: 0.40))
+                    .foregroundColor(colorScheme == .dark ? Color.white.opacity(0.96) : Color(red: 0.27, green: 0.20, blue: 0.40))
 
                 Text(subtitle)
                     .font(.system(size: 12, weight: .medium))
-                    .foregroundColor(Color(red: 0.42, green: 0.35, blue: 0.58))
+                    .foregroundColor(colorScheme == .dark ? Color.white.opacity(0.68) : Color(red: 0.42, green: 0.35, blue: 0.58))
             }
             .frame(maxWidth: .infinity, alignment: .leading)
         }
@@ -1154,6 +1172,7 @@ private struct GamepadStatusCard: View {
 
 @available(iOS 13.0, *)
 private struct GamepadInfoRow: View {
+    @Environment(\.colorScheme) private var colorScheme
     let title: String
     let value: String
 
@@ -1161,11 +1180,11 @@ private struct GamepadInfoRow: View {
         HStack(spacing: 12) {
             Text(title)
                 .font(.system(size: 13, weight: .semibold))
-                .foregroundColor(Color(red: 0.36, green: 0.29, blue: 0.50))
+                .foregroundColor(colorScheme == .dark ? Color.white.opacity(0.72) : Color(red: 0.36, green: 0.29, blue: 0.50))
             Spacer(minLength: 8)
             Text(value)
                 .font(.system(size: 13, weight: .medium))
-                .foregroundColor(Color(red: 0.26, green: 0.21, blue: 0.39))
+                .foregroundColor(colorScheme == .dark ? Color.white.opacity(0.94) : Color(red: 0.26, green: 0.21, blue: 0.39))
                 .multilineTextAlignment(.trailing)
         }
     }
@@ -1173,6 +1192,7 @@ private struct GamepadInfoRow: View {
 
 @available(iOS 13.0, *)
 private struct GamepadDeviceInfoCard: View {
+    @Environment(\.colorScheme) private var colorScheme
     let vendor: String
     let profile: String
     let playerIndex: String
@@ -1187,7 +1207,7 @@ private struct GamepadDeviceInfoCard: View {
             VStack(alignment: .leading, spacing: 10) {
                 Text(GamepadLocalized("gamepad.card.device_info"))
                     .font(.system(size: 16, weight: .bold))
-                    .foregroundColor(Color(red: 0.29, green: 0.22, blue: 0.42))
+                    .foregroundColor(colorScheme == .dark ? Color.white.opacity(0.94) : Color(red: 0.29, green: 0.22, blue: 0.42))
 
                 GamepadInfoRow(title: GamepadLocalized("gamepad.info.name"), value: vendor)
                 GamepadInfoRow(title: GamepadLocalized("gamepad.info.profile"), value: profile)
@@ -1204,6 +1224,7 @@ private struct GamepadDeviceInfoCard: View {
 
 @available(iOS 13.0, *)
 private struct GamepadCurrentDeviceCard: View {
+    @Environment(\.colorScheme) private var colorScheme
     let deviceModel: String
     let systemVersion: String
 
@@ -1212,7 +1233,7 @@ private struct GamepadCurrentDeviceCard: View {
             VStack(alignment: .leading, spacing: 10) {
                 Text(GamepadLocalized("gamepad.card.current_device"))
                     .font(.system(size: 16, weight: .bold))
-                    .foregroundColor(Color(red: 0.29, green: 0.22, blue: 0.42))
+                    .foregroundColor(colorScheme == .dark ? Color.white.opacity(0.94) : Color(red: 0.29, green: 0.22, blue: 0.42))
 
                 GamepadInfoRow(title: GamepadLocalized("gamepad.info.device_model"), value: deviceModel)
                 GamepadInfoRow(title: GamepadLocalized("gamepad.info.system_version"), value: systemVersion)
@@ -1223,6 +1244,7 @@ private struct GamepadCurrentDeviceCard: View {
 
 @available(iOS 13.0, *)
 private struct GamepadRumbleTestCard: View {
+    @Environment(\.colorScheme) private var colorScheme
     let statusText: String
     let isRumbling: Bool
     let triggerRumbleEnabled: Bool
@@ -1234,11 +1256,11 @@ private struct GamepadRumbleTestCard: View {
             VStack(alignment: .leading, spacing: 12) {
                 Text(GamepadLocalized("gamepad.card.rumble_test"))
                     .font(.system(size: 16, weight: .bold))
-                    .foregroundColor(Color(red: 0.29, green: 0.22, blue: 0.42))
+                    .foregroundColor(colorScheme == .dark ? Color.white.opacity(0.94) : Color(red: 0.29, green: 0.22, blue: 0.42))
 
                 Text(statusText)
                     .font(.system(size: 12, weight: .medium))
-                    .foregroundColor(Color(red: 0.43, green: 0.35, blue: 0.60))
+                    .foregroundColor(colorScheme == .dark ? Color.white.opacity(0.68) : Color(red: 0.43, green: 0.35, blue: 0.60))
 
                 Button(action: onTrigger) {
                     HStack(spacing: 10) {
@@ -1263,7 +1285,7 @@ private struct GamepadRumbleTestCard: View {
                 })) {
                     Text(GamepadLocalized("gamepad.rumble.after_trigger_toggle"))
                         .font(.system(size: 13, weight: .semibold))
-                        .foregroundColor(Color(red: 0.29, green: 0.22, blue: 0.42))
+                        .foregroundColor(colorScheme == .dark ? Color.white.opacity(0.88) : Color(red: 0.29, green: 0.22, blue: 0.42))
                 }
             }
         }
@@ -1272,6 +1294,7 @@ private struct GamepadRumbleTestCard: View {
 
 @available(iOS 13.0, *)
 private struct GamepadGyroMeterRow: View {
+    @Environment(\.colorScheme) private var colorScheme
     let title: String
     let value: Double
     let tint: Color
@@ -1284,11 +1307,11 @@ private struct GamepadGyroMeterRow: View {
             HStack(spacing: 8) {
                 Text(title)
                     .font(.system(size: 12, weight: .semibold))
-                    .foregroundColor(Color(red: 0.36, green: 0.29, blue: 0.50))
+                    .foregroundColor(colorScheme == .dark ? Color.white.opacity(0.72) : Color(red: 0.36, green: 0.29, blue: 0.50))
                 Spacer(minLength: 8)
                 Text(String(format: "%.2f rad/s", value))
                     .font(.system(size: 11, weight: .medium))
-                    .foregroundColor(Color(red: 0.45, green: 0.38, blue: 0.60))
+                    .foregroundColor(colorScheme == .dark ? Color.white.opacity(0.64) : Color(red: 0.45, green: 0.38, blue: 0.60))
             }
 
             GeometryReader { proxy in
@@ -1299,14 +1322,14 @@ private struct GamepadGyroMeterRow: View {
 
                 ZStack {
                     Capsule()
-                        .fill(Color.white.opacity(0.72))
+                        .fill(colorScheme == .dark ? Color.white.opacity(0.10) : Color.white.opacity(0.72))
 
                     Capsule()
                         .fill(tint.opacity(0.18))
                         .padding(.vertical, 2)
 
                     Rectangle()
-                        .fill(Color.white.opacity(0.95))
+                        .fill(colorScheme == .dark ? Color.white.opacity(0.22) : Color.white.opacity(0.95))
                         .frame(width: 1, height: 14)
 
                     Circle()
@@ -1326,6 +1349,7 @@ private struct GamepadGyroMeterRow: View {
 
 @available(iOS 13.0, *)
 private struct GamepadGyroTestCard: View {
+    @Environment(\.colorScheme) private var colorScheme
     let isEnabled: Bool
     let selectedSourceIndex: Int
     let controllerGyroSupported: Bool
@@ -1342,7 +1366,7 @@ private struct GamepadGyroTestCard: View {
             VStack(alignment: .leading, spacing: 12) {
                 Text(GamepadLocalized("gamepad.card.gyro_test"))
                     .font(.system(size: 16, weight: .bold))
-                    .foregroundColor(Color(red: 0.29, green: 0.22, blue: 0.42))
+                    .foregroundColor(colorScheme == .dark ? Color.white.opacity(0.94) : Color(red: 0.29, green: 0.22, blue: 0.42))
 
                 Toggle(isOn: Binding(get: {
                     isEnabled
@@ -1351,7 +1375,7 @@ private struct GamepadGyroTestCard: View {
                 })) {
                     Text(GamepadLocalized("gamepad.gyro.enable_toggle"))
                         .font(.system(size: 13, weight: .semibold))
-                        .foregroundColor(Color(red: 0.29, green: 0.22, blue: 0.42))
+                        .foregroundColor(colorScheme == .dark ? Color.white.opacity(0.88) : Color(red: 0.29, green: 0.22, blue: 0.42))
                 }
 
                 Picker("", selection: Binding(get: {
@@ -1366,11 +1390,11 @@ private struct GamepadGyroTestCard: View {
 
                 Text(statusText)
                     .font(.system(size: 13, weight: .semibold))
-                    .foregroundColor(Color(red: 0.29, green: 0.22, blue: 0.42))
+                    .foregroundColor(colorScheme == .dark ? Color.white.opacity(0.88) : Color(red: 0.29, green: 0.22, blue: 0.42))
 
                 Text(controllerGyroSupported || selectedSourceIndex == 0 ? hintText : GamepadLocalized("gamepad.gyro.controller_unsupported"))
                     .font(.system(size: 12, weight: .medium))
-                    .foregroundColor(Color(red: 0.43, green: 0.35, blue: 0.60))
+                    .foregroundColor(colorScheme == .dark ? Color.white.opacity(0.68) : Color(red: 0.43, green: 0.35, blue: 0.60))
 
                 if isEnabled {
                     GamepadGyroMeterRow(
@@ -1396,6 +1420,7 @@ private struct GamepadGyroTestCard: View {
 
 @available(iOS 13.0, *)
 private struct GamepadPollingStatRow: View {
+    @Environment(\.colorScheme) private var colorScheme
     let title: String
     let value: String
     var isInteractive: Bool = false
@@ -1418,15 +1443,15 @@ private struct GamepadPollingStatRow: View {
         HStack(spacing: 10) {
             Text(title)
                 .font(.system(size: 12, weight: .semibold))
-                .foregroundColor(Color(red: 0.36, green: 0.29, blue: 0.50))
+                .foregroundColor(colorScheme == .dark ? Color.white.opacity(0.72) : Color(red: 0.36, green: 0.29, blue: 0.50))
             Spacer(minLength: 8)
             Text(value)
                 .font(.system(size: 12, weight: .medium))
-                .foregroundColor(isInteractive ? Color(red: 0.46, green: 0.34, blue: 0.78) : Color(red: 0.26, green: 0.21, blue: 0.39))
+                .foregroundColor(isInteractive ? (colorScheme == .dark ? Color(red: 0.78, green: 0.70, blue: 1.0) : Color(red: 0.46, green: 0.34, blue: 0.78)) : (colorScheme == .dark ? Color.white.opacity(0.94) : Color(red: 0.26, green: 0.21, blue: 0.39)))
             if isInteractive {
                 Image(systemName: "chevron.right")
                     .font(.system(size: 11, weight: .semibold))
-                    .foregroundColor(Color(red: 0.56, green: 0.49, blue: 0.75))
+                    .foregroundColor(colorScheme == .dark ? Color.white.opacity(0.44) : Color(red: 0.56, green: 0.49, blue: 0.75))
             }
         }
     }
@@ -1434,6 +1459,7 @@ private struct GamepadPollingStatRow: View {
 
 @available(iOS 13.0, *)
 private struct GamepadPollingTestCard: View {
+    @Environment(\.colorScheme) private var colorScheme
     let statusText: String
     let progressText: String
     let hzText: String
@@ -1451,20 +1477,20 @@ private struct GamepadPollingTestCard: View {
             VStack(alignment: .leading, spacing: 12) {
                 Text(GamepadLocalized("gamepad.card.polling_test"))
                     .font(.system(size: 16, weight: .bold))
-                    .foregroundColor(Color(red: 0.29, green: 0.22, blue: 0.42))
+                    .foregroundColor(colorScheme == .dark ? Color.white.opacity(0.94) : Color(red: 0.29, green: 0.22, blue: 0.42))
 
                 Text(statusText)
                     .font(.system(size: 12, weight: .medium))
-                    .foregroundColor(Color(red: 0.43, green: 0.35, blue: 0.60))
+                    .foregroundColor(colorScheme == .dark ? Color.white.opacity(0.68) : Color(red: 0.43, green: 0.35, blue: 0.60))
 
                 VStack(spacing: 4) {
                     Text(GamepadLocalized("gamepad.polling.rate"))
                         .font(.system(size: 12, weight: .semibold))
-                        .foregroundColor(Color(red: 0.43, green: 0.35, blue: 0.60))
+                        .foregroundColor(colorScheme == .dark ? Color.white.opacity(0.64) : Color(red: 0.43, green: 0.35, blue: 0.60))
 
                     Text(hzText)
                         .font(.system(size: 28, weight: .bold, design: .rounded))
-                        .foregroundColor(Color(red: 0.30, green: 0.21, blue: 0.54))
+                        .foregroundColor(colorScheme == .dark ? Color(red: 0.90, green: 0.85, blue: 1.0) : Color(red: 0.30, green: 0.21, blue: 0.54))
                         .minimumScaleFactor(0.8)
                         .lineLimit(1)
                 }
@@ -1472,11 +1498,11 @@ private struct GamepadPollingTestCard: View {
                 .padding(.vertical, 12)
                 .background(
                     RoundedRectangle(cornerRadius: 18, style: .continuous)
-                        .fill(Color.white.opacity(0.62))
+                        .fill(colorScheme == .dark ? Color.white.opacity(0.08) : Color.white.opacity(0.62))
                 )
                 .overlay(
                     RoundedRectangle(cornerRadius: 18, style: .continuous)
-                        .stroke(Color.white.opacity(0.80), lineWidth: 1)
+                        .stroke(colorScheme == .dark ? Color.white.opacity(0.12) : Color.white.opacity(0.80), lineWidth: 1)
                 )
 
                 GamepadPollingStatRow(title: GamepadLocalized("gamepad.polling.progress"), value: progressText)
@@ -1490,7 +1516,7 @@ private struct GamepadPollingTestCard: View {
 
                 Text(GamepadLocalized("gamepad.polling.anomaly_hint"))
                     .font(.system(size: 11, weight: .medium))
-                    .foregroundColor(Color(red: 0.43, green: 0.35, blue: 0.60))
+                    .foregroundColor(colorScheme == .dark ? Color.white.opacity(0.64) : Color(red: 0.43, green: 0.35, blue: 0.60))
                     .fixedSize(horizontal: false, vertical: true)
 
                 Button(action: onTrigger) {
@@ -1515,6 +1541,7 @@ private struct GamepadPollingTestCard: View {
 
 @available(iOS 13.0, *)
 private struct GamepadPollingAnomalySheet: View {
+    @Environment(\.colorScheme) private var colorScheme
     let anomalyDetails: [GamepadPollingAnomalyDetail]
     @Environment(\.presentationMode) private var presentationMode
 
@@ -1528,7 +1555,7 @@ private struct GamepadPollingAnomalySheet: View {
                             .foregroundColor(Color(red: 0.39, green: 0.78, blue: 0.69))
                         Text(GamepadLocalized("gamepad.polling.no_anomalies"))
                             .font(.system(size: 16, weight: .semibold))
-                            .foregroundColor(Color(red: 0.29, green: 0.22, blue: 0.42))
+                            .foregroundColor(colorScheme == .dark ? Color.white.opacity(0.94) : Color(red: 0.29, green: 0.22, blue: 0.42))
                     }
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                     .background(Color(UIColor.systemGroupedBackground))
@@ -1538,7 +1565,7 @@ private struct GamepadPollingAnomalySheet: View {
                             HStack(spacing: 8) {
                                 Text(GamepadLocalizedFormat("gamepad.polling.sample", detail.sampleIndex))
                                     .font(.system(size: 14, weight: .semibold))
-                                    .foregroundColor(Color(red: 0.29, green: 0.22, blue: 0.42))
+                                    .foregroundColor(colorScheme == .dark ? Color.white.opacity(0.94) : Color(red: 0.29, green: 0.22, blue: 0.42))
 
                                 Text(detail.kind.title)
                                     .font(.system(size: 11, weight: .semibold))
@@ -1547,19 +1574,23 @@ private struct GamepadPollingAnomalySheet: View {
                                     .padding(.vertical, 4)
                                     .background(
                                         Capsule()
-                                            .fill((detail.kind == .tooSlow ? Color(red: 0.99, green: 0.91, blue: 0.86) : Color(red: 0.88, green: 0.94, blue: 0.99)))
+                                            .fill(detail.kind == .tooSlow
+                                                  ? (colorScheme == .dark ? Color(red: 0.48, green: 0.25, blue: 0.20).opacity(0.78) : Color(red: 0.99, green: 0.91, blue: 0.86))
+                                                  : (colorScheme == .dark ? Color(red: 0.18, green: 0.31, blue: 0.48).opacity(0.82) : Color(red: 0.88, green: 0.94, blue: 0.99)))
                                     )
                             }
 
                             Text(GamepadLocalizedFormat("gamepad.polling.interval_average", detail.intervalMs, detail.averageMs))
                                 .font(.system(size: 12, weight: .medium))
-                                .foregroundColor(Color(red: 0.43, green: 0.35, blue: 0.60))
+                                .foregroundColor(colorScheme == .dark ? Color.white.opacity(0.68) : Color(red: 0.43, green: 0.35, blue: 0.60))
                         }
                         .padding(.vertical, 4)
+                        .listRowBackground(colorScheme == .dark ? Color(red: 0.12, green: 0.11, blue: 0.18) : Color(UIColor.systemBackground))
                     }
                     .listStyle(GroupedListStyle())
                 }
             }
+            .background(colorScheme == .dark ? Color(red: 0.09, green: 0.09, blue: 0.13) : Color(UIColor.systemGroupedBackground))
             .navigationBarTitle(Text(GamepadLocalized("gamepad.polling.details_title")), displayMode: .inline)
             .navigationBarItems(trailing: Button(GamepadLocalized("common.done")) {
                 presentationMode.wrappedValue.dismiss()
@@ -1570,6 +1601,7 @@ private struct GamepadPollingAnomalySheet: View {
 
 @available(iOS 13.0, *)
 private struct GamepadTriggerView: View {
+    @Environment(\.colorScheme) private var colorScheme
     let title: String
     let value: Double
 
@@ -1577,11 +1609,11 @@ private struct GamepadTriggerView: View {
         VStack(alignment: .leading, spacing: 6) {
             Text(title)
                 .font(.system(size: 12, weight: .semibold))
-                .foregroundColor(Color(red: 0.34, green: 0.27, blue: 0.48))
+                .foregroundColor(colorScheme == .dark ? Color.white.opacity(0.72) : Color(red: 0.34, green: 0.27, blue: 0.48))
 
             ZStack(alignment: .leading) {
                 Capsule()
-                    .fill(Color.white.opacity(0.62))
+                    .fill(colorScheme == .dark ? Color.white.opacity(0.10) : Color.white.opacity(0.62))
                 GeometryReader { proxy in
                     Capsule()
                         .fill(Color(red: 0.55, green: 0.51, blue: 0.93))
@@ -1592,7 +1624,7 @@ private struct GamepadTriggerView: View {
 
             Text("\(Int((min(max(value, 0), 1) * 255).rounded()))")
                 .font(.system(size: 11, weight: .semibold))
-                .foregroundColor(Color(red: 0.45, green: 0.38, blue: 0.60))
+                .foregroundColor(colorScheme == .dark ? Color.white.opacity(0.64) : Color(red: 0.45, green: 0.38, blue: 0.60))
         }
         .frame(maxWidth: .infinity)
     }
@@ -1600,49 +1632,52 @@ private struct GamepadTriggerView: View {
 
 @available(iOS 13.0, *)
 private struct GamepadButtonCapsule: View {
+    @Environment(\.colorScheme) private var colorScheme
     let title: String
     let isPressed: Bool
 
     var body: some View {
         Text(title)
             .font(.system(size: 12, weight: .semibold))
-            .foregroundColor(isPressed ? .white : Color(red: 0.34, green: 0.27, blue: 0.48))
+            .foregroundColor(isPressed ? .white : (colorScheme == .dark ? Color.white.opacity(0.88) : Color(red: 0.34, green: 0.27, blue: 0.48)))
             .frame(maxWidth: .infinity, minHeight: 30)
             .background(
                 RoundedRectangle(cornerRadius: 12, style: .continuous)
-                    .fill(isPressed ? Color(red: 0.55, green: 0.51, blue: 0.93) : Color.white.opacity(0.76))
+                    .fill(isPressed ? Color(red: 0.55, green: 0.51, blue: 0.93) : (colorScheme == .dark ? Color.white.opacity(0.08) : Color.white.opacity(0.76)))
             )
             .overlay(
                 RoundedRectangle(cornerRadius: 12, style: .continuous)
-                    .stroke(Color.white.opacity(0.72), lineWidth: 1)
+                    .stroke(colorScheme == .dark ? Color.white.opacity(0.10) : Color.white.opacity(0.72), lineWidth: 1)
             )
     }
 }
 
 @available(iOS 13.0, *)
 private struct GamepadRoundButton: View {
+    @Environment(\.colorScheme) private var colorScheme
     let title: String
     let isPressed: Bool
 
     var body: some View {
         Text(title)
             .font(.system(size: 14, weight: .bold))
-            .foregroundColor(isPressed ? .white : Color(red: 0.30, green: 0.25, blue: 0.43))
+            .foregroundColor(isPressed ? .white : (colorScheme == .dark ? Color.white.opacity(0.88) : Color(red: 0.30, green: 0.25, blue: 0.43)))
             .frame(width: 32, height: 32)
             .background(
                 Circle()
-                    .fill(isPressed ? Color(red: 0.55, green: 0.51, blue: 0.93) : Color.white.opacity(0.78))
+                    .fill(isPressed ? Color(red: 0.55, green: 0.51, blue: 0.93) : (colorScheme == .dark ? Color.white.opacity(0.08) : Color.white.opacity(0.78)))
             )
             .overlay(
                 Circle()
-                    .stroke(isPressed ? Color.white.opacity(0.92) : Color(red: 0.63, green: 0.60, blue: 0.72).opacity(0.85), lineWidth: 0.8)
+                    .stroke(isPressed ? Color.white.opacity(0.92) : (colorScheme == .dark ? Color.white.opacity(0.12) : Color(red: 0.63, green: 0.60, blue: 0.72).opacity(0.85)), lineWidth: 0.8)
             )
-            .shadow(color: .black.opacity(isPressed ? 0.10 : 0.04), radius: isPressed ? 10 : 6, x: 0, y: 4)
+            .shadow(color: .black.opacity(isPressed ? (colorScheme == .dark ? 0.20 : 0.10) : (colorScheme == .dark ? 0.12 : 0.04)), radius: isPressed ? 10 : 6, x: 0, y: 4)
     }
 }
 
 @available(iOS 13.0, *)
 private struct GamepadStickView: View {
+    @Environment(\.colorScheme) private var colorScheme
     let title: String
     let x: Double
     let y: Double
@@ -1670,10 +1705,10 @@ private struct GamepadStickView: View {
 
                 ZStack {
                     Circle()
-                        .fill(Color.white.opacity(0.76))
+                        .fill(colorScheme == .dark ? Color.white.opacity(0.08) : Color.white.opacity(0.76))
 
                     Circle()
-                        .stroke(Color(red: 0.63, green: 0.60, blue: 0.72).opacity(0.75), lineWidth: 0.8)
+                        .stroke(colorScheme == .dark ? Color.white.opacity(0.12) : Color(red: 0.63, green: 0.60, blue: 0.72).opacity(0.75), lineWidth: 0.8)
 
                     if showTrail && !trailBuckets.isEmpty {
                         ForEach(trailBuckets) { bucket in
@@ -1689,17 +1724,17 @@ private struct GamepadStickView: View {
                     }
 
                     Circle()
-                        .fill(Color.black.opacity(0.08))
+                        .fill(colorScheme == .dark ? Color.white.opacity(0.10) : Color.black.opacity(0.08))
                         .frame(width: side * 0.07, height: side * 0.07)
 
                     Circle()
-                        .fill(isPressed ? Color(red: 0.55, green: 0.51, blue: 0.93) : Color(red: 0.38, green: 0.36, blue: 0.46))
+                        .fill(isPressed ? Color(red: 0.55, green: 0.51, blue: 0.93) : (colorScheme == .dark ? Color.white.opacity(0.72) : Color(red: 0.38, green: 0.36, blue: 0.46)))
                         .frame(width: knobDiameter, height: knobDiameter)
                         .offset(
                             x: CGFloat(min(max(x, -1), 1)) * travel,
                             y: CGFloat(min(max(y, -1), 1)) * travel
                         )
-                        .shadow(color: .black.opacity(0.12), radius: 10, x: 0, y: 4)
+                        .shadow(color: .black.opacity(colorScheme == .dark ? 0.22 : 0.12), radius: 10, x: 0, y: 4)
                 }
             }
             .aspectRatio(1, contentMode: .fit)
@@ -1707,7 +1742,7 @@ private struct GamepadStickView: View {
 
             Text(String(format: "X %.2f  Y %.2f", x, y))
                 .font(.system(size: 10, weight: .medium))
-                .foregroundColor(Color(red: 0.45, green: 0.38, blue: 0.60))
+                .foregroundColor(colorScheme == .dark ? Color.white.opacity(0.64) : Color(red: 0.45, green: 0.38, blue: 0.60))
         }
         .frame(maxWidth: .infinity)
     }
@@ -1768,6 +1803,7 @@ private struct GamepadStickView: View {
 
 @available(iOS 13.0, *)
 private struct GamepadVisualizationCard: View {
+    @Environment(\.colorScheme) private var colorScheme
     let showStickTrails: Bool
     let onShowStickTrailsChanged: (Bool) -> Void
 
@@ -1776,7 +1812,7 @@ private struct GamepadVisualizationCard: View {
             VStack(alignment: .leading, spacing: 12) {
                 Text(GamepadLocalized("gamepad.card.visualization"))
                     .font(.system(size: 16, weight: .bold))
-                    .foregroundColor(Color(red: 0.29, green: 0.22, blue: 0.42))
+                    .foregroundColor(colorScheme == .dark ? Color.white.opacity(0.94) : Color(red: 0.29, green: 0.22, blue: 0.42))
 
                 Toggle(isOn: Binding(get: {
                     showStickTrails
@@ -1785,7 +1821,7 @@ private struct GamepadVisualizationCard: View {
                 })) {
                     Text(GamepadLocalized("gamepad.visualization.show_trails"))
                         .font(.system(size: 13, weight: .semibold))
-                        .foregroundColor(Color(red: 0.29, green: 0.22, blue: 0.42))
+                        .foregroundColor(colorScheme == .dark ? Color.white.opacity(0.88) : Color(red: 0.29, green: 0.22, blue: 0.42))
                 }
             }
         }
@@ -2084,7 +2120,8 @@ final class GamepadTestHostingViewController: UIViewController {
         let navigationBar = navigationController?.navigationBar
         guard let navigationBar else { return }
 
-        let accentColor = UIColor(red: 0.31, green: 0.23, blue: 0.46, alpha: 1.0)
+        let darkMode = traitCollection.userInterfaceStyle == .dark
+        let accentColor = darkMode ? UIColor(red: 0.90, green: 0.85, blue: 0.99, alpha: 1.0) : UIColor(red: 0.31, green: 0.23, blue: 0.46, alpha: 1.0)
         let titleAttributes: [NSAttributedString.Key: Any] = [
             .foregroundColor: accentColor,
             .font: UIFont.systemFont(ofSize: 17.0, weight: .semibold)
@@ -2096,22 +2133,26 @@ final class GamepadTestHostingViewController: UIViewController {
         let appearance = UINavigationBarAppearance()
         appearance.titleTextAttributes = titleAttributes
 
-        if #available(iOS 26.0, *) {
-            appearance.configureWithTransparentBackground()
-            appearance.backgroundColor = .clear
-            appearance.shadowColor = .clear
-        }
-        else {
-            appearance.configureWithOpaqueBackground()
-            appearance.backgroundColor = UIColor(red: 0.98, green: 0.96, blue: 1.0, alpha: 0.96)
-            appearance.shadowColor = UIColor(red: 0.73, green: 0.69, blue: 0.82, alpha: 0.22)
-        }
+        appearance.configureWithTransparentBackground()
+        appearance.backgroundColor = .clear
+        appearance.shadowColor = .clear
 
         navigationBar.standardAppearance = appearance
         navigationBar.compactAppearance = appearance
         navigationBar.scrollEdgeAppearance = appearance
         if #available(iOS 15.0, *) {
             navigationBar.compactScrollEdgeAppearance = appearance
+        }
+        navigationBar.isTranslucent = true
+    }
+
+    override func traitCollectionDidChange(_ previousTraitCollection: UITraitCollection?) {
+        super.traitCollectionDidChange(previousTraitCollection)
+
+        if #available(iOS 13.0, *),
+           let previousTraitCollection,
+           traitCollection.hasDifferentColorAppearance(comparedTo: previousTraitCollection) {
+            applyNavigationBarAppearance()
         }
     }
 }
