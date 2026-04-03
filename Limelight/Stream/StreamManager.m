@@ -248,6 +248,7 @@ static NSString *MetalFxOverlayStringForSettings(TemporarySettings *settings, CG
         return @"";
     }
 
+
     TemporarySettings *settings = [[[DataManager alloc] init] getSettings];
     BOOL shouldShowDecoderLatency = settings.rendererSelection == StreamVideoRendererSelectionMetal;
     
@@ -306,7 +307,7 @@ static NSString *MetalFxOverlayStringForSettings(TemporarySettings *settings, CG
     else {
         droppedFramesStringLite = @"";
     }
-    
+
     return [NSString stringWithFormat:StreamManagerLocalized(@"stream.stats.overlay"),
             _config.width,
             _config.height,

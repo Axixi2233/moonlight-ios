@@ -32,12 +32,30 @@ typedef struct {
     uint64_t minDecoderLatency;
 } video_stats_t;
 
+typedef struct {
+    CFTimeInterval startTime;
+    CFTimeInterval endTime;
+    int receivedPackets;
+    int droppedPackets;
+    int decodeErrors;
+    double totalPendingDurationMs;
+    int pendingSamples;
+    double maxPendingDurationMs;
+    double totalQueuedDurationMs;
+    int queuedSamples;
+    double maxQueuedDurationMs;
+    double totalProcessTimeMs;
+    int processedPackets;
+    double maxProcessTimeMs;
+} audio_stats_t;
+
 @interface Connection : NSOperation <NSStreamDelegate>
 
 -(id) initWithConfig:(StreamConfiguration*)config renderer:(id<VideoRendering>)myRenderer connectionCallbacks:(id<ConnectionCallbacks>)callbacks;
 -(void) terminate;
 -(void) main;
 -(BOOL) getVideoStats:(video_stats_t*)stats;
+-(BOOL) getAudioStats:(audio_stats_t*)stats;
 -(NSString*) getActiveCodecName;
 -(NSString*) getActiveCodecNameLite;
 -(CGFloat) getActiveMetalFxScale;

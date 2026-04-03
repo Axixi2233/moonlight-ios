@@ -39,13 +39,53 @@ static int activeVideoFormat;
 static video_stats_t currentVideoStats;
 static video_stats_t lastVideoStats;
 static NSLock* videoStatsLock;
+static audio_stats_t currentAudioStats;
+static audio_stats_t lastAudioStats;
+static NSLock* audioStatsLock;
 
 static SDL_AudioDeviceID audioDevice;
 static OPUS_MULTISTREAM_CONFIGURATION audioConfig;
 static void* audioBuffer;
+static void* audioSilenceBuffer;
 static int audioFrameSize;
+static int audioBytesPerSampleFrame;
+static const int kMaxPendingAudioDurationMs = 80;
+static const int kPreferredSDLBufferSamples = 1024;
 
 static id<VideoRendering> renderer;
+
+static void QueueAudioSilenceFrames(int frameCount)
+{
+    if (audioDevice == 0 || audioSilenceBuffer == NULL || audioConfig.channelCount <= 0 || frameCount <= 0) {
+        return;
+    }
+
+    int bytes = sizeof(short) * frameCount * audioConfig.channelCount;
+    if (bytes <= 0 || bytes > audioFrameSize) {
+        bytes = audioFrameSize;
+    }
+
+    if (SDL_QueueAudio(audioDevice, audioSilenceBuffer, bytes) < 0) {
+        Log(LOG_E, @"Failed to queue silence sample: %s\n", SDL_GetError());
+    }
+}
+
+static void RotateAudioStatsWindowIfNeeded(CFTimeInterval now)
+{
+    if (currentAudioStats.startTime == 0) {
+        currentAudioStats.startTime = now;
+        return;
+    }
+
+    if (now - currentAudioStats.startTime < 1.0f) {
+        return;
+    }
+
+    currentAudioStats.endTime = now;
+    lastAudioStats = currentAudioStats;
+    memset(&currentAudioStats, 0, sizeof(currentAudioStats));
+    currentAudioStats.startTime = now;
+}
 
 static void DrainCompletedRendererDecoderStats(void)
 {
@@ -115,6 +155,29 @@ void DrStop(void)
     
     // No stats yet
     [videoStatsLock unlock];
+    return NO;
+}
+
+-(BOOL) getAudioStats:(audio_stats_t*)stats
+{
+    [audioStatsLock lock];
+
+    if (lastAudioStats.endTime != 0) {
+        memcpy(stats, &lastAudioStats, sizeof(*stats));
+        [audioStatsLock unlock];
+        return YES;
+    }
+
+    if (currentAudioStats.startTime != 0 &&
+        (currentAudioStats.receivedPackets != 0 ||
+         currentAudioStats.droppedPackets != 0 ||
+         currentAudioStats.decodeErrors != 0)) {
+        memcpy(stats, &currentAudioStats, sizeof(*stats));
+        [audioStatsLock unlock];
+        return YES;
+    }
+
+    [audioStatsLock unlock];
     return NO;
 }
 
@@ -298,7 +361,7 @@ int ArInit(int audioConfiguration, POPUS_MULTISTREAM_CONFIGURATION opusConfig, v
     want.freq = opusConfig->sampleRate;
     want.format = AUDIO_S16;
     want.channels = opusConfig->channelCount;
-    want.samples = opusConfig->samplesPerFrame;
+    want.samples = MAX(opusConfig->samplesPerFrame, kPreferredSDLBufferSamples);
 
     audioDevice = SDL_OpenAudioDevice(NULL, 0, &want, &have, 0);
     if (audioDevice == 0) {
@@ -309,9 +372,17 @@ int ArInit(int audioConfiguration, POPUS_MULTISTREAM_CONFIGURATION opusConfig, v
     
     audioConfig = *opusConfig;
     audioFrameSize = opusConfig->samplesPerFrame * sizeof(short) * opusConfig->channelCount;
+    audioBytesPerSampleFrame = sizeof(short) * opusConfig->channelCount;
     audioBuffer = SDL_malloc(audioFrameSize);
     if (audioBuffer == NULL) {
         Log(LOG_E, @"Failed to allocate audio frame buffer");
+        ArCleanup();
+        return -1;
+    }
+
+    audioSilenceBuffer = SDL_calloc(1, audioFrameSize);
+    if (audioSilenceBuffer == NULL) {
+        Log(LOG_E, @"Failed to allocate audio silence buffer");
         ArCleanup();
         return -1;
     }
@@ -330,6 +401,11 @@ int ArInit(int audioConfiguration, POPUS_MULTISTREAM_CONFIGURATION opusConfig, v
     
     // Start playback
     SDL_PauseAudioDevice(audioDevice, 0);
+
+    [audioStatsLock lock];
+    memset(&currentAudioStats, 0, sizeof(currentAudioStats));
+    memset(&lastAudioStats, 0, sizeof(lastAudioStats));
+    [audioStatsLock unlock];
     
     // Disable lowering volume of other audio streams (SDL sets AVAudioSessionCategoryOptionDuckOthers by default)
     [[AVAudioSession sharedInstance] setCategory:AVAudioSessionCategoryPlayback withOptions:AVAudioSessionCategoryOptionMixWithOthers error:nil];
@@ -357,6 +433,13 @@ void ArCleanup(void)
         SDL_free(audioBuffer);
         audioBuffer = NULL;
     }
+
+    if (audioSilenceBuffer != NULL) {
+        SDL_free(audioSilenceBuffer);
+        audioSilenceBuffer = NULL;
+    }
+
+    audioBytesPerSampleFrame = 0;
     
     SDL_QuitSubSystem(SDL_INIT_AUDIO);
 }
@@ -364,10 +447,43 @@ void ArCleanup(void)
 void ArDecodeAndPlaySample(char* sampleData, int sampleLength)
 {
     int decodeLen;
+    double pendingDurationMs = LiGetPendingAudioDuration();
+    double queuedDurationMs = 0.0;
+    Uint32 queuedBytes = audioDevice != 0 ? SDL_GetQueuedAudioSize(audioDevice) : 0;
+    CFTimeInterval processStartTime = CACurrentMediaTime();
+
+    if (audioDevice != 0 && audioBytesPerSampleFrame > 0 && audioConfig.sampleRate > 0) {
+        double queuedFrames = (double)queuedBytes / (double)audioBytesPerSampleFrame;
+        queuedDurationMs = (queuedFrames / (double)audioConfig.sampleRate) * 1000.0;
+    }
+
+    [audioStatsLock lock];
+    RotateAudioStatsWindowIfNeeded(processStartTime);
+    currentAudioStats.receivedPackets++;
+    currentAudioStats.totalPendingDurationMs += pendingDurationMs;
+    currentAudioStats.pendingSamples++;
+    if (pendingDurationMs > currentAudioStats.maxPendingDurationMs) {
+        currentAudioStats.maxPendingDurationMs = pendingDurationMs;
+    }
+    currentAudioStats.totalQueuedDurationMs += queuedDurationMs;
+    currentAudioStats.queuedSamples++;
+    if (queuedDurationMs > currentAudioStats.maxQueuedDurationMs) {
+        currentAudioStats.maxQueuedDurationMs = queuedDurationMs;
+    }
+    [audioStatsLock unlock];
     
-    // Don't queue if there's already more than 30 ms of audio data waiting
-    // in Moonlight's audio queue.
-    if (LiGetPendingAudioDuration() > 30) {
+    // A small amount of extra audio headroom is preferable to aggressive
+    // dropping on iOS, which tends to sound like periodic stutter.
+    if (pendingDurationMs > kMaxPendingAudioDurationMs) {
+        CFTimeInterval processEndTime = CACurrentMediaTime();
+        [audioStatsLock lock];
+        currentAudioStats.droppedPackets++;
+        currentAudioStats.processedPackets++;
+        currentAudioStats.totalProcessTimeMs += (processEndTime - processStartTime) * 1000.0;
+        if ((processEndTime - processStartTime) * 1000.0 > currentAudioStats.maxProcessTimeMs) {
+            currentAudioStats.maxProcessTimeMs = (processEndTime - processStartTime) * 1000.0;
+        }
+        [audioStatsLock unlock];
         return;
     }
     
@@ -381,18 +497,30 @@ void ArDecodeAndPlaySample(char* sampleData, int sampleLength)
                                         sampleRate:audioConfig.sampleRate];
         }
 
-        // Provide backpressure on the queue to ensure too many frames don't build up
-        // in SDL's audio queue.
-        while (SDL_GetQueuedAudioSize(audioDevice) / audioFrameSize > 10) {
-            SDL_Delay(1);
-        }
-        
         if (SDL_QueueAudio(audioDevice,
                            audioBuffer,
                            sizeof(short) * decodeLen * audioConfig.channelCount) < 0) {
             Log(LOG_E, @"Failed to queue audio sample: %s\n", SDL_GetError());
         }
     }
+    else {
+        [audioStatsLock lock];
+        currentAudioStats.decodeErrors++;
+        [audioStatsLock unlock];
+
+        // Feed a short silence bridge on decode failure to reduce audible pop/static.
+        QueueAudioSilenceFrames(audioConfig.samplesPerFrame / 2);
+    }
+
+    CFTimeInterval processEndTime = CACurrentMediaTime();
+    double processTimeMs = (processEndTime - processStartTime) * 1000.0;
+    [audioStatsLock lock];
+    currentAudioStats.processedPackets++;
+    currentAudioStats.totalProcessTimeMs += processTimeMs;
+    if (processTimeMs > currentAudioStats.maxProcessTimeMs) {
+        currentAudioStats.maxProcessTimeMs = processTimeMs;
+    }
+    [audioStatsLock unlock];
 }
 
 void ClStageStarting(int stage)
@@ -495,6 +623,9 @@ void ClSetControllerLED(uint16_t controllerNumber, uint8_t r, uint8_t g, uint8_t
     
     if (videoStatsLock == nil) {
         videoStatsLock = [[NSLock alloc] init];
+    }
+    if (audioStatsLock == nil) {
+        audioStatsLock = [[NSLock alloc] init];
     }
     
     NSString *rawAddress = [Utils addressPortStringToAddress:config.host];

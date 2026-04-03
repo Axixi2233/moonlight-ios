@@ -427,6 +427,7 @@
 "stream.connection.poor" = "電腦連線不良";
 "stream.performance.extended_metrics.toggle" = "顯示抖動/編碼/客戶端延遲/掉幀率";
 "stream.stats.client" = " 客戶端：%.1f ms";
+"stream.stats.audio" = " 音訊：待播%.0f 佇列%.0f 丟%d";
 "stream.stats.dropped" = " 掉幀：%.2f%%";
 "stream.stats.encoding" = " 編碼：%.1f ms";
 "stream.stats.decode" = " 解碼：%.1f ms";

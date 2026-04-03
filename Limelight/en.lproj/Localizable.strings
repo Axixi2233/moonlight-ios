@@ -427,6 +427,7 @@
 "stream.connection.poor" = "Poor connection to PC";
 "stream.performance.extended_metrics.toggle" = "Show jitter/encoding/client latency/dropped frames";
 "stream.stats.client" = " Client: %.1f ms";
+"stream.stats.audio" = " Audio: pend %.0f queue %.0f drop %d";
 "stream.stats.dropped" = " Dropped: %.2f%%";
 "stream.stats.encoding" = " Encoding: %.1f ms";
 "stream.stats.decode" = " Decoding: %.1f ms";

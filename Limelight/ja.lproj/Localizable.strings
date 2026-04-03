@@ -427,6 +427,7 @@
 "stream.connection.poor" = "PCとの接続状態が不安定です";
 "stream.performance.extended_metrics.toggle" = "ジッター/エンコード/クライアント遅延/ドロップを表示";
 "stream.stats.client" = " クライアント: %.1f ms";
+"stream.stats.audio" = " 音声: pend %.0f queue %.0f drop %d";
 "stream.stats.dropped" = " ドロップ: %.2f%%";
 "stream.stats.encoding" = " エンコード: %.1f ms";
 "stream.stats.decode" = " デコード: %.1f ms";

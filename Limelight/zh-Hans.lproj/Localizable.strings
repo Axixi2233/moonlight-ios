@@ -426,6 +426,7 @@
 "stream.connection.poor_slow" = "电脑连接速度缓慢，请降低码率！";
 "stream.connection.poor" = "电脑连接不良";
 "stream.stats.client" = " 客户端：%.1f ms";
+"stream.stats.audio" = " 音频：待播%.0f 队列%.0f 丢%d";
 "stream.stats.dropped" = " 丢帧：%.2f%%";
 "stream.stats.encoding" = " 编码：%.1f ms";
 "stream.stats.decode" = " 解码：%.1f ms";
