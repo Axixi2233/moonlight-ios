@@ -487,6 +487,11 @@ static BOOL SupportsPictureInPicture(void) {
     snapshot.streamOrientationSelection = currentSettings.streamOrientationSelection;
     snapshot.gameMenuShortcutSelection = currentSettings.gameMenuShortcutSelection;
     snapshot.longPressStartForGameMenuEnabled = currentSettings.longPressStartForGameMenuEnabled;
+    snapshot.audioHapticsEnabled = currentSettings.audioHapticsEnabled;
+    snapshot.audioHapticsOutputTarget = currentSettings.audioHapticsOutputTarget;
+    snapshot.audioHapticsStrength = currentSettings.audioHapticsStrength;
+    snapshot.audioHapticsVoiceFilterSelection = currentSettings.audioHapticsVoiceFilterSelection;
+    snapshot.audioHapticsKeepControllerRumble = currentSettings.audioHapticsKeepControllerRumble;
     snapshot.statsOverlay = currentSettings.statsOverlay;
     snapshot.rumbleModeSelection = currentSettings.rumbleModeSelection;
     snapshot.externalMonitor = currentSettings.externalMonitor;
@@ -560,6 +565,11 @@ static BOOL SupportsPictureInPicture(void) {
        streamOrientationSelection:snapshot.streamOrientationSelection
       gameMenuShortcutSelection:snapshot.gameMenuShortcutSelection
  longPressStartForGameMenuEnabled:snapshot.longPressStartForGameMenuEnabled
+            audioHapticsEnabled:snapshot.audioHapticsEnabled
+       audioHapticsOutputTarget:snapshot.audioHapticsOutputTarget
+          audioHapticsStrength:snapshot.audioHapticsStrength
+ audioHapticsVoiceFilterSelection:snapshot.audioHapticsVoiceFilterSelection
+ audioHapticsKeepControllerRumble:snapshot.audioHapticsKeepControllerRumble
                   touchModeSelection:snapshot.touchModeSelection
                         statsOverlay:snapshot.statsOverlay
                  rumbleModeSelection:snapshot.rumbleModeSelection

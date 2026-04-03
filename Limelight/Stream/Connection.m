@@ -339,6 +339,10 @@ int ArInit(int audioConfiguration, POPUS_MULTISTREAM_CONFIGURATION opusConfig, v
 
 void ArCleanup(void)
 {
+    if ([_callbacks respondsToSelector:@selector(stopAudioHaptics)]) {
+        [_callbacks stopAudioHaptics];
+    }
+
     if (opusDecoder != NULL) {
         opus_multistream_decoder_destroy(opusDecoder);
         opusDecoder = NULL;
@@ -370,6 +374,13 @@ void ArDecodeAndPlaySample(char* sampleData, int sampleLength)
     decodeLen = opus_multistream_decode(opusDecoder, (unsigned char *)sampleData, sampleLength,
                                         (short*)audioBuffer, audioConfig.samplesPerFrame, 0);
     if (decodeLen > 0) {
+        if ([_callbacks respondsToSelector:@selector(processAudioHapticsSamples:frameCount:channelCount:sampleRate:)]) {
+            [_callbacks processAudioHapticsSamples:(const short *)audioBuffer
+                                        frameCount:decodeLen
+                                      channelCount:audioConfig.channelCount
+                                        sampleRate:audioConfig.sampleRate];
+        }
+
         // Provide backpressure on the queue to ensure too many frames don't build up
         // in SDL's audio queue.
         while (SDL_GetQueuedAudioSize(audioDevice) / audioFrameSize > 10) {

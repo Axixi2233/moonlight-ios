@@ -44,6 +44,16 @@
 -(void) rumbleTriggers:(uint16_t)controllerNumber leftTrigger:(uint16_t)leftTrigger rightTrigger:(uint16_t)rightTrigger;
 -(void) setMotionEventState:(uint16_t)controllerNumber motionType:(uint8_t)motionType reportRateHz:(uint16_t)reportRateHz;
 -(void) setControllerLed:(uint16_t)controllerNumber r:(uint8_t)r g:(uint8_t)g b:(uint8_t)b;
+-(void) processAudioHapticsSamples:(const short *)samples
+                         frameCount:(int)frameCount
+                       channelCount:(int)channelCount
+                         sampleRate:(int)sampleRate;
+-(void) stopAudioHaptics;
+-(void) updateAudioHapticsEnabled:(BOOL)enabled
+                     outputTarget:(NSInteger)outputTarget
+                         strength:(NSInteger)strength
+             voiceFilterSelection:(NSInteger)voiceFilterSelection
+         keepControllerRumble:(BOOL)keepControllerRumble;
 
 +(int) getConnectedGamepadMask:(StreamConfiguration*)streamConfig;
 

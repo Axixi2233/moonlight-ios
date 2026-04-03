@@ -42,6 +42,14 @@ typedef struct {
 @property (nonatomic)                   HapticContext* _Nullable highFreqMotor;
 @property (nonatomic)                   HapticContext* _Nullable leftTriggerMotor;
 @property (nonatomic)                   HapticContext* _Nullable rightTriggerMotor;
+@property (nonatomic)                   HapticContext* _Nullable audioLowFreqMotor;
+@property (nonatomic)                   HapticContext* _Nullable audioHighFreqMotor;
+@property (nonatomic)                   unsigned short gameLowFreqMotorAmplitude;
+@property (nonatomic)                   unsigned short gameHighFreqMotorAmplitude;
+@property (nonatomic)                   unsigned short gameLeftTriggerMotorAmplitude;
+@property (nonatomic)                   unsigned short gameRightTriggerMotorAmplitude;
+@property (nonatomic)                   unsigned short audioLowFreqMotorAmplitude;
+@property (nonatomic)                   unsigned short audioHighFreqMotorAmplitude;
 
 @property (nonatomic)                   NSTimer* _Nullable accelTimer;
 @property (nonatomic)                   GCAcceleration lastAccelSample;

@@ -31,6 +31,11 @@ NSString * const StreamPreferencePictureInPictureEnabledKey = @"StreamPreference
 NSString * const StreamPreferenceStreamOrientationSelectionKey = @"StreamPreferenceStreamOrientationSelection";
 NSString * const StreamPreferenceGameMenuShortcutSelectionKey = @"StreamPreferenceGameMenuShortcutSelection";
 NSString * const StreamPreferenceLongPressStartForGameMenuEnabledKey = @"StreamPreferenceLongPressStartForGameMenuEnabled";
+NSString * const StreamPreferenceAudioHapticsEnabledKey = @"StreamPreferenceAudioHapticsEnabled";
+NSString * const StreamPreferenceAudioHapticsOutputTargetKey = @"StreamPreferenceAudioHapticsOutputTarget";
+NSString * const StreamPreferenceAudioHapticsStrengthKey = @"StreamPreferenceAudioHapticsStrength";
+NSString * const StreamPreferenceAudioHapticsVoiceFilterSelectionKey = @"StreamPreferenceAudioHapticsVoiceFilterSelection";
+NSString * const StreamPreferenceAudioHapticsKeepControllerRumbleKey = @"StreamPreferenceAudioHapticsKeepControllerRumble";
 
 @implementation TemporarySettings
 
@@ -163,6 +168,32 @@ NSString * const StreamPreferenceLongPressStartForGameMenuEnabledKey = @"StreamP
     }
 }
 
+- (NSInteger)normalizedAudioHapticsOutputTarget:(NSInteger)audioHapticsOutputTarget {
+    switch (audioHapticsOutputTarget) {
+        case StreamAudioHapticsOutputTargetController:
+            return audioHapticsOutputTarget;
+        case StreamAudioHapticsOutputTargetDevice:
+        default:
+            return StreamAudioHapticsOutputTargetDevice;
+    }
+}
+
+- (NSInteger)normalizedAudioHapticsStrength:(NSInteger)audioHapticsStrength {
+    return MAX(25, MIN(audioHapticsStrength, 200));
+}
+
+- (NSInteger)normalizedAudioHapticsVoiceFilterSelection:(NSInteger)audioHapticsVoiceFilterSelection {
+    switch (audioHapticsVoiceFilterSelection) {
+        case StreamAudioHapticsVoiceFilterSelectionLow:
+        case StreamAudioHapticsVoiceFilterSelectionMedium:
+        case StreamAudioHapticsVoiceFilterSelectionHigh:
+            return audioHapticsVoiceFilterSelection;
+        case StreamAudioHapticsVoiceFilterSelectionOff:
+        default:
+            return StreamAudioHapticsVoiceFilterSelectionOff;
+    }
+}
+
 - (id) initFromSettings:(Settings*)settings {
     self = [self init];
     
@@ -191,7 +222,12 @@ NSString * const StreamPreferenceLongPressStartForGameMenuEnabledKey = @"StreamP
         StreamPreferencePictureInPictureEnabledKey: @(NO),
         StreamPreferenceStreamOrientationSelectionKey: @(StreamOrientationSelectionAutomatic),
         StreamPreferenceGameMenuShortcutSelectionKey: @(StreamGameMenuShortcutSelectionNone),
-        StreamPreferenceLongPressStartForGameMenuEnabledKey: @(NO)
+        StreamPreferenceLongPressStartForGameMenuEnabledKey: @(NO),
+        StreamPreferenceAudioHapticsEnabledKey: @(NO),
+        StreamPreferenceAudioHapticsOutputTargetKey: @(StreamAudioHapticsOutputTargetDevice),
+        StreamPreferenceAudioHapticsStrengthKey: @(100),
+        StreamPreferenceAudioHapticsVoiceFilterSelectionKey: @(StreamAudioHapticsVoiceFilterSelectionOff),
+        StreamPreferenceAudioHapticsKeepControllerRumbleKey: @(NO)
     };
     [[NSUserDefaults standardUserDefaults] registerDefaults:streamPreferenceDefaults];
     
@@ -284,6 +320,11 @@ NSString * const StreamPreferenceLongPressStartForGameMenuEnabledKey = @"StreamP
     self.streamOrientationSelection = [self normalizedStreamOrientationSelection:[defaults integerForKey:StreamPreferenceStreamOrientationSelectionKey]];
     self.gameMenuShortcutSelection = [self normalizedGameMenuShortcutSelection:[defaults integerForKey:StreamPreferenceGameMenuShortcutSelectionKey]];
     self.longPressStartForGameMenuEnabled = [defaults boolForKey:StreamPreferenceLongPressStartForGameMenuEnabledKey];
+    self.audioHapticsEnabled = [defaults boolForKey:StreamPreferenceAudioHapticsEnabledKey];
+    self.audioHapticsOutputTarget = [self normalizedAudioHapticsOutputTarget:[defaults integerForKey:StreamPreferenceAudioHapticsOutputTargetKey]];
+    self.audioHapticsStrength = [self normalizedAudioHapticsStrength:[defaults integerForKey:StreamPreferenceAudioHapticsStrengthKey]];
+    self.audioHapticsVoiceFilterSelection = [self normalizedAudioHapticsVoiceFilterSelection:[defaults integerForKey:StreamPreferenceAudioHapticsVoiceFilterSelectionKey]];
+    self.audioHapticsKeepControllerRumble = [defaults boolForKey:StreamPreferenceAudioHapticsKeepControllerRumbleKey];
     id storedRumbleMode = [defaults objectForKey:StreamPreferenceRumbleModeSelectionKey];
     if ([storedRumbleMode isKindOfClass:[NSNumber class]]) {
         self.rumbleModeSelection = [storedRumbleMode integerValue];

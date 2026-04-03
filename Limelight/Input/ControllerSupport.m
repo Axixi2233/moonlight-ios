@@ -11,6 +11,7 @@
 
 #import "DataManager.h"
 #include "Limelight.h"
+#include <float.h>
 #include <limits.h>
 #include <math.h>
 
@@ -54,6 +55,204 @@ static float MouseSensitivityScaleForPercentage(NSInteger relativeMouseSensitivi
 
 static const NSTimeInterval kStartButtonHoldDurationForGameMenu = 0.6;
 
+typedef struct {
+    float smoothedEnergy;
+    float smoothedVoice;
+    float smoothedTransient;
+    float smoothedDeviceAmplitude;
+    float smoothedLowMotorAmplitude;
+    float smoothedHighMotorAmplitude;
+    float previousMonoSample;
+} audio_haptics_state_t;
+
+static float ClampUnitFloat(float value) {
+    return fmaxf(0.0f, fminf(1.0f, value));
+}
+
+static uint16_t AudioHapticsAmplitudeFromUnitFloat(float value) {
+    return (uint16_t)lrintf(ClampUnitFloat(value) * 65535.0f);
+}
+
+static float VoiceFilterCutoffForSelection(NSInteger selection) {
+    switch (selection) {
+        case StreamAudioHapticsVoiceFilterSelectionLow:
+            return 900.0f;
+        case StreamAudioHapticsVoiceFilterSelectionMedium:
+            return 1300.0f;
+        case StreamAudioHapticsVoiceFilterSelectionHigh:
+            return 1800.0f;
+        case StreamAudioHapticsVoiceFilterSelectionOff:
+        default:
+            return 0.0f;
+    }
+}
+
+static float VoiceFilterStrengthForSelection(NSInteger selection) {
+    switch (selection) {
+        case StreamAudioHapticsVoiceFilterSelectionLow:
+            return 0.22f;
+        case StreamAudioHapticsVoiceFilterSelectionMedium:
+            return 0.46f;
+        case StreamAudioHapticsVoiceFilterSelectionHigh:
+            return 0.72f;
+        case StreamAudioHapticsVoiceFilterSelectionOff:
+        default:
+            return 0.0f;
+    }
+}
+
+static float VoiceFilterBlendForSelection(NSInteger selection) {
+    switch (selection) {
+        case StreamAudioHapticsVoiceFilterSelectionLow:
+            return 0.30f;
+        case StreamAudioHapticsVoiceFilterSelectionMedium:
+            return 0.58f;
+        case StreamAudioHapticsVoiceFilterSelectionHigh:
+            return 0.85f;
+        case StreamAudioHapticsVoiceFilterSelectionOff:
+        default:
+            return 0.0f;
+    }
+}
+
+static float ControllerVoiceFilterBaseMultiplier(NSInteger selection) {
+    switch (selection) {
+        case StreamAudioHapticsVoiceFilterSelectionLow:
+            return 0.98f;
+        case StreamAudioHapticsVoiceFilterSelectionMedium:
+            return 0.58f;
+        case StreamAudioHapticsVoiceFilterSelectionHigh:
+            return 0.14f;
+        case StreamAudioHapticsVoiceFilterSelectionOff:
+        default:
+            return 1.0f;
+    }
+}
+
+static float ControllerVoiceFilterTransientBoost(NSInteger selection) {
+    switch (selection) {
+        case StreamAudioHapticsVoiceFilterSelectionLow:
+            return 1.00f;
+        case StreamAudioHapticsVoiceFilterSelectionMedium:
+            return 1.34f;
+        case StreamAudioHapticsVoiceFilterSelectionHigh:
+            return 1.95f;
+        case StreamAudioHapticsVoiceFilterSelectionOff:
+        default:
+            return 1.0f;
+    }
+}
+
+static float ControllerLowMotorBaseMix(NSInteger selection) {
+    switch (selection) {
+        case StreamAudioHapticsVoiceFilterSelectionLow:
+            return 2.90f;
+        case StreamAudioHapticsVoiceFilterSelectionMedium:
+            return 1.95f;
+        case StreamAudioHapticsVoiceFilterSelectionHigh:
+            return 1.05f;
+        case StreamAudioHapticsVoiceFilterSelectionOff:
+        default:
+            return 2.70f;
+    }
+}
+
+static float ControllerHighMotorTransientMix(NSInteger selection) {
+    switch (selection) {
+        case StreamAudioHapticsVoiceFilterSelectionLow:
+            return 2.00f;
+        case StreamAudioHapticsVoiceFilterSelectionMedium:
+            return 2.45f;
+        case StreamAudioHapticsVoiceFilterSelectionHigh:
+            return 2.55f;
+        case StreamAudioHapticsVoiceFilterSelectionOff:
+        default:
+            return 2.15f;
+    }
+}
+
+static float ControllerHighMotorBaseBleed(NSInteger selection) {
+    switch (selection) {
+        case StreamAudioHapticsVoiceFilterSelectionLow:
+            return 0.12f;
+        case StreamAudioHapticsVoiceFilterSelectionMedium:
+            return 0.05f;
+        case StreamAudioHapticsVoiceFilterSelectionHigh:
+            return 0.02f;
+        case StreamAudioHapticsVoiceFilterSelectionOff:
+        default:
+            return 0.10f;
+    }
+}
+
+static float ControllerLowMotorReleaseAlpha(NSInteger selection) {
+    switch (selection) {
+        case StreamAudioHapticsVoiceFilterSelectionLow:
+            return 0.18f;
+        case StreamAudioHapticsVoiceFilterSelectionMedium:
+            return 0.24f;
+        case StreamAudioHapticsVoiceFilterSelectionHigh:
+            return 0.38f;
+        case StreamAudioHapticsVoiceFilterSelectionOff:
+        default:
+            return 0.14f;
+    }
+}
+
+static float ControllerHighMotorReleaseAlpha(NSInteger selection) {
+    switch (selection) {
+        case StreamAudioHapticsVoiceFilterSelectionLow:
+            return 0.20f;
+        case StreamAudioHapticsVoiceFilterSelectionMedium:
+            return 0.26f;
+        case StreamAudioHapticsVoiceFilterSelectionHigh:
+            return 0.42f;
+        case StreamAudioHapticsVoiceFilterSelectionOff:
+        default:
+            return 0.16f;
+    }
+}
+
+static NSInteger NormalizedAudioHapticsOutputTargetValue(NSInteger outputTarget) {
+    switch (outputTarget) {
+        case StreamAudioHapticsOutputTargetController:
+            return StreamAudioHapticsOutputTargetController;
+        case StreamAudioHapticsOutputTargetDevice:
+        default:
+            return StreamAudioHapticsOutputTargetDevice;
+    }
+}
+
+static NSInteger NormalizedAudioHapticsStrengthValue(NSInteger strength) {
+    return MAX(25, MIN(strength, 200));
+}
+
+static NSInteger NormalizedAudioHapticsVoiceFilterSelectionValue(NSInteger selection) {
+    switch (selection) {
+        case StreamAudioHapticsVoiceFilterSelectionLow:
+        case StreamAudioHapticsVoiceFilterSelectionMedium:
+        case StreamAudioHapticsVoiceFilterSelectionHigh:
+            return selection;
+        case StreamAudioHapticsVoiceFilterSelectionOff:
+        default:
+            return StreamAudioHapticsVoiceFilterSelectionOff;
+    }
+}
+
+static float OnePoleSmoothingAlpha(float cutoffHz, int sampleRate) {
+    if (cutoffHz <= 0.0f || sampleRate <= 0) {
+        return 0.0f;
+    }
+    float dt = 1.0f / (float)sampleRate;
+    float rc = 1.0f / (2.0f * (float)M_PI * cutoffHz);
+    return dt / (rc + dt);
+}
+
+static float ApplyAttackReleaseSmoothing(float current, float target, float attackAlpha, float releaseAlpha) {
+    float alpha = target > current ? attackAlpha : releaseAlpha;
+    return current + ((target - current) * alpha);
+}
+
 @implementation ControllerSupport {
     id _controllerConnectObserver;
     id _controllerDisconnectObserver;
@@ -87,6 +286,14 @@ static const NSTimeInterval kStartButtonHoldDurationForGameMenu = 0.6;
     BOOL _remoteMouseMode;
     float _relativeMouseSensitivityScale;
     BOOL _longPressStartForGameMenuEnabled;
+    BOOL _audioHapticsEnabled;
+    NSInteger _audioHapticsOutputTarget;
+    float _audioHapticsStrengthScale;
+    NSInteger _audioHapticsVoiceFilterSelection;
+    BOOL _audioHapticsKeepControllerRumble;
+    HapticContext *_audioDeviceHaptics;
+    audio_haptics_state_t _audioDeviceState;
+    audio_haptics_state_t _audioControllerState;
 }
 
 // UPDATE_BUTTON_FLAG(controller, flag, pressed)
@@ -140,8 +347,9 @@ static const NSTimeInterval kStartButtonHoldDurationForGameMenu = 0.6;
         return;
     }
     
-    [controller.lowFreqMotor setMotorAmplitude:lowFreqMotor];
-    [controller.highFreqMotor setMotorAmplitude:highFreqMotor];
+    controller.gameLowFreqMotorAmplitude = lowFreqMotor;
+    controller.gameHighFreqMotorAmplitude = highFreqMotor;
+    [self applyCombinedRumbleForController:controller];
 }
 
 -(void) rumbleTriggers:(uint16_t)controllerNumber leftTrigger:(uint16_t)leftTrigger rightTrigger:(uint16_t)rightTrigger
@@ -159,8 +367,311 @@ static const NSTimeInterval kStartButtonHoldDurationForGameMenu = 0.6;
         return;
     }
     
-    [controller.leftTriggerMotor setMotorAmplitude:leftTrigger];
-    [controller.rightTriggerMotor setMotorAmplitude:rightTrigger];
+    controller.gameLeftTriggerMotorAmplitude = leftTrigger;
+    controller.gameRightTriggerMotorAmplitude = rightTrigger;
+    [self applyCombinedRumbleForController:controller];
+}
+
+- (BOOL)isAudioHapticsDrivingControllerRumble {
+    return _audioHapticsEnabled && _audioHapticsOutputTarget == StreamAudioHapticsOutputTargetController;
+}
+
+- (BOOL)shouldUseDedicatedAudioControllerHaptics {
+    return _audioHapticsEnabled &&
+           _audioHapticsOutputTarget == StreamAudioHapticsOutputTargetController &&
+           _rumbleMode != StreamRumbleModeSelectionController;
+}
+
+- (void)ensureAudioDeviceHapticsIfNeeded {
+    if (!_audioHapticsEnabled || _audioHapticsOutputTarget != StreamAudioHapticsOutputTargetDevice || _audioDeviceHaptics != nil) {
+        return;
+    }
+    if (@available(iOS 14.0, tvOS 14.0, *)) {
+        _audioDeviceHaptics = [HapticContext createForcedDeviceContext];
+    }
+}
+
+- (void)applyCombinedRumbleForController:(Controller *)controller {
+    if (controller == nil) {
+        return;
+    }
+
+    BOOL audioOnController = [self isAudioHapticsDrivingControllerRumble];
+    BOOL keepGameControllerRumble = !audioOnController || _audioHapticsKeepControllerRumble;
+
+    if (audioOnController && _rumbleMode != StreamRumbleModeSelectionController) {
+        [controller.lowFreqMotor setMotorAmplitude:controller.gameLowFreqMotorAmplitude];
+        [controller.highFreqMotor setMotorAmplitude:controller.gameHighFreqMotorAmplitude];
+        [controller.leftTriggerMotor setMotorAmplitude:controller.gameLeftTriggerMotorAmplitude];
+        [controller.rightTriggerMotor setMotorAmplitude:controller.gameRightTriggerMotorAmplitude];
+        [controller.audioLowFreqMotor setMotorAmplitude:controller.audioLowFreqMotorAmplitude];
+        [controller.audioHighFreqMotor setMotorAmplitude:controller.audioHighFreqMotorAmplitude];
+        return;
+    }
+
+    uint16_t lowAmplitude = controller.audioLowFreqMotorAmplitude;
+    uint16_t highAmplitude = controller.audioHighFreqMotorAmplitude;
+    if (keepGameControllerRumble) {
+        lowAmplitude = MAX(lowAmplitude, controller.gameLowFreqMotorAmplitude);
+        highAmplitude = MAX(highAmplitude, controller.gameHighFreqMotorAmplitude);
+    }
+
+    [controller.lowFreqMotor setMotorAmplitude:lowAmplitude];
+    [controller.highFreqMotor setMotorAmplitude:highAmplitude];
+
+    uint16_t leftTriggerAmplitude = keepGameControllerRumble ? controller.gameLeftTriggerMotorAmplitude : 0;
+    uint16_t rightTriggerAmplitude = keepGameControllerRumble ? controller.gameRightTriggerMotorAmplitude : 0;
+    [controller.leftTriggerMotor setMotorAmplitude:leftTriggerAmplitude];
+    [controller.rightTriggerMotor setMotorAmplitude:rightTriggerAmplitude];
+    [controller.audioLowFreqMotor setMotorAmplitude:0];
+    [controller.audioHighFreqMotor setMotorAmplitude:0];
+}
+
+- (void)clearAudioDrivenRumbleState {
+    _audioDeviceState = (audio_haptics_state_t){0};
+    _audioControllerState = (audio_haptics_state_t){0};
+    [_audioDeviceHaptics setMotorAmplitude:0];
+
+    for (Controller *controller in [_controllers allValues]) {
+        controller.audioLowFreqMotorAmplitude = 0;
+        controller.audioHighFreqMotorAmplitude = 0;
+        [self applyCombinedRumbleForController:controller];
+    }
+}
+
+- (void)syncAudioHapticsResourcesForController:(Controller *)controller {
+    if (controller == nil) {
+        return;
+    }
+
+    if ([self shouldUseDedicatedAudioControllerHaptics]) {
+        if (controller.audioLowFreqMotor == nil) {
+            controller.audioLowFreqMotor = [HapticContext createForcedControllerLowFreqMotor:controller.gamepad];
+        }
+        if (controller.audioHighFreqMotor == nil) {
+            controller.audioHighFreqMotor = [HapticContext createForcedControllerHighFreqMotor:controller.gamepad];
+        }
+        return;
+    }
+
+    [controller.audioLowFreqMotor cleanup];
+    controller.audioLowFreqMotor = nil;
+    [controller.audioHighFreqMotor cleanup];
+    controller.audioHighFreqMotor = nil;
+}
+
+- (void)syncAudioHapticsResources {
+    if (!_audioHapticsEnabled || _audioHapticsOutputTarget != StreamAudioHapticsOutputTargetDevice) {
+        [_audioDeviceHaptics cleanup];
+        _audioDeviceHaptics = nil;
+    }
+
+    for (Controller *controller in [_controllers allValues]) {
+        [self syncAudioHapticsResourcesForController:controller];
+    }
+}
+
+- (void)updateControllerAudioHapticsWithLowAmplitude:(uint16_t)lowAmplitude highAmplitude:(uint16_t)highAmplitude {
+    for (Controller *controller in [_controllers allValues]) {
+        controller.audioLowFreqMotorAmplitude = lowAmplitude;
+        controller.audioHighFreqMotorAmplitude = highAmplitude;
+        [self applyCombinedRumbleForController:controller];
+    }
+}
+
+- (float)audioHapticsVoiceCutoffHz {
+    return VoiceFilterCutoffForSelection(_audioHapticsVoiceFilterSelection);
+}
+
+- (void)accumulateAudioHapticsMetricsForSamples:(const short *)samples
+                                     frameCount:(int)frameCount
+                                   channelCount:(int)channelCount
+                                     sampleRate:(int)sampleRate
+                                          state:(audio_haptics_state_t *)state
+                                      baseLevel:(float *)baseLevel
+                                 transientLevel:(float *)transientLevel {
+    if (samples == NULL || frameCount <= 0 || channelCount <= 0 || state == NULL || baseLevel == NULL || transientLevel == NULL) {
+        if (baseLevel != NULL) {
+            *baseLevel = 0.0f;
+        }
+        if (transientLevel != NULL) {
+            *transientLevel = 0.0f;
+        }
+        return;
+    }
+
+    float energyAccumulator = 0.0f;
+    float transientAccumulator = 0.0f;
+    float lowAlpha = OnePoleSmoothingAlpha(180.0f, sampleRate);
+    float voiceCutoffHz = [self audioHapticsVoiceCutoffHz];
+    float voiceAlpha = OnePoleSmoothingAlpha(voiceCutoffHz, sampleRate);
+    float voiceStrength = VoiceFilterStrengthForSelection(_audioHapticsVoiceFilterSelection);
+
+    for (int frameIndex = 0; frameIndex < frameCount; frameIndex++) {
+        float monoSample = 0.0f;
+        for (int channelIndex = 0; channelIndex < channelCount; channelIndex++) {
+            monoSample += samples[(frameIndex * channelCount) + channelIndex] / 32768.0f;
+        }
+        monoSample /= (float)channelCount;
+
+        float absSample = fabsf(monoSample);
+        energyAccumulator += absSample;
+        transientAccumulator += fabsf(monoSample - state->previousMonoSample);
+        state->previousMonoSample = monoSample;
+    }
+
+    float averageEnergy = energyAccumulator / (float)frameCount;
+    float averageTransient = transientAccumulator / (float)frameCount;
+    state->smoothedEnergy += (averageEnergy - state->smoothedEnergy) * lowAlpha;
+    if (voiceAlpha > 0.0f) {
+        state->smoothedVoice += (averageEnergy - state->smoothedVoice) * voiceAlpha;
+    }
+    else {
+        state->smoothedVoice = 0.0f;
+    }
+    state->smoothedTransient += (averageTransient - state->smoothedTransient) * 0.18f;
+
+    float filteredBase = state->smoothedEnergy;
+    if (voiceStrength > 0.0f) {
+        float fullyFilteredBase = fmaxf(0.0f, state->smoothedEnergy - (state->smoothedVoice * voiceStrength));
+        float filterBlend = VoiceFilterBlendForSelection(_audioHapticsVoiceFilterSelection);
+        filteredBase = state->smoothedEnergy + ((fullyFilteredBase - state->smoothedEnergy) * filterBlend);
+    }
+
+    *baseLevel = ClampUnitFloat(filteredBase);
+    *transientLevel = ClampUnitFloat(fmaxf(0.0f, (state->smoothedTransient * 2.25f) - (*baseLevel * 0.30f)));
+}
+
+- (void)processAudioHapticsSamples:(const short *)samples
+                         frameCount:(int)frameCount
+                       channelCount:(int)channelCount
+                         sampleRate:(int)sampleRate {
+    if (!_audioHapticsEnabled || samples == NULL || frameCount <= 0 || channelCount <= 0 || sampleRate <= 0) {
+        return;
+    }
+
+    if (_audioHapticsOutputTarget == StreamAudioHapticsOutputTargetDevice) {
+        [self ensureAudioDeviceHapticsIfNeeded];
+        if (_audioDeviceHaptics == nil) {
+            return;
+        }
+
+        float baseLevel = 0.0f;
+        float transientLevel = 0.0f;
+        [self accumulateAudioHapticsMetricsForSamples:samples
+                                           frameCount:frameCount
+                                         channelCount:channelCount
+                                           sampleRate:sampleRate
+                                                state:&_audioDeviceState
+                                            baseLevel:&baseLevel
+                                       transientLevel:&transientLevel];
+
+        float targetAmplitude = ClampUnitFloat(powf(ClampUnitFloat((baseLevel * 2.85f * _audioHapticsStrengthScale) + (transientLevel * 0.52f)), 0.68f));
+        if (targetAmplitude < 0.008f) {
+            targetAmplitude = 0.0f;
+        }
+        _audioDeviceState.smoothedDeviceAmplitude = ApplyAttackReleaseSmoothing(_audioDeviceState.smoothedDeviceAmplitude,
+                                                                                targetAmplitude,
+                                                                                0.48f,
+                                                                                0.24f);
+        if (_audioDeviceState.smoothedDeviceAmplitude < 0.0024f) {
+            _audioDeviceState.smoothedDeviceAmplitude = 0.0f;
+        }
+        [_audioDeviceHaptics setMotorAmplitude:AudioHapticsAmplitudeFromUnitFloat(_audioDeviceState.smoothedDeviceAmplitude)];
+        return;
+    }
+
+    float baseLevel = 0.0f;
+    float transientLevel = 0.0f;
+    [self accumulateAudioHapticsMetricsForSamples:samples
+                                       frameCount:frameCount
+                                     channelCount:channelCount
+                                       sampleRate:sampleRate
+                                            state:&_audioControllerState
+                                        baseLevel:&baseLevel
+                                   transientLevel:&transientLevel];
+
+    float controllerBaseLevel = ClampUnitFloat(baseLevel * ControllerVoiceFilterBaseMultiplier(_audioHapticsVoiceFilterSelection));
+    float controllerTransientLevel = ClampUnitFloat(transientLevel * ControllerVoiceFilterTransientBoost(_audioHapticsVoiceFilterSelection));
+    if (_audioHapticsVoiceFilterSelection == StreamAudioHapticsVoiceFilterSelectionHigh) {
+        controllerTransientLevel = ClampUnitFloat(controllerTransientLevel + (transientLevel * 0.32f));
+    }
+
+    float targetLowAmplitude = ClampUnitFloat(powf(ClampUnitFloat(controllerBaseLevel * ControllerLowMotorBaseMix(_audioHapticsVoiceFilterSelection) * _audioHapticsStrengthScale), 0.70f));
+    float targetHighAmplitude = ClampUnitFloat(powf(ClampUnitFloat(((controllerTransientLevel * ControllerHighMotorTransientMix(_audioHapticsVoiceFilterSelection)) + (controllerBaseLevel * ControllerHighMotorBaseBleed(_audioHapticsVoiceFilterSelection))) * _audioHapticsStrengthScale), 0.74f));
+    if (_audioHapticsVoiceFilterSelection == StreamAudioHapticsVoiceFilterSelectionHigh && targetLowAmplitude < 0.0060f) {
+        targetLowAmplitude = 0.0f;
+    }
+    else if (targetLowAmplitude < 0.0025f) {
+        targetLowAmplitude = 0.0f;
+    }
+    if (_audioHapticsVoiceFilterSelection == StreamAudioHapticsVoiceFilterSelectionHigh && targetHighAmplitude < 0.0040f) {
+        targetHighAmplitude = 0.0f;
+    }
+    else if (targetHighAmplitude < 0.0025f) {
+        targetHighAmplitude = 0.0f;
+    }
+
+    _audioControllerState.smoothedLowMotorAmplitude = ApplyAttackReleaseSmoothing(_audioControllerState.smoothedLowMotorAmplitude,
+                                                                                  targetLowAmplitude,
+                                                                                  0.42f,
+                                                                                  ControllerLowMotorReleaseAlpha(_audioHapticsVoiceFilterSelection));
+    _audioControllerState.smoothedHighMotorAmplitude = ApplyAttackReleaseSmoothing(_audioControllerState.smoothedHighMotorAmplitude,
+                                                                                   targetHighAmplitude,
+                                                                                   0.48f,
+                                                                                   ControllerHighMotorReleaseAlpha(_audioHapticsVoiceFilterSelection));
+    if (_audioHapticsVoiceFilterSelection == StreamAudioHapticsVoiceFilterSelectionHigh && _audioControllerState.smoothedLowMotorAmplitude < 0.0035f) {
+        _audioControllerState.smoothedLowMotorAmplitude = 0.0f;
+    }
+    else if (_audioControllerState.smoothedLowMotorAmplitude < 0.0012f) {
+        _audioControllerState.smoothedLowMotorAmplitude = 0.0f;
+    }
+    if (_audioHapticsVoiceFilterSelection == StreamAudioHapticsVoiceFilterSelectionHigh && _audioControllerState.smoothedHighMotorAmplitude < 0.0030f) {
+        _audioControllerState.smoothedHighMotorAmplitude = 0.0f;
+    }
+    else if (_audioControllerState.smoothedHighMotorAmplitude < 0.0012f) {
+        _audioControllerState.smoothedHighMotorAmplitude = 0.0f;
+    }
+
+    [self updateControllerAudioHapticsWithLowAmplitude:AudioHapticsAmplitudeFromUnitFloat(_audioControllerState.smoothedLowMotorAmplitude)
+                                         highAmplitude:AudioHapticsAmplitudeFromUnitFloat(_audioControllerState.smoothedHighMotorAmplitude)];
+}
+
+- (void)stopAudioHaptics {
+    [self clearAudioDrivenRumbleState];
+}
+
+- (void)updateAudioHapticsEnabled:(BOOL)enabled
+                     outputTarget:(NSInteger)outputTarget
+                         strength:(NSInteger)strength
+             voiceFilterSelection:(NSInteger)voiceFilterSelection
+         keepControllerRumble:(BOOL)keepControllerRumble {
+    NSInteger normalizedOutputTarget = NormalizedAudioHapticsOutputTargetValue(outputTarget);
+    NSInteger normalizedStrength = NormalizedAudioHapticsStrengthValue(strength);
+    NSInteger normalizedVoiceFilterSelection = NormalizedAudioHapticsVoiceFilterSelectionValue(voiceFilterSelection);
+    BOOL configurationChanged = (_audioHapticsEnabled != enabled) ||
+                                (_audioHapticsOutputTarget != normalizedOutputTarget) ||
+                                (_audioHapticsVoiceFilterSelection != normalizedVoiceFilterSelection) ||
+                                (_audioHapticsKeepControllerRumble != keepControllerRumble) ||
+                                (fabsf(_audioHapticsStrengthScale - MAX(0.25f, MIN((float)normalizedStrength / 100.0f, 2.0f))) > FLT_EPSILON);
+
+    if (!configurationChanged) {
+        return;
+    }
+
+    [self clearAudioDrivenRumbleState];
+
+    _audioHapticsEnabled = enabled;
+    _audioHapticsOutputTarget = normalizedOutputTarget;
+    _audioHapticsStrengthScale = MAX(0.25f, MIN((float)normalizedStrength / 100.0f, 2.0f));
+    _audioHapticsVoiceFilterSelection = normalizedVoiceFilterSelection;
+    _audioHapticsKeepControllerRumble = keepControllerRumble;
+
+    [self syncAudioHapticsResources];
+
+    for (Controller *controller in [_controllers allValues]) {
+        [self applyCombinedRumbleForController:controller];
+    }
 }
 
 
@@ -694,6 +1205,12 @@ static const NSTimeInterval kStartButtonHoldDurationForGameMenu = 0.6;
     controller.highFreqMotor = [HapticContext createContextForHighFreqMotor:controller.gamepad];
     controller.leftTriggerMotor = [HapticContext createContextForLeftTrigger:controller.gamepad];
     controller.rightTriggerMotor = [HapticContext createContextForRightTrigger:controller.gamepad];
+    if (_audioHapticsEnabled &&
+        _audioHapticsOutputTarget == StreamAudioHapticsOutputTargetController &&
+        _rumbleMode != StreamRumbleModeSelectionController) {
+        controller.audioLowFreqMotor = [HapticContext createForcedControllerLowFreqMotor:controller.gamepad];
+        controller.audioHighFreqMotor = [HapticContext createForcedControllerHighFreqMotor:controller.gamepad];
+    }
 }
 
 -(void) cleanupControllerHaptics:(Controller*) controller
@@ -702,6 +1219,8 @@ static const NSTimeInterval kStartButtonHoldDurationForGameMenu = 0.6;
     [controller.highFreqMotor cleanup];
     [controller.leftTriggerMotor cleanup];
     [controller.rightTriggerMotor cleanup];
+    [controller.audioLowFreqMotor cleanup];
+    [controller.audioHighFreqMotor cleanup];
 }
 
 -(void) cleanupControllerMotion:(Controller*) controller
@@ -1369,6 +1888,11 @@ static const NSTimeInterval kStartButtonHoldDurationForGameMenu = 0.6;
     _remoteMouseMode = currentSettings.remoteMouseMode;
     _relativeMouseSensitivityScale = MouseSensitivityScaleForPercentage(currentSettings.relativeMouseSensitivity);
     _longPressStartForGameMenuEnabled = currentSettings.longPressStartForGameMenuEnabled;
+    _audioHapticsEnabled = currentSettings.audioHapticsEnabled;
+    _audioHapticsOutputTarget = currentSettings.audioHapticsOutputTarget;
+    _audioHapticsStrengthScale = MAX(0.25f, MIN((float)currentSettings.audioHapticsStrength / 100.0f, 2.0f));
+    _audioHapticsVoiceFilterSelection = currentSettings.audioHapticsVoiceFilterSelection;
+    _audioHapticsKeepControllerRumble = currentSettings.audioHapticsKeepControllerRumble;
     
     Log(LOG_I, @"Number of supported controllers connected: %d", [ControllerSupport getGamepadCount]);
     Log(LOG_I, @"Multi-controller: %d", _multiController);
@@ -1495,6 +2019,10 @@ static const NSTimeInterval kStartButtonHoldDurationForGameMenu = 0.6;
 
 -(void) cleanup
 {
+    [self stopAudioHaptics];
+    [_audioDeviceHaptics cleanup];
+    _audioDeviceHaptics = nil;
+
     [[NSNotificationCenter defaultCenter] removeObserver:_controllerConnectObserver];
     [[NSNotificationCenter defaultCenter] removeObserver:_controllerDisconnectObserver];
     [[NSNotificationCenter defaultCenter] removeObserver:_mouseConnectObserver];

@@ -58,6 +58,11 @@ final class SettingsFormSnapshot: NSObject {
     var streamOrientationSelection: Int = 0
     var gameMenuShortcutSelection: Int = 0
     var longPressStartForGameMenuEnabled: Bool = false
+    var audioHapticsEnabled: Bool = false
+    var audioHapticsOutputTarget: Int = 0
+    var audioHapticsStrength: Int = 100
+    var audioHapticsVoiceFilterSelection: Int = 0
+    var audioHapticsKeepControllerRumble: Bool = false
     var statsOverlay: Bool = false
     var rumbleModeSelection: Int = 0
     var externalMonitor: Bool = false
@@ -131,6 +136,11 @@ private final class SettingsFormViewModel: ObservableObject {
     @Published var streamOrientationSelection: Int = 0
     @Published var gameMenuShortcutSelection: Int = 0
     @Published var longPressStartForGameMenuEnabled: Bool = false
+    @Published var audioHapticsEnabled: Bool = false
+    @Published var audioHapticsOutputTarget: Int = 0
+    @Published var audioHapticsStrength: Double = 100
+    @Published var audioHapticsVoiceFilterSelection: Int = 0
+    @Published var audioHapticsKeepControllerRumble: Bool = false
     @Published var statsOverlay: Bool = false
     @Published var rumbleModeSelection: Int = 0
     @Published var externalMonitor: Bool = false
@@ -196,6 +206,11 @@ private final class SettingsFormViewModel: ObservableObject {
         streamOrientationSelection = snapshot.streamOrientationSelection
         gameMenuShortcutSelection = snapshot.gameMenuShortcutSelection
         longPressStartForGameMenuEnabled = snapshot.longPressStartForGameMenuEnabled
+        audioHapticsEnabled = snapshot.audioHapticsEnabled
+        audioHapticsOutputTarget = snapshot.audioHapticsOutputTarget
+        audioHapticsStrength = Double(snapshot.audioHapticsStrength)
+        audioHapticsVoiceFilterSelection = snapshot.audioHapticsVoiceFilterSelection
+        audioHapticsKeepControllerRumble = snapshot.audioHapticsKeepControllerRumble
         statsOverlay = snapshot.statsOverlay
         rumbleModeSelection = snapshot.rumbleModeSelection
         externalMonitor = snapshot.externalMonitor
@@ -257,6 +272,11 @@ private final class SettingsFormViewModel: ObservableObject {
         snapshot.streamOrientationSelection = streamOrientationSelection
         snapshot.gameMenuShortcutSelection = gameMenuShortcutSelection
         snapshot.longPressStartForGameMenuEnabled = longPressStartForGameMenuEnabled
+        snapshot.audioHapticsEnabled = audioHapticsEnabled
+        snapshot.audioHapticsOutputTarget = audioHapticsOutputTarget
+        snapshot.audioHapticsStrength = Int(audioHapticsStrength.rounded())
+        snapshot.audioHapticsVoiceFilterSelection = audioHapticsVoiceFilterSelection
+        snapshot.audioHapticsKeepControllerRumble = audioHapticsKeepControllerRumble
         snapshot.statsOverlay = statsOverlay
         snapshot.rumbleModeSelection = rumbleModeSelection
         snapshot.externalMonitor = externalMonitor
@@ -893,6 +913,31 @@ private struct SettingsRootView: View {
                                       description: SettingsLocalized("settings.external_monitor.description"),
                                       isOn: $model.externalMonitor)
                     Toggle(SettingsLocalized("settings.virtual_display.toggle"), isOn: virtualDisplayToggle()).font(.headline)
+                    descriptiveToggle(title: SettingsLocalized("settings.audio_haptics.enable"),
+                                      description: SettingsLocalized("settings.audio_haptics.enable_description"),
+                                      isOn: $model.audioHapticsEnabled)
+                    if model.audioHapticsEnabled {
+                        segmentedSection(
+                            title: SettingsLocalized("settings.audio_haptics.output_target"),
+                            selection: $model.audioHapticsOutputTarget,
+                            labels: model.audioHapticsOutputTargetTitles
+                        )
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text(model.audioHapticsStrengthLabel)
+                                .font(.headline)
+                            Slider(value: $model.audioHapticsStrength, in: 25...200, step: 5)
+                        }
+                        segmentedSection(
+                            title: SettingsLocalized("settings.audio_haptics.voice_filter"),
+                            selection: $model.audioHapticsVoiceFilterSelection,
+                            labels: model.audioHapticsVoiceFilterTitles
+                        )
+                        if model.audioHapticsOutputTarget == 1 {
+                            descriptiveToggle(title: SettingsLocalized("settings.audio_haptics.keep_controller_rumble"),
+                                              description: SettingsLocalized("settings.audio_haptics.keep_controller_rumble_description"),
+                                              isOn: $model.audioHapticsKeepControllerRumble)
+                        }
+                    }
                 }
 
                 Section(header: Text(SettingsLocalized("settings.section.virtual_controls"))) {
@@ -1174,6 +1219,26 @@ private extension SettingsFormViewModel {
             SettingsLocalized("settings.game_menu_shortcut.escape"),
             SettingsLocalized("settings.game_menu_shortcut.ctrl_alt_shift_q")
         ]
+    }
+
+    var audioHapticsOutputTargetTitles: [String] {
+        [
+            SettingsLocalized("common.device"),
+            SettingsLocalized("common.controller")
+        ]
+    }
+
+    var audioHapticsVoiceFilterTitles: [String] {
+        [
+            SettingsLocalized("common.off"),
+            SettingsLocalized("settings.audio_haptics.voice_filter.low"),
+            SettingsLocalized("settings.audio_haptics.voice_filter.medium"),
+            SettingsLocalized("settings.audio_haptics.voice_filter.high")
+        ]
+    }
+
+    var audioHapticsStrengthLabel: String {
+        SettingsLocalizedFormat("settings.audio_haptics.strength", Int(audioHapticsStrength.rounded()))
     }
 
     var rendererTitle: String {

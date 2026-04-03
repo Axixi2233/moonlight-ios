@@ -31,6 +31,11 @@ FOUNDATION_EXTERN NSString * const StreamPreferencePictureInPictureEnabledKey;
 FOUNDATION_EXTERN NSString * const StreamPreferenceStreamOrientationSelectionKey;
 FOUNDATION_EXTERN NSString * const StreamPreferenceGameMenuShortcutSelectionKey;
 FOUNDATION_EXTERN NSString * const StreamPreferenceLongPressStartForGameMenuEnabledKey;
+FOUNDATION_EXTERN NSString * const StreamPreferenceAudioHapticsEnabledKey;
+FOUNDATION_EXTERN NSString * const StreamPreferenceAudioHapticsOutputTargetKey;
+FOUNDATION_EXTERN NSString * const StreamPreferenceAudioHapticsStrengthKey;
+FOUNDATION_EXTERN NSString * const StreamPreferenceAudioHapticsVoiceFilterSelectionKey;
+FOUNDATION_EXTERN NSString * const StreamPreferenceAudioHapticsKeepControllerRumbleKey;
 
 typedef NS_ENUM(NSInteger, StreamTouchModeSelection) {
     StreamTouchModeSelectionTrackpad = 0,
@@ -74,6 +79,18 @@ typedef NS_ENUM(NSInteger, StreamGameMenuShortcutSelection) {
     StreamGameMenuShortcutSelectionNone = 0,
     StreamGameMenuShortcutSelectionEscape = 1,
     StreamGameMenuShortcutSelectionCtrlAltShiftQ = 2
+};
+
+typedef NS_ENUM(NSInteger, StreamAudioHapticsOutputTarget) {
+    StreamAudioHapticsOutputTargetDevice = 0,
+    StreamAudioHapticsOutputTargetController = 1
+};
+
+typedef NS_ENUM(NSInteger, StreamAudioHapticsVoiceFilterSelection) {
+    StreamAudioHapticsVoiceFilterSelectionOff = 0,
+    StreamAudioHapticsVoiceFilterSelectionLow = 1,
+    StreamAudioHapticsVoiceFilterSelectionMedium = 2,
+    StreamAudioHapticsVoiceFilterSelectionHigh = 3
 };
 
 @interface TemporarySettings : NSObject
@@ -133,6 +150,11 @@ typedef NS_ENUM(NSInteger, StreamGameMenuShortcutSelection) {
 @property (nonatomic) NSInteger streamOrientationSelection;
 @property (nonatomic) NSInteger gameMenuShortcutSelection;
 @property (nonatomic) BOOL longPressStartForGameMenuEnabled;
+@property (nonatomic) BOOL audioHapticsEnabled;
+@property (nonatomic) NSInteger audioHapticsOutputTarget;
+@property (nonatomic) NSInteger audioHapticsStrength;
+@property (nonatomic) NSInteger audioHapticsVoiceFilterSelection;
+@property (nonatomic) BOOL audioHapticsKeepControllerRumble;
 
 - (id) initFromSettings:(Settings*)settings;
 - (BOOL)usesAbsoluteTouchMode;

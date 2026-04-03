@@ -20,6 +20,12 @@
     BOOL _playing;
 }
 
+typedef NS_ENUM(NSInteger, HapticContextOutputMode) {
+    HapticContextOutputModeAutomatic = 0,
+    HapticContextOutputModeDevice = 1,
+    HapticContextOutputModeController = 2,
+};
+
 -(void)cleanup API_AVAILABLE(ios(14.0), tvos(14.0)) {
     if (_hapticPlayer != nil) {
         [_hapticPlayer cancelAndReturnError:nil];
@@ -85,14 +91,22 @@
     }
 }
 
--(id) initWithGamepad:(GCController*)gamepad locality:(GCHapticsLocality)locality API_AVAILABLE(ios(14.0), tvos(14.0)) {
+- (id)initWithGamepad:(GCController*)gamepad locality:(GCHapticsLocality)locality outputMode:(HapticContextOutputMode)outputMode API_AVAILABLE(ios(14.0), tvos(14.0)) {
     DataManager* dataMan = [[DataManager alloc] init];
     TemporarySettings* currentSettings = [dataMan getSettings];
-    if (currentSettings.rumbleModeSelection == StreamRumbleModeSelectionDisabled) {
+    NSInteger resolvedMode = currentSettings.rumbleModeSelection;
+    if (outputMode == HapticContextOutputModeDevice) {
+        resolvedMode = StreamRumbleModeSelectionDevice;
+    }
+    else if (outputMode == HapticContextOutputModeController) {
+        resolvedMode = StreamRumbleModeSelectionController;
+    }
+
+    if (resolvedMode == StreamRumbleModeSelectionDisabled) {
         return nil;
     }
 
-    if (currentSettings.rumbleModeSelection == StreamRumbleModeSelectionDevice) {
+    if (resolvedMode == StreamRumbleModeSelectionDevice) {
         if (!CHHapticEngine.capabilitiesForHardware.supportsHaptics) {
             Log(LOG_W, @"Device does not support haptics");
             return nil;
@@ -154,7 +168,7 @@
 
 +(HapticContext*) createContextForHighFreqMotor:(GCController*)gamepad {
     if (@available(iOS 14.0, tvOS 14.0, *)) {
-        return [[HapticContext alloc] initWithGamepad:gamepad locality:GCHapticsLocalityRightHandle];
+        return [[HapticContext alloc] initWithGamepad:gamepad locality:GCHapticsLocalityRightHandle outputMode:HapticContextOutputModeAutomatic];
     }
     else {
         return nil;
@@ -163,7 +177,7 @@
 
 +(HapticContext*) createContextForLowFreqMotor:(GCController*)gamepad {
     if (@available(iOS 14.0, tvOS 14.0, *)) {
-        return [[HapticContext alloc] initWithGamepad:gamepad locality:GCHapticsLocalityLeftHandle];
+        return [[HapticContext alloc] initWithGamepad:gamepad locality:GCHapticsLocalityLeftHandle outputMode:HapticContextOutputModeAutomatic];
     }
     else {
         return nil;
@@ -172,7 +186,7 @@
 
 +(HapticContext*) createContextForLeftTrigger:(GCController*)gamepad {
     if (@available(iOS 14.0, tvOS 14.0, *)) {
-        return [[HapticContext alloc] initWithGamepad:gamepad locality:GCHapticsLocalityLeftTrigger];
+        return [[HapticContext alloc] initWithGamepad:gamepad locality:GCHapticsLocalityLeftTrigger outputMode:HapticContextOutputModeAutomatic];
     }
     else {
         return nil;
@@ -181,11 +195,32 @@
 
 +(HapticContext*) createContextForRightTrigger:(GCController*)gamepad {
     if (@available(iOS 14.0, tvOS 14.0, *)) {
-        return [[HapticContext alloc] initWithGamepad:gamepad locality:GCHapticsLocalityRightTrigger];
+        return [[HapticContext alloc] initWithGamepad:gamepad locality:GCHapticsLocalityRightTrigger outputMode:HapticContextOutputModeAutomatic];
     }
     else {
         return nil;
     }
+}
+
++(HapticContext*) createForcedDeviceContext {
+    if (@available(iOS 14.0, tvOS 14.0, *)) {
+        return [[HapticContext alloc] initWithGamepad:nil locality:GCHapticsLocalityDefault outputMode:HapticContextOutputModeDevice];
+    }
+    return nil;
+}
+
++(HapticContext*) createForcedControllerHighFreqMotor:(GCController*)gamepad {
+    if (@available(iOS 14.0, tvOS 14.0, *)) {
+        return [[HapticContext alloc] initWithGamepad:gamepad locality:GCHapticsLocalityRightHandle outputMode:HapticContextOutputModeController];
+    }
+    return nil;
+}
+
++(HapticContext*) createForcedControllerLowFreqMotor:(GCController*)gamepad {
+    if (@available(iOS 14.0, tvOS 14.0, *)) {
+        return [[HapticContext alloc] initWithGamepad:gamepad locality:GCHapticsLocalityLeftHandle outputMode:HapticContextOutputModeController];
+    }
+    return nil;
 }
 
 @end

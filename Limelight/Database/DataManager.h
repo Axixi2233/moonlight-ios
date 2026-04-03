@@ -34,10 +34,15 @@
          metalFxScalingSelection:(NSInteger)metalFxScalingSelection
          metalFxSharpenSelection:(NSInteger)metalFxSharpenSelection
        metalFxColorModeSelection:(NSInteger)metalFxColorModeSelection
-          pictureInPictureEnabled:(BOOL)pictureInPictureEnabled
-        streamOrientationSelection:(NSInteger)streamOrientationSelection
-      gameMenuShortcutSelection:(NSInteger)gameMenuShortcutSelection
+       pictureInPictureEnabled:(BOOL)pictureInPictureEnabled
+     streamOrientationSelection:(NSInteger)streamOrientationSelection
+   gameMenuShortcutSelection:(NSInteger)gameMenuShortcutSelection
  longPressStartForGameMenuEnabled:(BOOL)longPressStartForGameMenuEnabled
+           audioHapticsEnabled:(BOOL)audioHapticsEnabled
+      audioHapticsOutputTarget:(NSInteger)audioHapticsOutputTarget
+         audioHapticsStrength:(NSInteger)audioHapticsStrength
+ audioHapticsVoiceFilterSelection:(NSInteger)audioHapticsVoiceFilterSelection
+ audioHapticsKeepControllerRumble:(BOOL)audioHapticsKeepControllerRumble
               touchModeSelection:(NSInteger)touchModeSelection
                     statsOverlay:(BOOL)statsOverlay
              rumbleModeSelection:(NSInteger)rumbleModeSelection
@@ -84,6 +89,11 @@ performanceOverlayPositionSelection:(NSInteger)performanceOverlayPositionSelecti
 - (NSArray<NSDictionary *> *)customShortcutDefinitions;
 - (void)saveCustomShortcutDefinitions:(NSArray<NSDictionary *> *)definitions;
 - (void)saveTouchModeSelection:(NSInteger)touchModeSelection;
+- (void)saveAudioHapticsEnabled:(BOOL)audioHapticsEnabled
+             outputTarget:(NSInteger)audioHapticsOutputTarget
+                 strength:(NSInteger)audioHapticsStrength
+     voiceFilterSelection:(NSInteger)audioHapticsVoiceFilterSelection
+     keepControllerRumble:(BOOL)audioHapticsKeepControllerRumble;
 - (void)resetSettingsToDefaultsClearingCustomData:(BOOL)clearCustomData;
 
 - (void) updateUniqueId:(NSString*)uniqueId;

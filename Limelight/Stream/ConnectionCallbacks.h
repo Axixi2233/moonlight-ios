@@ -22,4 +22,11 @@
 - (void) setControllerLed:(uint16_t)controllerNumber r:(uint8_t)r g:(uint8_t)g b:(uint8_t)b;
 - (void) videoContentShown;
 
+@optional
+- (void)processAudioHapticsSamples:(const short *)samples
+                        frameCount:(int)frameCount
+                      channelCount:(int)channelCount
+                        sampleRate:(int)sampleRate;
+- (void)stopAudioHaptics;
+
 @end

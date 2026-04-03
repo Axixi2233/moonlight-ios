@@ -44,6 +44,11 @@ final class StreamActionSheetItem: NSObject {
     func streamActionSheetHostingViewController(_ controller: StreamActionSheetHostingViewController, didChangeExtendedPerformanceMetricsEnabled enabled: Bool)
     func streamActionSheetHostingViewController(_ controller: StreamActionSheetHostingViewController, didChangePerformanceOverlayPositionSelection selection: Int)
     func streamActionSheetHostingViewController(_ controller: StreamActionSheetHostingViewController, didChangePerformanceOverlayMargin margin: Double)
+    func streamActionSheetHostingViewController(_ controller: StreamActionSheetHostingViewController, didChangeAudioHapticsEnabled enabled: Bool)
+    func streamActionSheetHostingViewController(_ controller: StreamActionSheetHostingViewController, didChangeAudioHapticsOutputTarget selection: Int)
+    func streamActionSheetHostingViewController(_ controller: StreamActionSheetHostingViewController, didChangeAudioHapticsStrength strength: Double)
+    func streamActionSheetHostingViewController(_ controller: StreamActionSheetHostingViewController, didChangeAudioHapticsVoiceFilterSelection selection: Int)
+    func streamActionSheetHostingViewController(_ controller: StreamActionSheetHostingViewController, didChangeAudioHapticsKeepControllerRumble enabled: Bool)
 }
 
 @objcMembers
@@ -103,6 +108,12 @@ private final class StreamActionSheetViewModel: ObservableObject {
     @Published var extendedPerformanceMetricsEnabled: Bool = false
     @Published var performanceOverlayPositionSelection: Int = 0
     @Published var performanceOverlayMargin: Double = 0
+    @Published var audioHapticsEnabled: Bool = false
+    @Published var audioHapticsOutputTargetSelection: Int = 0
+    @Published var audioHapticsStrength: Double = 100
+    @Published var audioHapticsVoiceFilterSelection: Int = 0
+    @Published var audioHapticsKeepControllerRumble: Bool = false
+    @Published var isShowingPerformanceOverlayPositionPicker: Bool = false
     @Published var touchModeToastText: String? = nil
 }
 
@@ -225,6 +236,11 @@ private struct StreamActionSheetPanelView: View {
     let onExtendedPerformanceMetricsChange: (Bool) -> Void
     let onPerformanceOverlayPositionChange: (Int) -> Void
     let onPerformanceOverlayMarginChange: (Double) -> Void
+    let onAudioHapticsEnabledChange: (Bool) -> Void
+    let onAudioHapticsOutputTargetChange: (Int) -> Void
+    let onAudioHapticsStrengthChange: (Double) -> Void
+    let onAudioHapticsVoiceFilterSelectionChange: (Int) -> Void
+    let onAudioHapticsKeepControllerRumbleChange: (Bool) -> Void
     let onCancel: () -> Void
 
     private let horizontalPadding: CGFloat = 20
@@ -270,6 +286,7 @@ private struct StreamActionSheetPanelView: View {
                             }
 
                             touchModeSection
+                            audioHapticsSection
                             videoAlignmentSection
                             videoAlignmentMarginSection
                             extendedPerformanceMetricsSection
@@ -442,22 +459,43 @@ private struct StreamActionSheetPanelView: View {
     }
 
     private var videoAlignmentSection: some View {
-        VStack(alignment: .leading, spacing: 10) {
+        let labels = [
+            StreamMenuLocalized("settings.video_alignment.top"),
+            StreamMenuLocalized("settings.video_alignment.center"),
+            StreamMenuLocalized("settings.video_alignment.bottom")
+        ]
+        let displayedSelection: Int
+        switch viewModel.videoAlignmentSelection {
+            case 1:
+                displayedSelection = 0
+            case 0:
+                displayedSelection = 1
+            default:
+                displayedSelection = 2
+        }
+
+        return VStack(alignment: .leading, spacing: 10) {
             Text(StreamMenuLocalized("stream.video_alignment.title"))
                 .font(.system(size: 13, weight: .medium))
                 .foregroundColor(Color.white.opacity(0.72))
 
-            SegmentedOptionsControl(items: [
-                StreamMenuLocalized("settings.video_alignment.center"),
-                StreamMenuLocalized("settings.video_alignment.top"),
-                StreamMenuLocalized("settings.video_alignment.bottom")
-            ],
-                                    selection: viewModel.videoAlignmentSelection) { newValue in
-                guard viewModel.videoAlignmentSelection != newValue else {
+            SegmentedOptionsControl(items: labels,
+                                    selection: displayedSelection) { newValue in
+                let actualSelection: Int
+                switch newValue {
+                    case 0:
+                        actualSelection = 1
+                    case 1:
+                        actualSelection = 0
+                    default:
+                        actualSelection = 2
+                }
+
+                guard viewModel.videoAlignmentSelection != actualSelection else {
                     return
                 }
-                viewModel.videoAlignmentSelection = newValue
-                onVideoAlignmentChange(newValue)
+                viewModel.videoAlignmentSelection = actualSelection
+                onVideoAlignmentChange(actualSelection)
             }
             .frame(height: 38)
         }
@@ -509,66 +547,179 @@ private struct StreamActionSheetPanelView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 
-    private var performanceOverlayPositionSection: some View {
-        let items = [
-            [
-                StreamMenuLocalized("settings.performance_overlay_position.top_center"),
-                StreamMenuLocalized("settings.performance_overlay_position.top_left"),
-                StreamMenuLocalized("settings.performance_overlay_position.top_right")
-            ],
-            [
-                StreamMenuLocalized("settings.performance_overlay_position.bottom_center"),
-                StreamMenuLocalized("settings.performance_overlay_position.bottom_left"),
-                StreamMenuLocalized("settings.performance_overlay_position.bottom_right")
-            ]
-        ]
-
-        return VStack(alignment: .leading, spacing: 10) {
-            Text(StreamMenuLocalized("settings.performance_overlay_position.title"))
+    private var audioHapticsSection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text(StreamMenuLocalized("stream.audio_haptics.title"))
                 .font(.system(size: 13, weight: .medium))
                 .foregroundColor(Color.white.opacity(0.72))
 
-            VStack(spacing: 8) {
-                ForEach(0..<items.count, id: \.self) { rowIndex in
-                    HStack(spacing: 8) {
-                        ForEach(0..<items[rowIndex].count, id: \.self) { columnIndex in
-                            let index = rowIndex * 3 + columnIndex
-                            performanceOverlayPositionButton(index: index, title: items[rowIndex][columnIndex])
+            Toggle(isOn: Binding(get: {
+                viewModel.audioHapticsEnabled
+            }, set: { newValue in
+                guard viewModel.audioHapticsEnabled != newValue else {
+                    return
+                }
+                viewModel.audioHapticsEnabled = newValue
+                onAudioHapticsEnabledChange(newValue)
+            })) {
+                Text(StreamMenuLocalized("stream.audio_haptics.enable_toggle"))
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundColor(.white)
+            }
+            .accentColor(Color(red: 0.50, green: 0.45, blue: 0.94))
+
+            if viewModel.audioHapticsEnabled {
+                audioHapticsOutputTargetSection
+                audioHapticsStrengthSection
+                audioHapticsVoiceFilterSection
+
+                if viewModel.audioHapticsOutputTargetSelection == 1 {
+                    Toggle(isOn: Binding(get: {
+                        viewModel.audioHapticsKeepControllerRumble
+                    }, set: { newValue in
+                        guard viewModel.audioHapticsKeepControllerRumble != newValue else {
+                            return
                         }
+                        viewModel.audioHapticsKeepControllerRumble = newValue
+                        onAudioHapticsKeepControllerRumbleChange(newValue)
+                    })) {
+                        Text(StreamMenuLocalized("settings.audio_haptics.keep_controller_rumble"))
+                            .font(.system(size: 14, weight: .semibold))
+                            .foregroundColor(.white)
                     }
+                    .accentColor(Color(red: 0.50, green: 0.45, blue: 0.94))
                 }
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 
-    private func performanceOverlayPositionButton(index: Int, title: String) -> some View {
-        let isSelected = viewModel.performanceOverlayPositionSelection == index
+    private var audioHapticsOutputTargetSection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text(StreamMenuLocalized("settings.audio_haptics.output_target"))
+                .font(.system(size: 13, weight: .medium))
+                .foregroundColor(Color.white.opacity(0.72))
 
-        return Button(action: {
-            guard !isSelected else {
-                return
+            SegmentedOptionsControl(items: [
+                StreamMenuLocalized("common.device"),
+                StreamMenuLocalized("common.controller")
+            ], selection: viewModel.audioHapticsOutputTargetSelection) { newValue in
+                guard viewModel.audioHapticsOutputTargetSelection != newValue else {
+                    return
+                }
+                viewModel.audioHapticsOutputTargetSelection = newValue
+                onAudioHapticsOutputTargetChange(newValue)
             }
-            viewModel.performanceOverlayPositionSelection = index
-            onPerformanceOverlayPositionChange(index)
-        }) {
-            Text(title)
-                .font(.system(size: 13, weight: .semibold))
-                .foregroundColor(.white)
-                .frame(maxWidth: .infinity)
-                .frame(height: 36)
+            .frame(height: 38)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private var audioHapticsStrengthSection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text(StreamMenuLocalizedFormat("settings.audio_haptics.strength", Int(viewModel.audioHapticsStrength.rounded())))
+                .font(.system(size: 13, weight: .medium))
+                .foregroundColor(Color.white.opacity(0.72))
+
+            Slider(value: Binding(get: {
+                viewModel.audioHapticsStrength
+            }, set: { newValue in
+                let steppedValue = Double(Int((newValue / 5.0).rounded()) * 5)
+                guard viewModel.audioHapticsStrength != steppedValue else {
+                    return
+                }
+                viewModel.audioHapticsStrength = steppedValue
+                onAudioHapticsStrengthChange(steppedValue)
+            }), in: 25...200, step: 5)
+            .accentColor(Color(red: 0.50, green: 0.45, blue: 0.94))
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private var audioHapticsVoiceFilterSection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text(StreamMenuLocalized("settings.audio_haptics.voice_filter"))
+                .font(.system(size: 13, weight: .medium))
+                .foregroundColor(Color.white.opacity(0.72))
+
+            SegmentedOptionsControl(items: [
+                StreamMenuLocalized("common.off"),
+                StreamMenuLocalized("settings.audio_haptics.voice_filter.low"),
+                StreamMenuLocalized("settings.audio_haptics.voice_filter.medium"),
+                StreamMenuLocalized("settings.audio_haptics.voice_filter.high")
+            ], selection: viewModel.audioHapticsVoiceFilterSelection, fontSize: 12) { newValue in
+                guard viewModel.audioHapticsVoiceFilterSelection != newValue else {
+                    return
+                }
+                viewModel.audioHapticsVoiceFilterSelection = newValue
+                onAudioHapticsVoiceFilterSelectionChange(newValue)
+            }
+            .frame(height: 38)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private var performanceOverlayPositionSection: some View {
+        let items = [
+            (title: StreamMenuLocalized("settings.performance_overlay_position.top_left"), actualSelection: 1),
+            (title: StreamMenuLocalized("settings.performance_overlay_position.top_center"), actualSelection: 0),
+            (title: StreamMenuLocalized("settings.performance_overlay_position.top_right"), actualSelection: 2),
+            (title: StreamMenuLocalized("settings.performance_overlay_position.bottom_left"), actualSelection: 4),
+            (title: StreamMenuLocalized("settings.performance_overlay_position.bottom_center"), actualSelection: 3),
+            (title: StreamMenuLocalized("settings.performance_overlay_position.bottom_right"), actualSelection: 5)
+        ]
+        let selectedTitle = items.first(where: { $0.actualSelection == viewModel.performanceOverlayPositionSelection })?.title ?? items[0].title
+
+        return HStack(alignment: .center, spacing: 12) {
+            Text(StreamMenuLocalized("settings.performance_overlay_position.title"))
+                .font(.system(size: 13, weight: .medium))
+                .foregroundColor(Color.white.opacity(0.72))
+                .frame(maxWidth: .infinity, alignment: .leading)
+
+            Button(action: {
+                viewModel.isShowingPerformanceOverlayPositionPicker = true
+            }) {
+                HStack(spacing: 10) {
+                    Text(selectedTitle)
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundColor(.white)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+
+                    Image(systemName: "chevron.down")
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundColor(Color.white.opacity(0.72))
+                }
+                .padding(.horizontal, 14)
+                .frame(height: 42)
                 .background(
                     RoundedRectangle(cornerRadius: 12, style: .continuous)
-                        .fill(isSelected ?
-                              Color(red: 0.50, green: 0.45, blue: 0.94) :
-                              Color.white.opacity(0.08))
+                        .fill(Color.white.opacity(0.08))
                 )
                 .overlay(
                     RoundedRectangle(cornerRadius: 12, style: .continuous)
-                        .stroke(Color.white.opacity(isSelected ? 0.0 : 0.10), lineWidth: 1)
+                        .stroke(Color.white.opacity(0.10), lineWidth: 1)
                 )
+            }
+            .frame(maxWidth: 220)
+            .buttonStyle(PlainButtonStyle())
+            .actionSheet(isPresented: Binding(get: {
+                viewModel.isShowingPerformanceOverlayPositionPicker
+            }, set: { newValue in
+                viewModel.isShowingPerformanceOverlayPositionPicker = newValue
+            })) {
+                ActionSheet(title: Text(StreamMenuLocalized("settings.performance_overlay_position.title")),
+                            buttons: items.map { item in
+                    .default(Text(item.title)) {
+                        guard viewModel.performanceOverlayPositionSelection != item.actualSelection else {
+                            return
+                        }
+                        viewModel.performanceOverlayPositionSelection = item.actualSelection
+                        onPerformanceOverlayPositionChange(item.actualSelection)
+                    }
+                } + [.cancel(Text(StreamMenuLocalized("common.cancel")))])
+            }
         }
-        .buttonStyle(PlainButtonStyle())
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private var performanceOverlayMarginSection: some View {
@@ -2737,6 +2888,11 @@ final class StreamActionSheetHostingViewController: UIViewController {
     @objc var extendedPerformanceMetricsEnabled: Bool = false
     @objc var performanceOverlayPositionSelection: NSNumber = 0
     @objc var performanceOverlayMargin: NSNumber = 0
+    @objc var audioHapticsEnabled: Bool = false
+    @objc var audioHapticsOutputTargetSelection: NSNumber = 0
+    @objc var audioHapticsStrength: NSNumber = 100
+    @objc var audioHapticsVoiceFilterSelection: NSNumber = 0
+    @objc var audioHapticsKeepControllerRumble: Bool = false
 
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -2787,6 +2943,11 @@ final class StreamActionSheetHostingViewController: UIViewController {
         viewModel.extendedPerformanceMetricsEnabled = extendedPerformanceMetricsEnabled
         viewModel.performanceOverlayPositionSelection = performanceOverlayPositionSelection.intValue
         viewModel.performanceOverlayMargin = performanceOverlayMargin.doubleValue
+        viewModel.audioHapticsEnabled = audioHapticsEnabled
+        viewModel.audioHapticsOutputTargetSelection = audioHapticsOutputTargetSelection.intValue
+        viewModel.audioHapticsStrength = audioHapticsStrength.doubleValue
+        viewModel.audioHapticsVoiceFilterSelection = audioHapticsVoiceFilterSelection.intValue
+        viewModel.audioHapticsKeepControllerRumble = audioHapticsKeepControllerRumble
         updateMetadata()
         refreshPanelRootView()
     }
@@ -2896,6 +3057,46 @@ final class StreamActionSheetHostingViewController: UIViewController {
 
                                        self.performanceOverlayMargin = NSNumber(value: margin)
                                        self.delegate?.streamActionSheetHostingViewController(self, didChangePerformanceOverlayMargin: margin)
+                                   },
+                                   onAudioHapticsEnabledChange: { [weak self] enabled in
+                                       guard let self = self else {
+                                           return
+                                       }
+
+                                       self.audioHapticsEnabled = enabled
+                                       self.delegate?.streamActionSheetHostingViewController(self, didChangeAudioHapticsEnabled: enabled)
+                                   },
+                                   onAudioHapticsOutputTargetChange: { [weak self] selection in
+                                       guard let self = self else {
+                                           return
+                                       }
+
+                                       self.audioHapticsOutputTargetSelection = NSNumber(value: selection)
+                                       self.delegate?.streamActionSheetHostingViewController(self, didChangeAudioHapticsOutputTarget: selection)
+                                   },
+                                   onAudioHapticsStrengthChange: { [weak self] strength in
+                                       guard let self = self else {
+                                           return
+                                       }
+
+                                       self.audioHapticsStrength = NSNumber(value: strength)
+                                       self.delegate?.streamActionSheetHostingViewController(self, didChangeAudioHapticsStrength: strength)
+                                   },
+                                   onAudioHapticsVoiceFilterSelectionChange: { [weak self] selection in
+                                       guard let self = self else {
+                                           return
+                                       }
+
+                                       self.audioHapticsVoiceFilterSelection = NSNumber(value: selection)
+                                       self.delegate?.streamActionSheetHostingViewController(self, didChangeAudioHapticsVoiceFilterSelection: selection)
+                                   },
+                                   onAudioHapticsKeepControllerRumbleChange: { [weak self] enabled in
+                                       guard let self = self else {
+                                           return
+                                       }
+
+                                       self.audioHapticsKeepControllerRumble = enabled
+                                       self.delegate?.streamActionSheetHostingViewController(self, didChangeAudioHapticsKeepControllerRumble: enabled)
                                    },
                                    onCancel: { [weak self] in
                                        guard let self = self else {

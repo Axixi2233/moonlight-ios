@@ -1422,6 +1422,11 @@ static const CGFloat kStreamFloatingMenuExpandedAlpha = 0.96f;
         controller.extendedPerformanceMetricsEnabled = _extendedPerformanceMetricsEnabled;
         controller.performanceOverlayPositionSelection = @(_currentSessionPerformanceOverlayPositionSelection);
         controller.performanceOverlayMargin = @(_currentSessionPerformanceOverlayMargin);
+        controller.audioHapticsEnabled = _settings.audioHapticsEnabled;
+        controller.audioHapticsOutputTargetSelection = @(_settings.audioHapticsOutputTarget);
+        controller.audioHapticsStrength = @(_settings.audioHapticsStrength);
+        controller.audioHapticsVoiceFilterSelection = @(_settings.audioHapticsVoiceFilterSelection);
+        controller.audioHapticsKeepControllerRumble = _settings.audioHapticsKeepControllerRumble;
         [controller configureWithTitle:title subtitle:StreamMenuLocalized(@"stream.menu.subtitle") items:items];
         controller.modalPresentationStyle = UIModalPresentationOverFullScreen;
 
@@ -1572,6 +1577,23 @@ static const CGFloat kStreamFloatingMenuExpandedAlpha = 0.96f;
 - (void)applyPerformanceOverlayMarginToCurrentSession:(CGFloat)margin {
     _currentSessionPerformanceOverlayMargin = MAX(0.0f, MIN(margin, 150.0f));
     [self layoutOverlayViewForCurrentBounds];
+}
+
+- (void)persistCurrentAudioHapticsSettings {
+    DataManager *dataManager = [[DataManager alloc] init];
+    [dataManager saveAudioHapticsEnabled:_settings.audioHapticsEnabled
+                            outputTarget:_settings.audioHapticsOutputTarget
+                                strength:_settings.audioHapticsStrength
+                    voiceFilterSelection:_settings.audioHapticsVoiceFilterSelection
+                    keepControllerRumble:_settings.audioHapticsKeepControllerRumble];
+}
+
+- (void)applyCurrentAudioHapticsSettingsToSession {
+    [_controllerSupport updateAudioHapticsEnabled:_settings.audioHapticsEnabled
+                                     outputTarget:_settings.audioHapticsOutputTarget
+                                         strength:_settings.audioHapticsStrength
+                             voiceFilterSelection:_settings.audioHapticsVoiceFilterSelection
+                         keepControllerRumble:_settings.audioHapticsKeepControllerRumble];
 }
 
 - (NSString *)touchModeTitleForSelection:(NSInteger)selection {
@@ -2802,6 +2824,20 @@ static const CGFloat kStreamFloatingMenuExpandedAlpha = 0.96f;
     [_controllerSupport rumble:controllerNumber lowFreqMotor:lowFreqMotor highFreqMotor:highFreqMotor];
 }
 
+- (void)processAudioHapticsSamples:(const short *)samples
+                        frameCount:(int)frameCount
+                      channelCount:(int)channelCount
+                        sampleRate:(int)sampleRate {
+    [_controllerSupport processAudioHapticsSamples:samples
+                                        frameCount:frameCount
+                                      channelCount:channelCount
+                                        sampleRate:sampleRate];
+}
+
+- (void)stopAudioHaptics {
+    [_controllerSupport stopAudioHaptics];
+}
+
 - (void) rumbleTriggers:(uint16_t)controllerNumber leftTrigger:(uint16_t)leftTrigger rightTrigger:(uint16_t)rightTrigger {
     Log(LOG_I, @"Trigger rumble on gamepad %d: %04x %04x", controllerNumber, leftTrigger, rightTrigger);
     
@@ -3085,6 +3121,41 @@ static const CGFloat kStreamFloatingMenuExpandedAlpha = 0.96f;
 - (void)streamActionSheetHostingViewController:(StreamActionSheetHostingViewController *)controller didChangePerformanceOverlayMargin:(double)margin {
     (void)controller;
     [self applyPerformanceOverlayMarginToCurrentSession:(CGFloat)margin];
+}
+
+- (void)streamActionSheetHostingViewController:(StreamActionSheetHostingViewController *)controller didChangeAudioHapticsEnabled:(BOOL)enabled {
+    (void)controller;
+    _settings.audioHapticsEnabled = enabled;
+    [self persistCurrentAudioHapticsSettings];
+    [self applyCurrentAudioHapticsSettingsToSession];
+}
+
+- (void)streamActionSheetHostingViewController:(StreamActionSheetHostingViewController *)controller didChangeAudioHapticsOutputTarget:(NSInteger)selection {
+    (void)controller;
+    _settings.audioHapticsOutputTarget = selection;
+    [self persistCurrentAudioHapticsSettings];
+    [self applyCurrentAudioHapticsSettingsToSession];
+}
+
+- (void)streamActionSheetHostingViewController:(StreamActionSheetHostingViewController *)controller didChangeAudioHapticsStrength:(double)strength {
+    (void)controller;
+    _settings.audioHapticsStrength = (NSInteger)strength;
+    [self persistCurrentAudioHapticsSettings];
+    [self applyCurrentAudioHapticsSettingsToSession];
+}
+
+- (void)streamActionSheetHostingViewController:(StreamActionSheetHostingViewController *)controller didChangeAudioHapticsVoiceFilterSelection:(NSInteger)selection {
+    (void)controller;
+    _settings.audioHapticsVoiceFilterSelection = selection;
+    [self persistCurrentAudioHapticsSettings];
+    [self applyCurrentAudioHapticsSettingsToSession];
+}
+
+- (void)streamActionSheetHostingViewController:(StreamActionSheetHostingViewController *)controller didChangeAudioHapticsKeepControllerRumble:(BOOL)enabled {
+    (void)controller;
+    _settings.audioHapticsKeepControllerRumble = enabled;
+    [self persistCurrentAudioHapticsSettings];
+    [self applyCurrentAudioHapticsSettingsToSession];
 }
 
 - (void)streamActionSheetHostingViewControllerDidCancel:(StreamActionSheetHostingViewController *)controller {

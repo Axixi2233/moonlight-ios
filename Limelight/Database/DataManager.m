@@ -98,6 +98,32 @@ static NSInteger NormalizedGameMenuShortcutSelection(NSInteger gameMenuShortcutS
     }
 }
 
+static NSInteger NormalizedAudioHapticsOutputTarget(NSInteger audioHapticsOutputTarget) {
+    switch (audioHapticsOutputTarget) {
+        case StreamAudioHapticsOutputTargetController:
+            return audioHapticsOutputTarget;
+        case StreamAudioHapticsOutputTargetDevice:
+        default:
+            return StreamAudioHapticsOutputTargetDevice;
+    }
+}
+
+static NSInteger NormalizedAudioHapticsStrength(NSInteger audioHapticsStrength) {
+    return MAX(25, MIN(audioHapticsStrength, 200));
+}
+
+static NSInteger NormalizedAudioHapticsVoiceFilterSelection(NSInteger audioHapticsVoiceFilterSelection) {
+    switch (audioHapticsVoiceFilterSelection) {
+        case StreamAudioHapticsVoiceFilterSelectionLow:
+        case StreamAudioHapticsVoiceFilterSelectionMedium:
+        case StreamAudioHapticsVoiceFilterSelectionHigh:
+            return audioHapticsVoiceFilterSelection;
+        case StreamAudioHapticsVoiceFilterSelectionOff:
+        default:
+            return StreamAudioHapticsVoiceFilterSelectionOff;
+    }
+}
+
 static NSInteger NormalizedMetalFxScalingSelection(NSInteger metalFxScalingSelection) {
     switch (metalFxScalingSelection) {
         case StreamMetalFxScalingSelectionOnePointFiveX:
@@ -194,6 +220,11 @@ static NSInteger NormalizedMetalFxColorModeSelection(NSInteger metalFxColorModeS
      streamOrientationSelection:(NSInteger)streamOrientationSelection
    gameMenuShortcutSelection:(NSInteger)gameMenuShortcutSelection
 longPressStartForGameMenuEnabled:(BOOL)longPressStartForGameMenuEnabled
+         audioHapticsEnabled:(BOOL)audioHapticsEnabled
+    audioHapticsOutputTarget:(NSInteger)audioHapticsOutputTarget
+       audioHapticsStrength:(NSInteger)audioHapticsStrength
+audioHapticsVoiceFilterSelection:(NSInteger)audioHapticsVoiceFilterSelection
+audioHapticsKeepControllerRumble:(BOOL)audioHapticsKeepControllerRumble
               touchModeSelection:(NSInteger)touchModeSelection
                     statsOverlay:(BOOL)statsOverlay
              rumbleModeSelection:(NSInteger)rumbleModeSelection
@@ -237,6 +268,9 @@ performanceOverlayPositionSelection:(NSInteger)performanceOverlayPositionSelecti
         NSInteger normalizedMetalFxColorModeSelection = NormalizedMetalFxColorModeSelection(metalFxColorModeSelection);
         NSInteger normalizedStreamOrientationSelection = NormalizedStreamOrientationSelection(streamOrientationSelection);
         NSInteger normalizedGameMenuShortcutSelection = NormalizedGameMenuShortcutSelection(gameMenuShortcutSelection);
+        NSInteger normalizedAudioHapticsOutputTarget = NormalizedAudioHapticsOutputTarget(audioHapticsOutputTarget);
+        NSInteger normalizedAudioHapticsStrength = NormalizedAudioHapticsStrength(audioHapticsStrength);
+        NSInteger normalizedAudioHapticsVoiceFilterSelection = NormalizedAudioHapticsVoiceFilterSelection(audioHapticsVoiceFilterSelection);
         StreamTouchModeSelection normalizedTouchModeSelection = NormalizedTouchModeSelection(touchModeSelection);
         StreamRumbleModeSelection normalizedRumbleModeSelection = NormalizedRumbleModeSelection(rumbleModeSelection);
         settingsToSave.absoluteTouchMode = (normalizedTouchModeSelection == StreamTouchModeSelectionMouse ||
@@ -269,6 +303,11 @@ performanceOverlayPositionSelection:(NSInteger)performanceOverlayPositionSelecti
         [defaults setInteger:normalizedStreamOrientationSelection forKey:StreamPreferenceStreamOrientationSelectionKey];
         [defaults setInteger:normalizedGameMenuShortcutSelection forKey:StreamPreferenceGameMenuShortcutSelectionKey];
         [defaults setBool:longPressStartForGameMenuEnabled forKey:StreamPreferenceLongPressStartForGameMenuEnabledKey];
+        [defaults setBool:audioHapticsEnabled forKey:StreamPreferenceAudioHapticsEnabledKey];
+        [defaults setInteger:normalizedAudioHapticsOutputTarget forKey:StreamPreferenceAudioHapticsOutputTargetKey];
+        [defaults setInteger:normalizedAudioHapticsStrength forKey:StreamPreferenceAudioHapticsStrengthKey];
+        [defaults setInteger:normalizedAudioHapticsVoiceFilterSelection forKey:StreamPreferenceAudioHapticsVoiceFilterSelectionKey];
+        [defaults setBool:audioHapticsKeepControllerRumble forKey:StreamPreferenceAudioHapticsKeepControllerRumbleKey];
         [defaults setInteger:normalizedTouchModeSelection forKey:StreamPreferenceTouchModeSelectionKey];
         [defaults setInteger:normalizedRumbleModeSelection forKey:StreamPreferenceRumbleModeSelectionKey];
         [defaults setInteger:MAX(0, MIN(virtualButtonSchemeSelection, 4)) forKey:StreamPreferenceVirtualButtonSchemeSelectionKey];
@@ -428,6 +467,20 @@ performanceOverlayPositionSelection:(NSInteger)performanceOverlayPositionSelecti
         [defaults synchronize];
         [self saveData];
     }];
+}
+
+- (void)saveAudioHapticsEnabled:(BOOL)audioHapticsEnabled
+                   outputTarget:(NSInteger)audioHapticsOutputTarget
+                       strength:(NSInteger)audioHapticsStrength
+           voiceFilterSelection:(NSInteger)audioHapticsVoiceFilterSelection
+           keepControllerRumble:(BOOL)audioHapticsKeepControllerRumble {
+    NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
+    [defaults setBool:audioHapticsEnabled forKey:StreamPreferenceAudioHapticsEnabledKey];
+    [defaults setInteger:NormalizedAudioHapticsOutputTarget(audioHapticsOutputTarget) forKey:StreamPreferenceAudioHapticsOutputTargetKey];
+    [defaults setInteger:NormalizedAudioHapticsStrength(audioHapticsStrength) forKey:StreamPreferenceAudioHapticsStrengthKey];
+    [defaults setInteger:NormalizedAudioHapticsVoiceFilterSelection(audioHapticsVoiceFilterSelection) forKey:StreamPreferenceAudioHapticsVoiceFilterSelectionKey];
+    [defaults setBool:audioHapticsKeepControllerRumble forKey:StreamPreferenceAudioHapticsKeepControllerRumbleKey];
+    [defaults synchronize];
 }
 
 - (void)saveCustomShortcutDefinitions:(NSArray<NSDictionary *> *)definitions {
