@@ -12,6 +12,7 @@ FOUNDATION_EXTERN NSString * const StreamPreferenceVideoAlignmentSelectionKey;
 FOUNDATION_EXTERN NSString * const StreamPreferenceVideoAlignmentMarginKey;
 FOUNDATION_EXTERN NSString * const StreamPreferencePerformanceOverlayPositionSelectionKey;
 FOUNDATION_EXTERN NSString * const StreamPreferencePerformanceOverlayMarginKey;
+FOUNDATION_EXTERN NSString * const StreamPreferencePerformanceOverlayDragEnabledKey;
 FOUNDATION_EXTERN NSString * const StreamPreferenceFloatingMenuEnabledKey;
 FOUNDATION_EXTERN NSString * const StreamPreferenceTouchModeSelectionKey;
 FOUNDATION_EXTERN NSString * const StreamPreferenceVirtualButtonSchemeSelectionKey;
@@ -143,6 +144,7 @@ typedef NS_ENUM(NSInteger, StreamAudioHapticsVoiceFilterSelection) {
 @property (nonatomic) CGFloat videoAlignmentMargin;
 @property (nonatomic) NSInteger performanceOverlayPositionSelection;
 @property (nonatomic) CGFloat performanceOverlayMargin;
+@property (nonatomic) BOOL performanceOverlayDragEnabled;
 @property (nonatomic) BOOL floatingMenuEnabled;
 @property (nonatomic) BOOL virtualButtonsEnabled;
 @property (nonatomic) BOOL virtualGamepadEnabled;

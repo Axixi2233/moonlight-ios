@@ -251,6 +251,7 @@ audioPlaybackOptimizationEnabled:(BOOL)audioPlaybackOptimizationEnabled
               videoAlignmentMargin:(CGFloat)videoAlignmentMargin
 performanceOverlayPositionSelection:(NSInteger)performanceOverlayPositionSelection
          performanceOverlayMargin:(CGFloat)performanceOverlayMargin
+ performanceOverlayDragEnabled:(BOOL)performanceOverlayDragEnabled
                floatingMenuEnabled:(BOOL)floatingMenuEnabled
              virtualButtonsEnabled:(BOOL)virtualButtonsEnabled
              virtualGamepadEnabled:(BOOL)virtualGamepadEnabled
@@ -303,6 +304,7 @@ performanceOverlayPositionSelection:(NSInteger)performanceOverlayPositionSelecti
         [defaults setDouble:MAX(0.0, MIN(videoAlignmentMargin, 150.0)) forKey:StreamPreferenceVideoAlignmentMarginKey];
         [defaults setInteger:MAX(0, MIN(performanceOverlayPositionSelection, 5)) forKey:StreamPreferencePerformanceOverlayPositionSelectionKey];
         [defaults setDouble:MAX(0.0, MIN(performanceOverlayMargin, 150.0)) forKey:StreamPreferencePerformanceOverlayMarginKey];
+        [defaults setBool:performanceOverlayDragEnabled forKey:StreamPreferencePerformanceOverlayDragEnabledKey];
         [defaults setBool:floatingMenuEnabled forKey:StreamPreferenceFloatingMenuEnabledKey];
         [defaults setBool:virtualButtonsEnabled forKey:StreamPreferenceVirtualButtonsEnabledKey];
         [defaults setBool:virtualGamepadEnabled forKey:StreamPreferenceVirtualGamepadEnabledKey];
@@ -530,6 +532,7 @@ performanceOverlayPositionSelection:(NSInteger)performanceOverlayPositionSelecti
             StreamPreferenceVideoAlignmentMarginKey,
             StreamPreferencePerformanceOverlayPositionSelectionKey,
             StreamPreferencePerformanceOverlayMarginKey,
+            StreamPreferencePerformanceOverlayDragEnabledKey,
             StreamPreferenceFloatingMenuEnabledKey,
             StreamPreferenceVirtualButtonsEnabledKey,
             StreamPreferenceVirtualGamepadEnabledKey,

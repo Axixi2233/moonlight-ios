@@ -81,6 +81,8 @@
 "settings.performance_overlay_position.bottom_center" = "底部居中";
 "settings.performance_overlay_position.bottom_left" = "底部居左";
 "settings.performance_overlay_position.bottom_right" = "底部居右";
+"settings.performance_overlay_position.custom" = "自訂";
+"settings.performance_overlay_drag.toggle" = "啟用效能資訊拖拽";
 "settings.performance_overlay_position.title" = "性能信息位置";
 "settings.performance_overlay_position.top_center" = "頂部居中";
 "settings.performance_overlay_position.top_left" = "頂部居左";
@@ -131,6 +133,7 @@
 "settings.rumble_mode.title" = "觸觉反馈";
 "stream.audio_haptics.title" = "音訊震動";
 "stream.audio_haptics.enable_toggle" = "啟用音訊震動";
+"stream.menu.performance_overlay_drag.title" = "啟用效能資訊拖拽";
 "settings.audio_haptics.enable" = "音訊震動";
 "settings.audio_haptics.enable_description" = "根據串流音訊內容驅動裝置或標準手把震動。";
 "settings.audio_haptics.output_target" = "音訊震動輸出";

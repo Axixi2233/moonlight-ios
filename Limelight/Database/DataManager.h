@@ -58,6 +58,7 @@
                 videoAlignmentMargin:(CGFloat)videoAlignmentMargin
 performanceOverlayPositionSelection:(NSInteger)performanceOverlayPositionSelection
          performanceOverlayMargin:(CGFloat)performanceOverlayMargin
+ performanceOverlayDragEnabled:(BOOL)performanceOverlayDragEnabled
                floatingMenuEnabled:(BOOL)floatingMenuEnabled
              virtualButtonsEnabled:(BOOL)virtualButtonsEnabled
              virtualGamepadEnabled:(BOOL)virtualGamepadEnabled

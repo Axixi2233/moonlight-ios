@@ -42,8 +42,7 @@ final class StreamActionSheetItem: NSObject {
     func streamActionSheetHostingViewController(_ controller: StreamActionSheetHostingViewController, didChangeVideoAlignmentSelection selection: Int)
     func streamActionSheetHostingViewController(_ controller: StreamActionSheetHostingViewController, didChangeVideoAlignmentMargin margin: Double)
     func streamActionSheetHostingViewController(_ controller: StreamActionSheetHostingViewController, didChangeExtendedPerformanceMetricsEnabled enabled: Bool)
-    func streamActionSheetHostingViewController(_ controller: StreamActionSheetHostingViewController, didChangePerformanceOverlayPositionSelection selection: Int)
-    func streamActionSheetHostingViewController(_ controller: StreamActionSheetHostingViewController, didChangePerformanceOverlayMargin margin: Double)
+    func streamActionSheetHostingViewController(_ controller: StreamActionSheetHostingViewController, didChangePerformanceOverlayDragEnabled enabled: Bool)
     func streamActionSheetHostingViewController(_ controller: StreamActionSheetHostingViewController, didChangeAudioHapticsEnabled enabled: Bool)
     func streamActionSheetHostingViewController(_ controller: StreamActionSheetHostingViewController, didChangeAudioHapticsOutputTarget selection: Int)
     func streamActionSheetHostingViewController(_ controller: StreamActionSheetHostingViewController, didChangeAudioHapticsStrength strength: Double)
@@ -106,14 +105,12 @@ private final class StreamActionSheetViewModel: ObservableObject {
     @Published var videoAlignmentSelection: Int = 0
     @Published var videoAlignmentMargin: Double = 0
     @Published var extendedPerformanceMetricsEnabled: Bool = false
-    @Published var performanceOverlayPositionSelection: Int = 0
-    @Published var performanceOverlayMargin: Double = 0
+    @Published var performanceOverlayDragEnabled: Bool = true
     @Published var audioHapticsEnabled: Bool = false
     @Published var audioHapticsOutputTargetSelection: Int = 0
     @Published var audioHapticsStrength: Double = 100
     @Published var audioHapticsVoiceFilterSelection: Int = 0
     @Published var audioHapticsKeepControllerRumble: Bool = false
-    @Published var isShowingPerformanceOverlayPositionPicker: Bool = false
     @Published var touchModeToastText: String? = nil
 }
 
@@ -234,8 +231,7 @@ private struct StreamActionSheetPanelView: View {
     let onVideoAlignmentChange: (Int) -> Void
     let onVideoAlignmentMarginChange: (Double) -> Void
     let onExtendedPerformanceMetricsChange: (Bool) -> Void
-    let onPerformanceOverlayPositionChange: (Int) -> Void
-    let onPerformanceOverlayMarginChange: (Double) -> Void
+    let onPerformanceOverlayDragEnabledChange: (Bool) -> Void
     let onAudioHapticsEnabledChange: (Bool) -> Void
     let onAudioHapticsOutputTargetChange: (Int) -> Void
     let onAudioHapticsStrengthChange: (Double) -> Void
@@ -290,8 +286,7 @@ private struct StreamActionSheetPanelView: View {
                             videoAlignmentSection
                             videoAlignmentMarginSection
                             extendedPerformanceMetricsSection
-                            performanceOverlayPositionSection
-                            performanceOverlayMarginSection
+                            performanceOverlayDragSection
                         }
                         .padding(.horizontal, horizontalPadding)
                         .padding(.bottom, 20)
@@ -659,87 +654,21 @@ private struct StreamActionSheetPanelView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 
-    private var performanceOverlayPositionSection: some View {
-        let items = [
-            (title: StreamMenuLocalized("settings.performance_overlay_position.top_left"), actualSelection: 1),
-            (title: StreamMenuLocalized("settings.performance_overlay_position.top_center"), actualSelection: 0),
-            (title: StreamMenuLocalized("settings.performance_overlay_position.top_right"), actualSelection: 2),
-            (title: StreamMenuLocalized("settings.performance_overlay_position.bottom_left"), actualSelection: 4),
-            (title: StreamMenuLocalized("settings.performance_overlay_position.bottom_center"), actualSelection: 3),
-            (title: StreamMenuLocalized("settings.performance_overlay_position.bottom_right"), actualSelection: 5)
-        ]
-        let selectedTitle = items.first(where: { $0.actualSelection == viewModel.performanceOverlayPositionSelection })?.title ?? items[0].title
-
-        return HStack(alignment: .center, spacing: 12) {
-            Text(StreamMenuLocalized("settings.performance_overlay_position.title"))
-                .font(.system(size: 13, weight: .medium))
-                .foregroundColor(Color.white.opacity(0.72))
-                .frame(maxWidth: .infinity, alignment: .leading)
-
-            Button(action: {
-                viewModel.isShowingPerformanceOverlayPositionPicker = true
-            }) {
-                HStack(spacing: 10) {
-                    Text(selectedTitle)
-                        .font(.system(size: 14, weight: .semibold))
-                        .foregroundColor(.white)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-
-                    Image(systemName: "chevron.down")
-                        .font(.system(size: 13, weight: .semibold))
-                        .foregroundColor(Color.white.opacity(0.72))
-                }
-                .padding(.horizontal, 14)
-                .frame(height: 42)
-                .background(
-                    RoundedRectangle(cornerRadius: 12, style: .continuous)
-                        .fill(Color.white.opacity(0.08))
-                )
-                .overlay(
-                    RoundedRectangle(cornerRadius: 12, style: .continuous)
-                        .stroke(Color.white.opacity(0.10), lineWidth: 1)
-                )
+    private var performanceOverlayDragSection: some View {
+        Toggle(isOn: Binding(get: {
+            viewModel.performanceOverlayDragEnabled
+        }, set: { newValue in
+            guard viewModel.performanceOverlayDragEnabled != newValue else {
+                return
             }
-            .frame(maxWidth: 220)
-            .buttonStyle(PlainButtonStyle())
-            .actionSheet(isPresented: Binding(get: {
-                viewModel.isShowingPerformanceOverlayPositionPicker
-            }, set: { newValue in
-                viewModel.isShowingPerformanceOverlayPositionPicker = newValue
-            })) {
-                ActionSheet(title: Text(StreamMenuLocalized("settings.performance_overlay_position.title")),
-                            buttons: items.map { item in
-                    .default(Text(item.title)) {
-                        guard viewModel.performanceOverlayPositionSelection != item.actualSelection else {
-                            return
-                        }
-                        viewModel.performanceOverlayPositionSelection = item.actualSelection
-                        onPerformanceOverlayPositionChange(item.actualSelection)
-                    }
-                } + [.cancel(Text(StreamMenuLocalized("common.cancel")))])
-            }
+            viewModel.performanceOverlayDragEnabled = newValue
+            onPerformanceOverlayDragEnabledChange(newValue)
+        })) {
+            Text(StreamMenuLocalized("stream.menu.performance_overlay_drag.title"))
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundColor(.white)
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
-    }
-
-    private var performanceOverlayMarginSection: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Text(StreamMenuLocalizedFormat("settings.performance_overlay_margin.label", Int(viewModel.performanceOverlayMargin)))
-                .font(.system(size: 13, weight: .medium))
-                .foregroundColor(Color.white.opacity(0.72))
-
-            Slider(value: Binding(get: {
-                viewModel.performanceOverlayMargin
-            }, set: { newValue in
-                let steppedValue = Double(Int(newValue.rounded()))
-                guard viewModel.performanceOverlayMargin != steppedValue else {
-                    return
-                }
-                viewModel.performanceOverlayMargin = steppedValue
-                onPerformanceOverlayMarginChange(steppedValue)
-            }), in: 0...150, step: 1)
-            .accentColor(Color(red: 0.50, green: 0.45, blue: 0.94))
-        }
+        .accentColor(Color(red: 0.50, green: 0.45, blue: 0.94))
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 
@@ -2886,8 +2815,7 @@ final class StreamActionSheetHostingViewController: UIViewController {
     @objc var videoAlignmentSelection: NSNumber = 0
     @objc var videoAlignmentMargin: NSNumber = 0
     @objc var extendedPerformanceMetricsEnabled: Bool = false
-    @objc var performanceOverlayPositionSelection: NSNumber = 0
-    @objc var performanceOverlayMargin: NSNumber = 0
+    @objc var performanceOverlayDragEnabled: Bool = true
     @objc var audioHapticsEnabled: Bool = false
     @objc var audioHapticsOutputTargetSelection: NSNumber = 0
     @objc var audioHapticsStrength: NSNumber = 100
@@ -2941,8 +2869,7 @@ final class StreamActionSheetHostingViewController: UIViewController {
         viewModel.videoAlignmentSelection = videoAlignmentSelection.intValue
         viewModel.videoAlignmentMargin = videoAlignmentMargin.doubleValue
         viewModel.extendedPerformanceMetricsEnabled = extendedPerformanceMetricsEnabled
-        viewModel.performanceOverlayPositionSelection = performanceOverlayPositionSelection.intValue
-        viewModel.performanceOverlayMargin = performanceOverlayMargin.doubleValue
+        viewModel.performanceOverlayDragEnabled = performanceOverlayDragEnabled
         viewModel.audioHapticsEnabled = audioHapticsEnabled
         viewModel.audioHapticsOutputTargetSelection = audioHapticsOutputTargetSelection.intValue
         viewModel.audioHapticsStrength = audioHapticsStrength.doubleValue
@@ -3042,21 +2969,13 @@ final class StreamActionSheetHostingViewController: UIViewController {
                                        self.extendedPerformanceMetricsEnabled = enabled
                                        self.delegate?.streamActionSheetHostingViewController(self, didChangeExtendedPerformanceMetricsEnabled: enabled)
                                    },
-                                   onPerformanceOverlayPositionChange: { [weak self] selection in
+                                   onPerformanceOverlayDragEnabledChange: { [weak self] enabled in
                                        guard let self = self else {
                                            return
                                        }
 
-                                       self.performanceOverlayPositionSelection = NSNumber(value: selection)
-                                       self.delegate?.streamActionSheetHostingViewController(self, didChangePerformanceOverlayPositionSelection: selection)
-                                   },
-                                   onPerformanceOverlayMarginChange: { [weak self] margin in
-                                       guard let self = self else {
-                                           return
-                                       }
-
-                                       self.performanceOverlayMargin = NSNumber(value: margin)
-                                       self.delegate?.streamActionSheetHostingViewController(self, didChangePerformanceOverlayMargin: margin)
+                                       self.performanceOverlayDragEnabled = enabled
+                                       self.delegate?.streamActionSheetHostingViewController(self, didChangePerformanceOverlayDragEnabled: enabled)
                                    },
                                    onAudioHapticsEnabledChange: { [weak self] enabled in
                                        guard let self = self else {

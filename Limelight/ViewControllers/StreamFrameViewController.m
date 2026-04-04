@@ -52,6 +52,7 @@ static const CGFloat kStreamFloatingMenuExpandedMargin = 6.0f;
 static const CGFloat kStreamFloatingMenuAutoCollapseDelay = 3.0f;
 static const CGFloat kStreamFloatingMenuCollapsedAlpha = 0.42f;
 static const CGFloat kStreamFloatingMenuExpandedAlpha = 0.96f;
+static const NSInteger kStreamPerformanceOverlayPositionCustom = 6;
 
 @implementation StreamFrameViewController {
     ControllerSupport *_controllerSupport;
@@ -80,6 +81,11 @@ static const CGFloat kStreamFloatingMenuExpandedAlpha = 0.96f;
     BOOL _extendedPerformanceMetricsEnabled;
     NSInteger _currentSessionPerformanceOverlayPositionSelection;
     CGFloat _currentSessionPerformanceOverlayMargin;
+    BOOL _currentSessionPerformanceOverlayDragEnabled;
+    CGFloat _currentSessionPerformanceOverlayCustomXRatio;
+    CGFloat _currentSessionPerformanceOverlayCustomYRatio;
+    UIPanGestureRecognizer *_overlayPanGestureRecognizer;
+    CGPoint _overlayPanTouchOffset;
     BOOL _viewOnlyModeEnabled;
     CGFloat _viewOnlyRestoreZoomScale;
     CGPoint _viewOnlyRestoreContentOffset;
@@ -415,30 +421,43 @@ static const CGFloat kStreamFloatingMenuExpandedAlpha = 0.96f;
     CGFloat originX = safeAreaInsets.left + floor((availableWidth - overlayWidth) / 2.0);
     CGFloat originY = minY + clampedMargin;
 
-    switch (_currentSessionPerformanceOverlayPositionSelection) {
-        case 1:
-            originX = minX;
-            originY = minY + clampedMargin;
-            break;
-        case 2:
-            originX = maxX;
-            originY = minY + clampedMargin;
-            break;
-        case 3:
-            originX = safeAreaInsets.left + floor((availableWidth - overlayWidth) / 2.0);
-            originY = maxY - clampedMargin;
-            break;
-        case 4:
-            originX = minX;
-            originY = maxY - clampedMargin;
-            break;
-        case 5:
-            originX = maxX;
-            originY = maxY - clampedMargin;
-            break;
-        case 0:
-        default:
-            break;
+    if (_currentSessionPerformanceOverlayPositionSelection == kStreamPerformanceOverlayPositionCustom) {
+        originX = minX + (maxX - minX) * _currentSessionPerformanceOverlayCustomXRatio;
+        originY = minY + (maxY - minY) * _currentSessionPerformanceOverlayCustomYRatio;
+    }
+    else {
+        switch (_currentSessionPerformanceOverlayPositionSelection) {
+            case 1:
+                originX = minX;
+                originY = minY + clampedMargin;
+                break;
+            case 2:
+                originX = maxX;
+                originY = minY + clampedMargin;
+                break;
+            case 3:
+                originX = safeAreaInsets.left + floor((availableWidth - overlayWidth) / 2.0);
+                originY = maxY - clampedMargin;
+                break;
+            case 4:
+                originX = minX;
+                originY = maxY - clampedMargin;
+                break;
+            case 5:
+                originX = maxX;
+                originY = maxY - clampedMargin;
+                break;
+            case 0:
+            default:
+                break;
+        }
+    }
+
+    if (maxX <= minX) {
+        originX = minX;
+    }
+    if (maxY <= minY) {
+        originY = minY;
     }
 
     originX = MIN(MAX(originX, minX), maxX);
@@ -449,6 +468,89 @@ static const CGFloat kStreamFloatingMenuExpandedAlpha = 0.96f;
                               overlayWidth,
                               overlayHeight);
     _overlayView.frame = frame;
+}
+
+- (void)updateCustomPerformanceOverlayRatiosForFrame:(CGRect)frame {
+    CGRect bounds = self.view.bounds;
+    UIEdgeInsets safeAreaInsets = UIEdgeInsetsZero;
+    if (@available(iOS 11.0, *)) {
+        safeAreaInsets = self.view.safeAreaInsets;
+    }
+
+    CGFloat minX = safeAreaInsets.left;
+    CGFloat maxX = CGRectGetMaxX(bounds) - safeAreaInsets.right - CGRectGetWidth(frame);
+    CGFloat minY = safeAreaInsets.top;
+    CGFloat maxY = CGRectGetMaxY(bounds) - safeAreaInsets.bottom - CGRectGetHeight(frame);
+
+    if (maxX <= minX) {
+        _currentSessionPerformanceOverlayCustomXRatio = 0.0f;
+    }
+    else {
+        _currentSessionPerformanceOverlayCustomXRatio = (CGRectGetMinX(frame) - minX) / (maxX - minX);
+    }
+
+    if (maxY <= minY) {
+        _currentSessionPerformanceOverlayCustomYRatio = 0.0f;
+    }
+    else {
+        _currentSessionPerformanceOverlayCustomYRatio = (CGRectGetMinY(frame) - minY) / (maxY - minY);
+    }
+
+    _currentSessionPerformanceOverlayCustomXRatio = MIN(MAX(_currentSessionPerformanceOverlayCustomXRatio, 0.0f), 1.0f);
+    _currentSessionPerformanceOverlayCustomYRatio = MIN(MAX(_currentSessionPerformanceOverlayCustomYRatio, 0.0f), 1.0f);
+}
+
+- (void)handlePerformanceOverlayPan:(UIPanGestureRecognizer *)gestureRecognizer {
+    if (_overlayView == nil || _overlayView.hidden || !_currentSessionPerformanceOverlayDragEnabled) {
+        return;
+    }
+
+    CGPoint location = [gestureRecognizer locationInView:self.view];
+    CGRect bounds = self.view.bounds;
+    UIEdgeInsets safeAreaInsets = UIEdgeInsetsZero;
+    if (@available(iOS 11.0, *)) {
+        safeAreaInsets = self.view.safeAreaInsets;
+    }
+
+    CGFloat minX = safeAreaInsets.left;
+    CGFloat maxX = CGRectGetMaxX(bounds) - safeAreaInsets.right - CGRectGetWidth(_overlayView.bounds);
+    CGFloat minY = safeAreaInsets.top;
+    CGFloat maxY = CGRectGetMaxY(bounds) - safeAreaInsets.bottom - CGRectGetHeight(_overlayView.bounds);
+
+    switch (gestureRecognizer.state) {
+        case UIGestureRecognizerStateBegan: {
+            _overlayPanTouchOffset = CGPointMake(location.x - CGRectGetMinX(_overlayView.frame),
+                                                 location.y - CGRectGetMinY(_overlayView.frame));
+            break;
+        }
+        case UIGestureRecognizerStateChanged:
+        case UIGestureRecognizerStateEnded:
+        case UIGestureRecognizerStateCancelled: {
+            CGFloat originX = location.x - _overlayPanTouchOffset.x;
+            CGFloat originY = location.y - _overlayPanTouchOffset.y;
+            if (maxX <= minX) {
+                originX = minX;
+            }
+            else {
+                originX = MIN(MAX(originX, minX), maxX);
+            }
+            if (maxY <= minY) {
+                originY = minY;
+            }
+            else {
+                originY = MIN(MAX(originY, minY), maxY);
+            }
+
+            CGRect frame = _overlayView.frame;
+            frame.origin = CGPointMake(originX, originY);
+            _overlayView.frame = frame;
+            _currentSessionPerformanceOverlayPositionSelection = kStreamPerformanceOverlayPositionCustom;
+            [self updateCustomPerformanceOverlayRatiosForFrame:frame];
+            break;
+        }
+        default:
+            break;
+    }
 }
 
 - (void)layoutStreamingSubviewsForCurrentBounds {
@@ -835,8 +937,17 @@ static const CGFloat kStreamFloatingMenuExpandedAlpha = 0.96f;
                                             MIN(_settings.touchModeSelection, StreamTouchModeSelectionDisabled));
     _currentSessionVideoAlignmentSelection = MAX(0, MIN(_settings.videoAlignmentSelection, 2));
     _currentSessionVideoAlignmentMargin = MAX(0.0f, MIN(_settings.videoAlignmentMargin, 150.0f));
-    _currentSessionPerformanceOverlayPositionSelection = MAX(0, MIN(_settings.performanceOverlayPositionSelection, 5));
+    NSInteger savedPerformanceOverlayPositionSelection = _settings.performanceOverlayPositionSelection;
+    if (savedPerformanceOverlayPositionSelection == kStreamPerformanceOverlayPositionCustom) {
+        _currentSessionPerformanceOverlayPositionSelection = kStreamPerformanceOverlayPositionCustom;
+    }
+    else {
+        _currentSessionPerformanceOverlayPositionSelection = MAX(0, MIN(savedPerformanceOverlayPositionSelection, 5));
+    }
     _currentSessionPerformanceOverlayMargin = MAX(0.0f, MIN(_settings.performanceOverlayMargin, 150.0f));
+    _currentSessionPerformanceOverlayDragEnabled = _settings.performanceOverlayDragEnabled;
+    _currentSessionPerformanceOverlayCustomXRatio = 0.5f;
+    _currentSessionPerformanceOverlayCustomYRatio = 0.0f;
     
     _stageLabel = [[UILabel alloc] init];
     [_stageLabel setUserInteractionEnabled:NO];
@@ -1132,7 +1243,7 @@ static const CGFloat kStreamFloatingMenuExpandedAlpha = 0.96f;
 #if !TARGET_OS_TV
         [_overlayView setEditable:NO];
 #endif
-        [_overlayView setUserInteractionEnabled:NO];
+        [_overlayView setUserInteractionEnabled:_currentSessionPerformanceOverlayDragEnabled];
         [_overlayView setSelectable:NO];
         [_overlayView setScrollEnabled:NO];
         
@@ -1155,6 +1266,8 @@ static const CGFloat kStreamFloatingMenuExpandedAlpha = 0.96f;
 #else
         [_overlayView setFont:[UIFont systemFontOfSize:10]];
 #endif
+        _overlayPanGestureRecognizer = [[UIPanGestureRecognizer alloc] initWithTarget:self action:@selector(handlePerformanceOverlayPan:)];
+        [_overlayView addGestureRecognizer:_overlayPanGestureRecognizer];
         //        [_overlayView setAlpha:0.35];
         [self.view addSubview:_overlayView];
     }
@@ -1420,8 +1533,7 @@ static const CGFloat kStreamFloatingMenuExpandedAlpha = 0.96f;
         controller.videoAlignmentSelection = @([self currentVideoAlignmentSelection]);
         controller.videoAlignmentMargin = @(_currentSessionVideoAlignmentMargin);
         controller.extendedPerformanceMetricsEnabled = _extendedPerformanceMetricsEnabled;
-        controller.performanceOverlayPositionSelection = @(_currentSessionPerformanceOverlayPositionSelection);
-        controller.performanceOverlayMargin = @(_currentSessionPerformanceOverlayMargin);
+        controller.performanceOverlayDragEnabled = _currentSessionPerformanceOverlayDragEnabled;
         controller.audioHapticsEnabled = _settings.audioHapticsEnabled;
         controller.audioHapticsOutputTargetSelection = @(_settings.audioHapticsOutputTarget);
         controller.audioHapticsStrength = @(_settings.audioHapticsStrength);
@@ -1566,6 +1678,13 @@ static const CGFloat kStreamFloatingMenuExpandedAlpha = 0.96f;
 
     if (_overlayView != nil && !_overlayView.hidden) {
         [self updateStatsOverlay];
+    }
+}
+
+- (void)applyPerformanceOverlayDragEnabledToCurrentSession:(BOOL)enabled {
+    _currentSessionPerformanceOverlayDragEnabled = enabled;
+    if (_overlayView != nil) {
+        [_overlayView setUserInteractionEnabled:enabled];
     }
 }
 
@@ -3113,14 +3232,9 @@ static const CGFloat kStreamFloatingMenuExpandedAlpha = 0.96f;
     [self applyExtendedPerformanceMetricsEnabled:enabled];
 }
 
-- (void)streamActionSheetHostingViewController:(StreamActionSheetHostingViewController *)controller didChangePerformanceOverlayPositionSelection:(NSInteger)selection {
+- (void)streamActionSheetHostingViewController:(StreamActionSheetHostingViewController *)controller didChangePerformanceOverlayDragEnabled:(BOOL)enabled {
     (void)controller;
-    [self applyPerformanceOverlayPositionSelectionToCurrentSession:selection];
-}
-
-- (void)streamActionSheetHostingViewController:(StreamActionSheetHostingViewController *)controller didChangePerformanceOverlayMargin:(double)margin {
-    (void)controller;
-    [self applyPerformanceOverlayMarginToCurrentSession:(CGFloat)margin];
+    [self applyPerformanceOverlayDragEnabledToCurrentSession:enabled];
 }
 
 - (void)streamActionSheetHostingViewController:(StreamActionSheetHostingViewController *)controller didChangeAudioHapticsEnabled:(BOOL)enabled {

@@ -76,6 +76,7 @@ final class SettingsFormSnapshot: NSObject {
     var videoAlignmentMargin: Int = 0
     var performanceOverlayPositionSelection: Int = 0
     var performanceOverlayMargin: Int = 6
+    var performanceOverlayDragEnabled: Bool = true
     var floatingMenuEnabled: Bool = false
     var virtualButtonsEnabled: Bool = false
     var virtualGamepadEnabled: Bool = false
@@ -155,6 +156,7 @@ private final class SettingsFormViewModel: ObservableObject {
     @Published var videoAlignmentMargin: Double = 0
     @Published var performanceOverlayPositionSelection: Int = 0
     @Published var performanceOverlayMargin: Double = 6
+    @Published var performanceOverlayDragEnabled: Bool = true
     @Published var floatingMenuEnabled: Bool = false
     @Published var virtualButtonsEnabled: Bool = false
     @Published var virtualGamepadEnabled: Bool = false
@@ -226,6 +228,7 @@ private final class SettingsFormViewModel: ObservableObject {
         videoAlignmentMargin = Double(snapshot.videoAlignmentMargin)
         performanceOverlayPositionSelection = snapshot.performanceOverlayPositionSelection
         performanceOverlayMargin = Double(snapshot.performanceOverlayMargin)
+        performanceOverlayDragEnabled = snapshot.performanceOverlayDragEnabled
         floatingMenuEnabled = snapshot.floatingMenuEnabled
         virtualButtonsEnabled = snapshot.virtualButtonsEnabled
         virtualGamepadEnabled = snapshot.virtualGamepadEnabled
@@ -293,6 +296,7 @@ private final class SettingsFormViewModel: ObservableObject {
         snapshot.videoAlignmentMargin = Int(videoAlignmentMargin.rounded())
         snapshot.performanceOverlayPositionSelection = performanceOverlayPositionSelection
         snapshot.performanceOverlayMargin = Int(performanceOverlayMargin.rounded())
+        snapshot.performanceOverlayDragEnabled = performanceOverlayDragEnabled
         snapshot.floatingMenuEnabled = floatingMenuEnabled
         snapshot.virtualButtonsEnabled = virtualButtonsEnabled
         snapshot.virtualGamepadEnabled = virtualGamepadEnabled
@@ -982,6 +986,8 @@ private struct SettingsRootView: View {
                     descriptiveToggle(title: SettingsLocalized("settings.stats_overlay.toggle"),
                                       description: SettingsLocalized("settings.stats_overlay.description"),
                                       isOn: $model.statsOverlay)
+                    Toggle(SettingsLocalized("settings.performance_overlay_drag.toggle"), isOn: $model.performanceOverlayDragEnabled)
+                        .font(.headline)
                     choiceSection(
                         title: SettingsLocalized("settings.performance_overlay_position.title"),
                         subtitle: model.performanceOverlayPositionTitle,

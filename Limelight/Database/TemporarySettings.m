@@ -12,6 +12,7 @@ NSString * const StreamPreferenceVideoAlignmentSelectionKey = @"StreamPreference
 NSString * const StreamPreferenceVideoAlignmentMarginKey = @"StreamPreferenceVideoAlignmentMargin";
 NSString * const StreamPreferencePerformanceOverlayPositionSelectionKey = @"StreamPreferencePerformanceOverlayPositionSelection";
 NSString * const StreamPreferencePerformanceOverlayMarginKey = @"StreamPreferencePerformanceOverlayMargin";
+NSString * const StreamPreferencePerformanceOverlayDragEnabledKey = @"StreamPreferencePerformanceOverlayDragEnabled";
 NSString * const StreamPreferenceFloatingMenuEnabledKey = @"StreamPreferenceFloatingMenuEnabled";
 NSString * const StreamPreferenceTouchModeSelectionKey = @"StreamPreferenceTouchModeSelection";
 NSString * const StreamPreferenceVirtualButtonSchemeSelectionKey = @"StreamPreferenceVirtualButtonSchemeSelection";
@@ -217,6 +218,7 @@ NSString * const StreamPreferenceAudioPlaybackOptimizationEnabledKey = @"StreamP
         StreamPreferenceVideoAlignmentMarginKey: @(0.0),
         StreamPreferencePerformanceOverlayPositionSelectionKey: @(0),
         StreamPreferencePerformanceOverlayMarginKey: @(6.0),
+        StreamPreferencePerformanceOverlayDragEnabledKey: @(YES),
         StreamPreferenceFloatingMenuEnabledKey: @(YES),
         StreamPreferenceTouchModeSelectionKey: @(StreamTouchModeSelectionTrackpad),
         StreamPreferenceVirtualButtonsEnabledKey: @(NO),
@@ -365,6 +367,7 @@ NSString * const StreamPreferenceAudioPlaybackOptimizationEnabledKey = @"StreamP
     self.videoAlignmentMargin = (CGFloat)[[NSUserDefaults standardUserDefaults] doubleForKey:StreamPreferenceVideoAlignmentMarginKey];
     self.performanceOverlayPositionSelection = [[NSUserDefaults standardUserDefaults] integerForKey:StreamPreferencePerformanceOverlayPositionSelectionKey];
     self.performanceOverlayMargin = (CGFloat)[[NSUserDefaults standardUserDefaults] doubleForKey:StreamPreferencePerformanceOverlayMarginKey];
+    self.performanceOverlayDragEnabled = [[NSUserDefaults standardUserDefaults] boolForKey:StreamPreferencePerformanceOverlayDragEnabledKey];
     self.floatingMenuEnabled = [[NSUserDefaults standardUserDefaults] boolForKey:StreamPreferenceFloatingMenuEnabledKey];
     self.virtualButtonsEnabled = [[NSUserDefaults standardUserDefaults] boolForKey:StreamPreferenceVirtualButtonsEnabledKey];
     self.virtualGamepadEnabled = [[NSUserDefaults standardUserDefaults] boolForKey:StreamPreferenceVirtualGamepadEnabledKey];

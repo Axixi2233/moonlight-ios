@@ -81,6 +81,8 @@
 "settings.performance_overlay_position.bottom_center" = "Bottom Center";
 "settings.performance_overlay_position.bottom_left" = "Bottom Left";
 "settings.performance_overlay_position.bottom_right" = "Bottom Right";
+"settings.performance_overlay_position.custom" = "Custom";
+"settings.performance_overlay_drag.toggle" = "Enable Performance Overlay Drag";
 "settings.performance_overlay_position.title" = "Performance Overlay Position";
 "settings.performance_overlay_position.top_center" = "Top Center";
 "settings.performance_overlay_position.top_left" = "Top Left";
@@ -131,6 +133,7 @@
 "settings.rumble_mode.title" = "Haptics";
 "stream.audio_haptics.title" = "Audio Haptics";
 "stream.audio_haptics.enable_toggle" = "Enable Audio Haptics";
+"stream.menu.performance_overlay_drag.title" = "Enable Performance Overlay Drag";
 "settings.audio_haptics.enable" = "Audio Haptics";
 "settings.audio_haptics.enable_description" = "Drive device or standard controller vibration from streamed audio content.";
 "settings.audio_haptics.output_target" = "Audio Haptics Output";

@@ -505,6 +505,7 @@ static BOOL SupportsPictureInPicture(void) {
     snapshot.videoAlignmentMargin = (NSInteger)currentSettings.videoAlignmentMargin;
     snapshot.performanceOverlayPositionSelection = currentSettings.performanceOverlayPositionSelection;
     snapshot.performanceOverlayMargin = (NSInteger)currentSettings.performanceOverlayMargin;
+    snapshot.performanceOverlayDragEnabled = currentSettings.performanceOverlayDragEnabled;
     snapshot.floatingMenuEnabled = currentSettings.floatingMenuEnabled;
     snapshot.virtualButtonsEnabled = currentSettings.virtualButtonsEnabled;
     snapshot.virtualGamepadEnabled = currentSettings.virtualGamepadEnabled;
@@ -586,6 +587,7 @@ static BOOL SupportsPictureInPicture(void) {
                 videoAlignmentMargin:snapshot.videoAlignmentMargin
 performanceOverlayPositionSelection:snapshot.performanceOverlayPositionSelection
          performanceOverlayMargin:snapshot.performanceOverlayMargin
+ performanceOverlayDragEnabled:snapshot.performanceOverlayDragEnabled
               floatingMenuEnabled:snapshot.floatingMenuEnabled
              virtualButtonsEnabled:snapshot.virtualButtonsEnabled
              virtualGamepadEnabled:snapshot.virtualGamepadEnabled

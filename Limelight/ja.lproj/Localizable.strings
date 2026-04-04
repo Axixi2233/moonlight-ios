@@ -81,6 +81,8 @@
 "settings.performance_overlay_position.bottom_center" = "下中央";
 "settings.performance_overlay_position.bottom_left" = "左下";
 "settings.performance_overlay_position.bottom_right" = "右下";
+"settings.performance_overlay_position.custom" = "カスタム";
+"settings.performance_overlay_drag.toggle" = "パフォーマンス表示のドラッグを有効化";
 "settings.performance_overlay_position.title" = "パフォーマンス表示位置";
 "settings.performance_overlay_position.top_center" = "上中央";
 "settings.performance_overlay_position.top_left" = "左上";
@@ -131,6 +133,7 @@
 "settings.rumble_mode.title" = "振動オプション";
 "stream.audio_haptics.title" = "オーディオ触覚";
 "stream.audio_haptics.enable_toggle" = "オーディオ触覚を有効化";
+"stream.menu.performance_overlay_drag.title" = "パフォーマンス表示のドラッグを有効化";
 "settings.audio_haptics.enable" = "オーディオ触覚";
 "settings.audio_haptics.enable_description" = "ストリーミング音声に合わせてデバイスまたは標準コントローラーを振動させます。";
 "settings.audio_haptics.output_target" = "オーディオ触覚の出力先";
