@@ -225,6 +225,7 @@ longPressStartForGameMenuEnabled:(BOOL)longPressStartForGameMenuEnabled
        audioHapticsStrength:(NSInteger)audioHapticsStrength
 audioHapticsVoiceFilterSelection:(NSInteger)audioHapticsVoiceFilterSelection
 audioHapticsKeepControllerRumble:(BOOL)audioHapticsKeepControllerRumble
+audioPlaybackOptimizationEnabled:(BOOL)audioPlaybackOptimizationEnabled
               touchModeSelection:(NSInteger)touchModeSelection
                     statsOverlay:(BOOL)statsOverlay
              rumbleModeSelection:(NSInteger)rumbleModeSelection
@@ -308,6 +309,7 @@ performanceOverlayPositionSelection:(NSInteger)performanceOverlayPositionSelecti
         [defaults setInteger:normalizedAudioHapticsStrength forKey:StreamPreferenceAudioHapticsStrengthKey];
         [defaults setInteger:normalizedAudioHapticsVoiceFilterSelection forKey:StreamPreferenceAudioHapticsVoiceFilterSelectionKey];
         [defaults setBool:audioHapticsKeepControllerRumble forKey:StreamPreferenceAudioHapticsKeepControllerRumbleKey];
+        [defaults setBool:audioPlaybackOptimizationEnabled forKey:StreamPreferenceAudioPlaybackOptimizationEnabledKey];
         [defaults setInteger:normalizedTouchModeSelection forKey:StreamPreferenceTouchModeSelectionKey];
         [defaults setInteger:normalizedRumbleModeSelection forKey:StreamPreferenceRumbleModeSelectionKey];
         [defaults setInteger:MAX(0, MIN(virtualButtonSchemeSelection, 4)) forKey:StreamPreferenceVirtualButtonSchemeSelectionKey];
@@ -529,6 +531,7 @@ performanceOverlayPositionSelection:(NSInteger)performanceOverlayPositionSelecti
             StreamPreferenceLongPressStartForGameMenuEnabledKey,
             StreamPreferenceTouchModeSelectionKey,
             StreamPreferenceRumbleModeSelectionKey,
+            StreamPreferenceAudioPlaybackOptimizationEnabledKey,
             StreamPreferenceVirtualButtonSchemeSelectionKey,
             StreamPreferenceVirtualGamepadSchemeSelectionKey,
             StreamPreferenceVirtualGamepadOpacityKey

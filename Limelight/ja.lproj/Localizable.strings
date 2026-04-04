@@ -43,6 +43,8 @@
 "settings.audio_config.surround_5_1" = "5.1";
 "settings.audio_config.surround_7_1" = "7.1";
 "settings.audio_config.title" = "音声出力";
+"settings.audio_playback_optimization.toggle" = "音声スタッター軽減";
+"settings.audio_playback_optimization.description" = "より大きな音声バッファと緩やかなキュー制御で、音声のカクつきを減らします。";
 "settings.bitrate.label" = "ビットレート: %.1f Mbps";
 "settings.bt_mouse_support.toggle" = "Citrix X1 マウス対応";
 "settings.capture_mouse_cursor.toggle" = "ローカル物理マウス";

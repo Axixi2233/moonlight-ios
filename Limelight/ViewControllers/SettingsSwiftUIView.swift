@@ -63,6 +63,7 @@ final class SettingsFormSnapshot: NSObject {
     var audioHapticsStrength: Int = 100
     var audioHapticsVoiceFilterSelection: Int = 0
     var audioHapticsKeepControllerRumble: Bool = false
+    var audioPlaybackOptimizationEnabled: Bool = true
     var statsOverlay: Bool = false
     var rumbleModeSelection: Int = 0
     var externalMonitor: Bool = false
@@ -141,6 +142,7 @@ private final class SettingsFormViewModel: ObservableObject {
     @Published var audioHapticsStrength: Double = 100
     @Published var audioHapticsVoiceFilterSelection: Int = 0
     @Published var audioHapticsKeepControllerRumble: Bool = false
+    @Published var audioPlaybackOptimizationEnabled: Bool = true
     @Published var statsOverlay: Bool = false
     @Published var rumbleModeSelection: Int = 0
     @Published var externalMonitor: Bool = false
@@ -211,6 +213,7 @@ private final class SettingsFormViewModel: ObservableObject {
         audioHapticsStrength = Double(snapshot.audioHapticsStrength)
         audioHapticsVoiceFilterSelection = snapshot.audioHapticsVoiceFilterSelection
         audioHapticsKeepControllerRumble = snapshot.audioHapticsKeepControllerRumble
+        audioPlaybackOptimizationEnabled = snapshot.audioPlaybackOptimizationEnabled
         statsOverlay = snapshot.statsOverlay
         rumbleModeSelection = snapshot.rumbleModeSelection
         externalMonitor = snapshot.externalMonitor
@@ -277,6 +280,7 @@ private final class SettingsFormViewModel: ObservableObject {
         snapshot.audioHapticsStrength = Int(audioHapticsStrength.rounded())
         snapshot.audioHapticsVoiceFilterSelection = audioHapticsVoiceFilterSelection
         snapshot.audioHapticsKeepControllerRumble = audioHapticsKeepControllerRumble
+        snapshot.audioPlaybackOptimizationEnabled = audioPlaybackOptimizationEnabled
         snapshot.statsOverlay = statsOverlay
         snapshot.rumbleModeSelection = rumbleModeSelection
         snapshot.externalMonitor = externalMonitor
@@ -901,6 +905,9 @@ private struct SettingsRootView: View {
                     ) { index in
                         model.audioConfigSelection = index
                     } isDisabled: { _ in false }
+                    descriptiveToggle(title: SettingsLocalized("settings.audio_playback_optimization.toggle"),
+                                      description: SettingsLocalized("settings.audio_playback_optimization.description"),
+                                      isOn: $model.audioPlaybackOptimizationEnabled)
                     Toggle(SettingsLocalized("settings.play_audio_on_pc.toggle"), isOn: $model.playAudioOnPC).font(.headline)
                     Toggle(SettingsLocalized("settings.optimize_games.toggle"), isOn: $model.optimizeGames).font(.headline)
                     Toggle(SettingsLocalized("settings.floating_menu.toggle"), isOn: $model.floatingMenuEnabled).font(.headline)

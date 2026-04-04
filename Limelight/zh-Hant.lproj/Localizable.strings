@@ -43,6 +43,8 @@
 "settings.audio_config.surround_5_1" = "5.1";
 "settings.audio_config.surround_7_1" = "7.1";
 "settings.audio_config.title" = "聲道輸出";
+"settings.audio_playback_optimization.toggle" = "音訊防卡頓優化";
+"settings.audio_playback_optimization.description" = "開啟後使用較大的音訊緩衝與較寬鬆的佇列策略，以減少音訊卡頓。";
 "settings.bitrate.label" = "碼率: %.1f Mbps";
 "settings.bt_mouse_support.toggle" = "Citrix X1 滑鼠支持";
 "settings.capture_mouse_cursor.toggle" = "本機實體滑鼠";

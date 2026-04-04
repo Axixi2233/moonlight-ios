@@ -43,6 +43,7 @@
          audioHapticsStrength:(NSInteger)audioHapticsStrength
  audioHapticsVoiceFilterSelection:(NSInteger)audioHapticsVoiceFilterSelection
  audioHapticsKeepControllerRumble:(BOOL)audioHapticsKeepControllerRumble
+ audioPlaybackOptimizationEnabled:(BOOL)audioPlaybackOptimizationEnabled
               touchModeSelection:(NSInteger)touchModeSelection
                     statsOverlay:(BOOL)statsOverlay
              rumbleModeSelection:(NSInteger)rumbleModeSelection

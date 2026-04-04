@@ -7,6 +7,7 @@
 //
 
 #import "Connection.h"
+#import "TemporarySettings.h"
 #import "Utils.h"
 
 #import <VideoToolbox/VideoToolbox.h>
@@ -49,10 +50,19 @@ static void* audioBuffer;
 static void* audioSilenceBuffer;
 static int audioFrameSize;
 static int audioBytesPerSampleFrame;
-static const int kMaxPendingAudioDurationMs = 80;
-static const int kPreferredSDLBufferSamples = 1024;
+static BOOL audioPlaybackOptimizationEnabled;
+static int maxPendingAudioDurationMs;
 
 static id<VideoRendering> renderer;
+
+static BOOL CurrentAudioPlaybackOptimizationEnabled(void)
+{
+    NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
+    if ([defaults objectForKey:StreamPreferenceAudioPlaybackOptimizationEnabledKey] == nil) {
+        return YES;
+    }
+    return [defaults boolForKey:StreamPreferenceAudioPlaybackOptimizationEnabledKey];
+}
 
 static void QueueAudioSilenceFrames(int frameCount)
 {
@@ -361,7 +371,9 @@ int ArInit(int audioConfiguration, POPUS_MULTISTREAM_CONFIGURATION opusConfig, v
     want.freq = opusConfig->sampleRate;
     want.format = AUDIO_S16;
     want.channels = opusConfig->channelCount;
-    want.samples = MAX(opusConfig->samplesPerFrame, kPreferredSDLBufferSamples);
+    audioPlaybackOptimizationEnabled = CurrentAudioPlaybackOptimizationEnabled();
+    maxPendingAudioDurationMs = audioPlaybackOptimizationEnabled ? 80 : 30;
+    want.samples = audioPlaybackOptimizationEnabled ? MAX(opusConfig->samplesPerFrame, 1024) : opusConfig->samplesPerFrame;
 
     audioDevice = SDL_OpenAudioDevice(NULL, 0, &want, &have, 0);
     if (audioDevice == 0) {
@@ -440,6 +452,8 @@ void ArCleanup(void)
     }
 
     audioBytesPerSampleFrame = 0;
+    maxPendingAudioDurationMs = 0;
+    audioPlaybackOptimizationEnabled = NO;
     
     SDL_QuitSubSystem(SDL_INIT_AUDIO);
 }
@@ -474,7 +488,7 @@ void ArDecodeAndPlaySample(char* sampleData, int sampleLength)
     
     // A small amount of extra audio headroom is preferable to aggressive
     // dropping on iOS, which tends to sound like periodic stutter.
-    if (pendingDurationMs > kMaxPendingAudioDurationMs) {
+    if (pendingDurationMs > maxPendingAudioDurationMs) {
         CFTimeInterval processEndTime = CACurrentMediaTime();
         [audioStatsLock lock];
         currentAudioStats.droppedPackets++;
@@ -495,6 +509,12 @@ void ArDecodeAndPlaySample(char* sampleData, int sampleLength)
                                         frameCount:decodeLen
                                       channelCount:audioConfig.channelCount
                                         sampleRate:audioConfig.sampleRate];
+        }
+
+        if (!audioPlaybackOptimizationEnabled && audioDevice != 0) {
+            while (SDL_GetQueuedAudioSize(audioDevice) > (Uint32)(audioFrameSize * 10)) {
+                SDL_Delay(1);
+            }
         }
 
         if (SDL_QueueAudio(audioDevice,

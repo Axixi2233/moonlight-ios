@@ -36,6 +36,7 @@ FOUNDATION_EXTERN NSString * const StreamPreferenceAudioHapticsOutputTargetKey;
 FOUNDATION_EXTERN NSString * const StreamPreferenceAudioHapticsStrengthKey;
 FOUNDATION_EXTERN NSString * const StreamPreferenceAudioHapticsVoiceFilterSelectionKey;
 FOUNDATION_EXTERN NSString * const StreamPreferenceAudioHapticsKeepControllerRumbleKey;
+FOUNDATION_EXTERN NSString * const StreamPreferenceAudioPlaybackOptimizationEnabledKey;
 
 typedef NS_ENUM(NSInteger, StreamTouchModeSelection) {
     StreamTouchModeSelectionTrackpad = 0,
@@ -155,6 +156,7 @@ typedef NS_ENUM(NSInteger, StreamAudioHapticsVoiceFilterSelection) {
 @property (nonatomic) NSInteger audioHapticsStrength;
 @property (nonatomic) NSInteger audioHapticsVoiceFilterSelection;
 @property (nonatomic) BOOL audioHapticsKeepControllerRumble;
+@property (nonatomic) BOOL audioPlaybackOptimizationEnabled;
 
 - (id) initFromSettings:(Settings*)settings;
 - (BOOL)usesAbsoluteTouchMode;

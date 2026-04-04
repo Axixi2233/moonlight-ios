@@ -492,6 +492,7 @@ static BOOL SupportsPictureInPicture(void) {
     snapshot.audioHapticsStrength = currentSettings.audioHapticsStrength;
     snapshot.audioHapticsVoiceFilterSelection = currentSettings.audioHapticsVoiceFilterSelection;
     snapshot.audioHapticsKeepControllerRumble = currentSettings.audioHapticsKeepControllerRumble;
+    snapshot.audioPlaybackOptimizationEnabled = currentSettings.audioPlaybackOptimizationEnabled;
     snapshot.statsOverlay = currentSettings.statsOverlay;
     snapshot.rumbleModeSelection = currentSettings.rumbleModeSelection;
     snapshot.externalMonitor = currentSettings.externalMonitor;
@@ -567,9 +568,10 @@ static BOOL SupportsPictureInPicture(void) {
  longPressStartForGameMenuEnabled:snapshot.longPressStartForGameMenuEnabled
             audioHapticsEnabled:snapshot.audioHapticsEnabled
        audioHapticsOutputTarget:snapshot.audioHapticsOutputTarget
-          audioHapticsStrength:snapshot.audioHapticsStrength
+       audioHapticsStrength:snapshot.audioHapticsStrength
  audioHapticsVoiceFilterSelection:snapshot.audioHapticsVoiceFilterSelection
  audioHapticsKeepControllerRumble:snapshot.audioHapticsKeepControllerRumble
+ audioPlaybackOptimizationEnabled:snapshot.audioPlaybackOptimizationEnabled
                   touchModeSelection:snapshot.touchModeSelection
                         statsOverlay:snapshot.statsOverlay
                  rumbleModeSelection:snapshot.rumbleModeSelection

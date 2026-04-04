@@ -43,6 +43,8 @@
 "settings.audio_config.surround_5_1" = "5.1";
 "settings.audio_config.surround_7_1" = "7.1";
 "settings.audio_config.title" = "Audio Output";
+"settings.audio_playback_optimization.toggle" = "Anti-Stutter Audio";
+"settings.audio_playback_optimization.description" = "Use a larger audio buffer and a more relaxed queue strategy to reduce audio stutter.";
 "settings.bitrate.label" = "Bitrate: %.1f Mbps";
 "settings.bt_mouse_support.toggle" = "Citrix X1 Mouse Support";
 "settings.capture_mouse_cursor.toggle" = "Local Physical Mouse";

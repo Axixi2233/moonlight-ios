@@ -36,6 +36,7 @@ NSString * const StreamPreferenceAudioHapticsOutputTargetKey = @"StreamPreferenc
 NSString * const StreamPreferenceAudioHapticsStrengthKey = @"StreamPreferenceAudioHapticsStrength";
 NSString * const StreamPreferenceAudioHapticsVoiceFilterSelectionKey = @"StreamPreferenceAudioHapticsVoiceFilterSelection";
 NSString * const StreamPreferenceAudioHapticsKeepControllerRumbleKey = @"StreamPreferenceAudioHapticsKeepControllerRumble";
+NSString * const StreamPreferenceAudioPlaybackOptimizationEnabledKey = @"StreamPreferenceAudioPlaybackOptimizationEnabled";
 
 @implementation TemporarySettings
 
@@ -227,7 +228,8 @@ NSString * const StreamPreferenceAudioHapticsKeepControllerRumbleKey = @"StreamP
         StreamPreferenceAudioHapticsOutputTargetKey: @(StreamAudioHapticsOutputTargetDevice),
         StreamPreferenceAudioHapticsStrengthKey: @(100),
         StreamPreferenceAudioHapticsVoiceFilterSelectionKey: @(StreamAudioHapticsVoiceFilterSelectionOff),
-        StreamPreferenceAudioHapticsKeepControllerRumbleKey: @(NO)
+        StreamPreferenceAudioHapticsKeepControllerRumbleKey: @(NO),
+        StreamPreferenceAudioPlaybackOptimizationEnabledKey: @(YES)
     };
     [[NSUserDefaults standardUserDefaults] registerDefaults:streamPreferenceDefaults];
     
@@ -325,6 +327,7 @@ NSString * const StreamPreferenceAudioHapticsKeepControllerRumbleKey = @"StreamP
     self.audioHapticsStrength = [self normalizedAudioHapticsStrength:[defaults integerForKey:StreamPreferenceAudioHapticsStrengthKey]];
     self.audioHapticsVoiceFilterSelection = [self normalizedAudioHapticsVoiceFilterSelection:[defaults integerForKey:StreamPreferenceAudioHapticsVoiceFilterSelectionKey]];
     self.audioHapticsKeepControllerRumble = [defaults boolForKey:StreamPreferenceAudioHapticsKeepControllerRumbleKey];
+    self.audioPlaybackOptimizationEnabled = [defaults boolForKey:StreamPreferenceAudioPlaybackOptimizationEnabledKey];
     id storedRumbleMode = [defaults objectForKey:StreamPreferenceRumbleModeSelectionKey];
     if ([storedRumbleMode isKindOfClass:[NSNumber class]]) {
         self.rumbleModeSelection = [storedRumbleMode integerValue];
