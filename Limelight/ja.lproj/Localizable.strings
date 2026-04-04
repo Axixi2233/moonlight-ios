@@ -3,6 +3,7 @@
 "about.credits.heading" = "ここまで支えてくれた皆さまへ";
 "about.credits.list_title" = "クレジットウォール";
 "about.credits.message" = "この一覧は、阿西西を支えてくださったすべての皆さまへ贈るものです。皆さまの応援が、プロジェクトを前へ進めてくれています。";
+"about.credits.support" = "プロジェクトを支援";
 "about.credits.subtitle" = "支えてくださった皆さまへ、心からの感謝を";
 "about.credits.title" = "謝辞";
 "about.gamepad_test.subtitle" = "スティック、ボタン、トリガー、振動、モーションをリアルタイムで確認します。";

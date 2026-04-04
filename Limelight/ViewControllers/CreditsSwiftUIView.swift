@@ -1,6 +1,7 @@
 import UIKit
 #if canImport(SwiftUI)
 import SwiftUI
+import Combine
 import Nuke
 
 private func CreditsLocalized(_ key: String) -> String {
@@ -20,6 +21,68 @@ private struct CreditsEntry: Identifiable {
             return String(avatarURLString[..<range.lowerBound])
         }
         return avatarURLString
+    }
+}
+
+private struct CreditsRemoteEntry: Decodable {
+    let name: String
+    let avatar: String
+}
+
+@available(iOS 13.0, *)
+private final class CreditsDataSource: ObservableObject {
+    @Published private(set) var entries: [CreditsEntry] = creditsEntries
+
+    private let session: URLSession
+    private var hasLoaded = false
+
+    init(session: URLSession = .shared) {
+        self.session = session
+    }
+
+    func loadIfNeeded() {
+        guard !hasLoaded else { return }
+        hasLoaded = true
+
+        var components = URLComponents(string: "https://axixi2233.github.io/res/config/sponsored.json")
+        components?.queryItems = [
+            URLQueryItem(name: "t", value: String(Int(Date().timeIntervalSince1970)))
+        ]
+
+        guard let url = components?.url else {
+            return
+        }
+
+        session.dataTask(with: url) { [weak self] data, response, error in
+            guard let self else { return }
+            guard error == nil,
+                  let httpResponse = response as? HTTPURLResponse,
+                  200..<300 ~= httpResponse.statusCode,
+                  let data else {
+                return
+            }
+
+            guard let decodedEntries = try? JSONDecoder().decode([CreditsRemoteEntry].self, from: data) else {
+                return
+            }
+
+            let mappedEntries = decodedEntries.compactMap { entry -> CreditsEntry? in
+                let trimmedName = entry.name.trimmingCharacters(in: .whitespacesAndNewlines)
+                let trimmedAvatar = entry.avatar.trimmingCharacters(in: .whitespacesAndNewlines)
+
+                guard !trimmedName.isEmpty, !trimmedAvatar.isEmpty else {
+                    return nil
+                }
+
+                return CreditsEntry(name: trimmedName, avatarURLString: trimmedAvatar)
+            }
+
+            guard !mappedEntries.isEmpty else { return }
+
+            DispatchQueue.main.async {
+                self.entries = mappedEntries
+            }
+        }.resume()
     }
 }
 
@@ -452,6 +515,8 @@ private struct CreditsWallCard: View {
 
 @available(iOS 13.0, *)
 private struct CreditsRootView: View {
+    @ObservedObject var dataSource: CreditsDataSource
+
     var body: some View {
         GeometryReader { proxy in
             let wallHeight = max(500, proxy.size.height - 230)
@@ -462,7 +527,7 @@ private struct CreditsRootView: View {
                 ScrollView(showsIndicators: false) {
                     VStack(spacing: 22) {
                         CreditsHeaderCard()
-                        CreditsWallCard(entries: creditsEntries, preferredHeight: wallHeight)
+                        CreditsWallCard(entries: dataSource.entries, preferredHeight: wallHeight)
                     }
                     .padding(.horizontal, 18)
                     .padding(.top, 18)
@@ -477,6 +542,7 @@ private struct CreditsRootView: View {
 @available(iOS 13.0, *)
 final class CreditsHostingViewController: UIViewController {
     private var hostingController: UIHostingController<CreditsRootView>?
+    private let dataSource = CreditsDataSource()
 
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -484,6 +550,7 @@ final class CreditsHostingViewController: UIViewController {
         title = CreditsLocalized("about.credits.title")
         installHostingControllerIfNeeded()
         applyNavigationBarAppearance()
+        dataSource.loadIfNeeded()
     }
 
     override func viewWillAppear(_ animated: Bool) {
@@ -492,7 +559,7 @@ final class CreditsHostingViewController: UIViewController {
     }
 
     private func installHostingControllerIfNeeded() {
-        let rootView = CreditsRootView()
+        let rootView = CreditsRootView(dataSource: dataSource)
         if let hostingController {
             hostingController.rootView = rootView
             return
