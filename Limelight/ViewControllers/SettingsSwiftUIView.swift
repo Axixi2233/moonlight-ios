@@ -36,7 +36,7 @@ final class SettingsFormSnapshot: NSObject {
 
     var hdrSupported: Bool = false
     var enableHdr: Bool = false
-    var useFramePacing: Bool = false
+    var latencyModeSelection: Int = 1
 
     var touchModeSelection: Int = 0
     var optimizeGames: Bool = true
@@ -115,7 +115,7 @@ private final class SettingsFormViewModel: ObservableObject {
 
     @Published var hdrSupported: Bool = false
     @Published var enableHdr: Bool = false
-    @Published var useFramePacing: Bool = false
+    @Published var latencyModeSelection: Int = 1
 
     @Published var touchModeSelection: Int = 0
     @Published var optimizeGames: Bool = true
@@ -186,7 +186,7 @@ private final class SettingsFormViewModel: ObservableObject {
 
         hdrSupported = snapshot.hdrSupported
         enableHdr = snapshot.enableHdr
-        useFramePacing = snapshot.useFramePacing
+        latencyModeSelection = snapshot.latencyModeSelection
 
         touchModeSelection = snapshot.touchModeSelection
         optimizeGames = snapshot.optimizeGames
@@ -254,7 +254,7 @@ private final class SettingsFormViewModel: ObservableObject {
         snapshot.preferredCodecValue = preferredCodecValue
         snapshot.hdrSupported = hdrSupported
         snapshot.enableHdr = enableHdr
-        snapshot.useFramePacing = useFramePacing
+        snapshot.latencyModeSelection = latencyModeSelection
         snapshot.touchModeSelection = touchModeSelection
         snapshot.optimizeGames = optimizeGames
         snapshot.multiController = multiController
@@ -838,7 +838,12 @@ private struct SettingsRootView: View {
                             .foregroundColor(.secondary)
                     }
 
-                    segmentedSection(title: SettingsLocalized("settings.frame_pacing.title"), selection: boolSelection($model.useFramePacing), labels: [SettingsLocalized("settings.frame_pacing.low_latency"), SettingsLocalized("settings.frame_pacing.smooth_video")])
+                    segmentedSection(
+                        title: SettingsLocalized("settings.latency_mode.title"),
+                        description: SettingsLocalized("settings.latency_mode.description"),
+                        selection: $model.latencyModeSelection,
+                        labels: model.latencyModeTitles
+                    )
 
                     segmentedSection(
                         title: SettingsLocalized("settings.stream_orientation.title"),
@@ -1209,6 +1214,14 @@ private extension SettingsFormViewModel {
         [
             SettingsLocalized("settings.renderer.system"),
             SettingsLocalized("settings.renderer.metal")
+        ]
+    }
+
+    var latencyModeTitles: [String] {
+        [
+            SettingsLocalized("settings.latency_mode.competitive"),
+            SettingsLocalized("settings.latency_mode.balanced"),
+            SettingsLocalized("settings.latency_mode.smooth")
         ]
     }
 

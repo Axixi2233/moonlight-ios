@@ -76,6 +76,17 @@ static NSInteger NormalizedRendererSelection(NSInteger rendererSelection) {
     }
 }
 
+static NSInteger NormalizedLatencyModeSelection(NSInteger latencyModeSelection) {
+    switch (latencyModeSelection) {
+        case StreamLatencyModeSelectionCompetitive:
+        case StreamLatencyModeSelectionSmooth:
+            return latencyModeSelection;
+        case StreamLatencyModeSelectionBalanced:
+        default:
+            return StreamLatencyModeSelectionBalanced;
+    }
+}
+
 static NSInteger NormalizedStreamOrientationSelection(NSInteger streamOrientationSelection) {
     switch (streamOrientationSelection) {
         case StreamOrientationSelectionLandscape:
@@ -206,6 +217,7 @@ static NSInteger NormalizedMetalFxColorModeSelection(NSInteger metalFxColorModeS
                  swapABXYButtons:(BOOL)swapABXYButtons
                        audioOnPC:(BOOL)audioOnPC
                   preferredCodec:(uint32_t)preferredCodec
+            latencyModeSelection:(NSInteger)latencyModeSelection
                   useFramePacing:(BOOL)useFramePacing
                        enableHdr:(BOOL)enableHdr
                   btMouseSupport:(BOOL)btMouseSupport
@@ -259,7 +271,8 @@ performanceOverlayPositionSelection:(NSInteger)performanceOverlayPositionSelecti
         settingsToSave.swapABXYButtons = swapABXYButtons;
         settingsToSave.playAudioOnPC = audioOnPC;
         settingsToSave.preferredCodec = preferredCodec;
-        settingsToSave.useFramePacing = useFramePacing;
+        NSInteger normalizedLatencyModeSelection = NormalizedLatencyModeSelection(latencyModeSelection);
+        settingsToSave.useFramePacing = (normalizedLatencyModeSelection == StreamLatencyModeSelectionSmooth) ? YES : useFramePacing;
         settingsToSave.enableHdr = enableHdr;
         settingsToSave.btMouseSupport = btMouseSupport;
         NSInteger normalizedRelativeMouseSensitivity = NormalizedRelativeMouseSensitivity(relativeMouseSensitivity);
@@ -297,6 +310,7 @@ performanceOverlayPositionSelection:(NSInteger)performanceOverlayPositionSelecti
         [defaults setBool:captureMouseCursor forKey:StreamPreferenceCaptureMouseCursorKey];
         [defaults setInteger:normalizedRelativeMouseSensitivity forKey:StreamPreferenceRelativeMouseSensitivityKey];
         [defaults setInteger:normalizedRendererSelection forKey:StreamPreferenceRendererSelectionKey];
+        [defaults setInteger:normalizedLatencyModeSelection forKey:StreamPreferenceLatencyModeSelectionKey];
         [defaults setInteger:normalizedMetalFxScalingSelection forKey:StreamPreferenceMetalFxScalingSelectionKey];
         [defaults setInteger:normalizedMetalFxSharpenSelection forKey:StreamPreferenceMetalFxSharpenSelectionKey];
         [defaults setInteger:normalizedMetalFxColorModeSelection forKey:StreamPreferenceMetalFxColorModeSelectionKey];
@@ -523,6 +537,7 @@ performanceOverlayPositionSelection:(NSInteger)performanceOverlayPositionSelecti
             StreamPreferenceCaptureMouseCursorKey,
             StreamPreferenceRelativeMouseSensitivityKey,
             StreamPreferenceRendererSelectionKey,
+            StreamPreferenceLatencyModeSelectionKey,
             StreamPreferenceMetalFxScalingSelectionKey,
             StreamPreferenceMetalFxSharpenSelectionKey,
             StreamPreferencePictureInPictureEnabledKey,

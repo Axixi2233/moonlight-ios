@@ -24,6 +24,7 @@ NSString * const StreamPreferenceRumbleModeSelectionKey = @"StreamPreferenceRumb
 NSString * const StreamPreferenceRemoteMouseModeKey = @"StreamPreferenceRemoteMouseMode";
 NSString * const StreamPreferenceRelativeMouseSensitivityKey = @"StreamPreferenceRelativeMouseSensitivity";
 NSString * const StreamPreferenceRendererSelectionKey = @"StreamPreferenceRendererSelection";
+NSString * const StreamPreferenceLatencyModeSelectionKey = @"StreamPreferenceLatencyModeSelection";
 NSString * const StreamPreferenceMetalFxScalingSelectionKey = @"StreamPreferenceMetalFxScalingSelection";
 NSString * const StreamPreferenceMetalFxSharpenSelectionKey = @"StreamPreferenceMetalFxSharpenSelection";
 NSString * const StreamPreferenceMetalFxColorModeSelectionKey = @"StreamPreferenceMetalFxColorModeSelection";
@@ -110,6 +111,17 @@ NSString * const StreamPreferenceAudioPlaybackOptimizationEnabledKey = @"StreamP
         case 0:
         default:
             return 0;
+    }
+}
+
+- (NSInteger)normalizedLatencyModeSelection:(NSInteger)latencyModeSelection {
+    switch (latencyModeSelection) {
+        case StreamLatencyModeSelectionCompetitive:
+        case StreamLatencyModeSelectionSmooth:
+            return latencyModeSelection;
+        case StreamLatencyModeSelectionBalanced:
+        default:
+            return StreamLatencyModeSelectionBalanced;
     }
 }
 
@@ -315,6 +327,13 @@ NSString * const StreamPreferenceAudioPlaybackOptimizationEnabledKey = @"StreamP
     self.captureMouseCursor = [defaults boolForKey:StreamPreferenceCaptureMouseCursorKey];
     self.relativeMouseSensitivity = [self normalizedRelativeMouseSensitivity:[defaults integerForKey:StreamPreferenceRelativeMouseSensitivityKey]];
     self.rendererSelection = [self normalizedRendererSelection:[defaults integerForKey:StreamPreferenceRendererSelectionKey]];
+    id storedLatencyMode = [defaults objectForKey:StreamPreferenceLatencyModeSelectionKey];
+    if ([storedLatencyMode isKindOfClass:[NSNumber class]]) {
+        self.latencyModeSelection = [self normalizedLatencyModeSelection:[storedLatencyMode integerValue]];
+    } else {
+        self.latencyModeSelection = self.useFramePacing ? StreamLatencyModeSelectionSmooth : StreamLatencyModeSelectionBalanced;
+    }
+    self.useFramePacing = (self.latencyModeSelection == StreamLatencyModeSelectionSmooth);
     self.metalFxScalingSelection = [self normalizedMetalFxScalingSelection:[defaults integerForKey:StreamPreferenceMetalFxScalingSelectionKey]];
     self.metalFxSharpenSelection = [self normalizedMetalFxSharpenSelection:[defaults integerForKey:StreamPreferenceMetalFxSharpenSelectionKey]];
     self.metalFxColorModeSelection = [self normalizedMetalFxColorModeSelection:[defaults integerForKey:StreamPreferenceMetalFxColorModeSelectionKey]];

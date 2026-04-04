@@ -67,6 +67,11 @@
 "settings.frame_pacing.low_latency" = "低遅延";
 "settings.frame_pacing.smooth_video" = "最も滑らかな映像";
 "settings.frame_pacing.title" = "フレームペーシング";
+"settings.latency_mode.title" = "ストリーム遅延モード";
+"settings.latency_mode.description" = "映像の滑らかさと入力遅延のバランスを調整します。Metal レンダリングでは差がより分かりやすくなります。";
+"settings.latency_mode.competitive" = "競技低遅延";
+"settings.latency_mode.balanced" = "バランス";
+"settings.latency_mode.smooth" = "最も滑らか";
 "settings.framerate.title" = "フレームレート";
 "settings.hdr.unsupported" = "このデバイスはHDRストリーミングに対応していません";
 "settings.motion_mode.title" = "ジャイロモード";

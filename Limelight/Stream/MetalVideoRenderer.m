@@ -119,6 +119,7 @@ static void MetalVideoRendererDecompressionOutputCallback(void *decompressionOut
     CGRect _cachedDrawableBounds;
     BOOL _hasCachedPresentationTransform;
     BOOL _metalFxAvailable;
+    StreamLatencyModeSelection _latencyModeSelection;
     StreamMetalFxScalingSelection _metalFxScalingSelection;
     StreamMetalFxSharpenSelection _metalFxSharpenSelection;
     StreamMetalFxColorModeSelection _metalFxColorModeSelection;
@@ -146,6 +147,7 @@ int DrSubmitDecodeUnit(PDECODE_UNIT decodeUnit);
         _outstandingDecodeFrames = 0;
         parameterSetBuffers = [[NSMutableArray alloc] init];
         TemporarySettings *settings = [[[DataManager alloc] init] getSettings];
+        _latencyModeSelection = (StreamLatencyModeSelection)settings.latencyModeSelection;
         _metalFxScalingSelection = (StreamMetalFxScalingSelection)settings.metalFxScalingSelection;
         _metalFxSharpenSelection = (StreamMetalFxSharpenSelection)settings.metalFxSharpenSelection;
         _metalFxColorModeSelection = (StreamMetalFxColorModeSelection)settings.metalFxColorModeSelection;
@@ -203,6 +205,26 @@ int DrSubmitDecodeUnit(PDECODE_UNIT decodeUnit);
     _spatialScalerInputTexture = nil;
     _spatialScalerOutputTexture = nil;
 #endif
+}
+
+- (NSUInteger)maxOutstandingDecodeFrames
+{
+    if (_latencyModeSelection == StreamLatencyModeSelectionCompetitive &&
+        frameRate <= 60 &&
+        !_hdrOutputEnabled &&
+        [self effectiveMetalFxScalingSelection] == StreamMetalFxScalingSelectionDisabled) {
+        return 1;
+    }
+    return kMetalRendererMaxOutstandingDecodeFrames;
+}
+
+- (StreamMetalFxScalingSelection)effectiveMetalFxScalingSelection
+{
+    if (_latencyModeSelection == StreamLatencyModeSelectionCompetitive &&
+        _metalFxScalingSelection != StreamMetalFxScalingSelectionDisabled) {
+        return StreamMetalFxScalingSelectionDisabled;
+    }
+    return _metalFxScalingSelection;
 }
 
 - (BOOL)buildTexturePresentationResources
@@ -486,7 +508,7 @@ int DrSubmitDecodeUnit(PDECODE_UNIT decodeUnit);
         _fallbackRenderer = [[VideoDecoderRenderer alloc] initWithView:_hostView
                                                              callbacks:_callbacks
                                                      streamAspectRatio:_streamAspectRatio
-                                                        useFramePacing:NO];
+                                                        useFramePacing:(_latencyModeSelection == StreamLatencyModeSelectionSmooth)];
     }
 
     return _fallbackRenderer;
@@ -1186,7 +1208,7 @@ int DrSubmitDecodeUnit(PDECODE_UNIT decodeUnit);
     if (!_metalFxAvailable || !kMetalRendererEnableMetalFxSpatial) {
         return NO;
     }
-    if (_metalFxScalingSelection == StreamMetalFxScalingSelectionDisabled) {
+    if ([self effectiveMetalFxScalingSelection] == StreamMetalFxScalingSelectionDisabled) {
         return NO;
     }
 
@@ -1225,8 +1247,9 @@ int DrSubmitDecodeUnit(PDECODE_UNIT decodeUnit);
     CGFloat inputHeight = MAX(inputSize.height, 1.0f);
 
     CGSize requestedOutputSize;
+    StreamMetalFxScalingSelection scalingSelection = [self effectiveMetalFxScalingSelection];
     if (_hdrOutputEnabled) {
-        switch (_metalFxScalingSelection) {
+        switch (scalingSelection) {
             case StreamMetalFxScalingSelectionOnePointFiveX:
                 requestedOutputSize = CGSizeMake(inputWidth * 1.5f, inputHeight * 1.5f);
                 break;
@@ -1244,7 +1267,7 @@ int DrSubmitDecodeUnit(PDECODE_UNIT decodeUnit);
         }
     }
     else {
-        switch (_metalFxScalingSelection) {
+        switch (scalingSelection) {
             case StreamMetalFxScalingSelectionOnePointFiveX:
                 requestedOutputSize = CGSizeMake(inputWidth * 1.5f, inputHeight * 1.5f);
                 break;
@@ -1362,7 +1385,7 @@ int DrSubmitDecodeUnit(PDECODE_UNIT decodeUnit);
 
     @synchronized (self) {
         if (_decodeSubmissionScheduled ||
-            _outstandingDecodeFrames >= kMetalRendererMaxOutstandingDecodeFrames) {
+            _outstandingDecodeFrames >= [self maxOutstandingDecodeFrames]) {
             return;
         }
         _decodeSubmissionScheduled = YES;
@@ -1379,7 +1402,7 @@ int DrSubmitDecodeUnit(PDECODE_UNIT decodeUnit);
             while (1) {
                 BOOL canSubmitMore = NO;
                 @synchronized (strongSelf) {
-                    canSubmitMore = strongSelf->_outstandingDecodeFrames < kMetalRendererMaxOutstandingDecodeFrames;
+                    canSubmitMore = strongSelf->_outstandingDecodeFrames < [strongSelf maxOutstandingDecodeFrames];
                 }
                 if (!canSubmitMore) {
                     break;

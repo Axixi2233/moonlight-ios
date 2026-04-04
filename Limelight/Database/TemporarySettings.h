@@ -24,6 +24,7 @@ FOUNDATION_EXTERN NSString * const StreamPreferenceRumbleModeSelectionKey;
 FOUNDATION_EXTERN NSString * const StreamPreferenceRemoteMouseModeKey;
 FOUNDATION_EXTERN NSString * const StreamPreferenceRelativeMouseSensitivityKey;
 FOUNDATION_EXTERN NSString * const StreamPreferenceRendererSelectionKey;
+FOUNDATION_EXTERN NSString * const StreamPreferenceLatencyModeSelectionKey;
 FOUNDATION_EXTERN NSString * const StreamPreferenceMetalFxScalingSelectionKey;
 FOUNDATION_EXTERN NSString * const StreamPreferenceMetalFxSharpenSelectionKey;
 FOUNDATION_EXTERN NSString * const StreamPreferenceMetalFxColorModeSelectionKey;
@@ -56,6 +57,12 @@ typedef NS_ENUM(NSInteger, StreamMetalFxScalingSelection) {
     StreamMetalFxScalingSelectionOnePointFiveX = 1,
     StreamMetalFxScalingSelectionTwoX = 2,
     StreamMetalFxScalingSelectionDisabled = 3
+};
+
+typedef NS_ENUM(NSInteger, StreamLatencyModeSelection) {
+    StreamLatencyModeSelectionCompetitive = 0,
+    StreamLatencyModeSelectionBalanced = 1,
+    StreamLatencyModeSelectionSmooth = 2
 };
 
 typedef NS_ENUM(NSInteger, StreamMetalFxSharpenSelection) {
@@ -144,6 +151,7 @@ typedef NS_ENUM(NSInteger, StreamAudioHapticsVoiceFilterSelection) {
 @property (nonatomic) CGFloat virtualGamepadOpacity;
 @property (nonatomic) NSInteger relativeMouseSensitivity;
 @property (nonatomic) NSInteger rendererSelection;
+@property (nonatomic) NSInteger latencyModeSelection;
 @property (nonatomic) NSInteger metalFxScalingSelection;
 @property (nonatomic) NSInteger metalFxSharpenSelection;
 @property (nonatomic) NSInteger metalFxColorModeSelection;

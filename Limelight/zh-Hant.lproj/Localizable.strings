@@ -67,6 +67,11 @@
 "settings.frame_pacing.low_latency" = "低延遲";
 "settings.frame_pacing.smooth_video" = "最流暢的影片";
 "settings.frame_pacing.title" = "幀同步";
+"settings.latency_mode.title" = "串流延遲模式";
+"settings.latency_mode.description" = "調整畫面流暢度與輸入延遲的取捨，在 Metal 渲染下差異更明顯。";
+"settings.latency_mode.competitive" = "競技低延遲";
+"settings.latency_mode.balanced" = "平衡";
+"settings.latency_mode.smooth" = "最流暢";
 "settings.framerate.title" = "幀率";
 "settings.hdr.unsupported" = "HDR 目前裝置不支持";
 "settings.motion_mode.title" = "體感";

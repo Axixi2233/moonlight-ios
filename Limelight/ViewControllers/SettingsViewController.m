@@ -464,7 +464,7 @@ static BOOL SupportsPictureInPicture(void) {
 
     snapshot.hdrSupported = VTIsHardwareDecodeSupported(kCMVideoCodecType_HEVC) && (AVPlayer.availableHDRModes & AVPlayerHDRModeHDR10);
     snapshot.enableHdr = snapshot.hdrSupported ? currentSettings.enableHdr : NO;
-    snapshot.useFramePacing = currentSettings.useFramePacing;
+    snapshot.latencyModeSelection = currentSettings.latencyModeSelection;
     snapshot.audioConfigSelection = AudioConfigSelectionFromChannelCount([currentSettings.audioConfig intValue]);
 
     snapshot.touchModeSelection = currentSettings.touchModeSelection;
@@ -552,7 +552,8 @@ static BOOL SupportsPictureInPicture(void) {
                      swapABXYButtons:snapshot.swapABXYButtons
                            audioOnPC:snapshot.playAudioOnPC
                       preferredCodec:(uint32_t)snapshot.preferredCodecValue
-                      useFramePacing:snapshot.useFramePacing
+                latencyModeSelection:snapshot.latencyModeSelection
+                      useFramePacing:(snapshot.latencyModeSelection == StreamLatencyModeSelectionSmooth)
                            enableHdr:snapshot.enableHdr
                       btMouseSupport:snapshot.btMouseSupport
                  remoteMouseMode:snapshot.remoteMouseMode

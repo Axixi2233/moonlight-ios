@@ -67,6 +67,11 @@
 "settings.frame_pacing.low_latency" = "Low Latency";
 "settings.frame_pacing.smooth_video" = "Smoothest Video";
 "settings.frame_pacing.title" = "Frame Pacing";
+"settings.latency_mode.title" = "Stream Latency Mode";
+"settings.latency_mode.description" = "Adjust the tradeoff between responsiveness and smoothness. The difference is more noticeable with Metal rendering.";
+"settings.latency_mode.competitive" = "Competitive";
+"settings.latency_mode.balanced" = "Balanced";
+"settings.latency_mode.smooth" = "Smoothest";
 "settings.framerate.title" = "Frame Rate";
 "settings.hdr.unsupported" = "HDR is not supported on this device";
 "settings.motion_mode.title" = "Motion";
