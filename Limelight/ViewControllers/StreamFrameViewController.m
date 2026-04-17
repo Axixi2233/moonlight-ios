@@ -75,6 +75,7 @@ static const NSInteger kStreamPerformanceOverlayPositionCustom = 6;
     StreamShortcutPanelHostingViewController *_streamShortcutPanelHostingViewController;
     StreamVirtualKeyboardPanelHostingViewController *_streamVirtualKeyboardPanelHostingViewController;
     StreamVirtualButtonsPanelHostingViewController *_streamVirtualButtonsPanelHostingViewController;
+    BOOL _streamOverlayMouseInputSuppressed;
     NSInteger _currentSessionTouchModeSelection;
     NSInteger _currentSessionVideoAlignmentSelection;
     CGFloat _currentSessionVideoAlignmentMargin;
@@ -143,6 +144,7 @@ static const NSInteger kStreamPerformanceOverlayPositionCustom = 6;
     BOOL _pictureInPictureActive;
     BOOL _pictureInPictureStartingForBackground;
 #endif
+    BOOL _manualExitInProgress;
 }
 
 - (NSAttributedString *)statsOverlayAttributedTextForText:(NSString *)text {
@@ -1138,7 +1140,9 @@ static const NSInteger kStreamPerformanceOverlayPositionCustom = 6;
     if (parent == nil) {
         [_controllerSupport cleanup];
         [UIApplication sharedApplication].idleTimerDisabled = NO;
-        [_streamMan stopStream];
+        if (!_manualExitInProgress) {
+            [_streamMan stopStream];
+        }
         if (_inactivityTimer != nil) {
             [_inactivityTimer invalidate];
             _inactivityTimer = nil;
@@ -1333,7 +1337,25 @@ static const NSInteger kStreamPerformanceOverlayPositionCustom = 6;
     _statsUpdateTimer = nil;
     [self invalidateFloatingMenuDormancyTimer];
     
+    _suppressTerminationAlertForManualExit = YES;
+    _manualExitInProgress = YES;
+
+    void (^stopStreamAfterNavigation)(void) = ^{
+        [self->_streamMan stopStream];
+    };
+
     [self.navigationController popToRootViewControllerAnimated:YES];
+    id<UIViewControllerTransitionCoordinator> coordinator = self.navigationController.transitionCoordinator;
+    if (coordinator != nil) {
+        [coordinator animateAlongsideTransition:nil completion:^(__unused id<UIViewControllerTransitionCoordinatorContext> context) {
+            stopStreamAfterNavigation();
+        }];
+    }
+    else {
+        dispatch_async(dispatch_get_main_queue(), ^{
+            stopStreamAfterNavigation();
+        });
+    }
     _extWindow = nil;
     
 }
@@ -1372,6 +1394,7 @@ static const NSInteger kStreamPerformanceOverlayPositionCustom = 6;
     UIViewController *presenter = self.navigationController ?: self;
     UIViewController *presentedController = presenter.presentedViewController;
     if (presentedController != nil && !presentedController.isBeingDismissed) {
+        [self clearPresentedStreamOverlayControllerIfNeeded:presentedController];
         [presentedController dismissViewControllerAnimated:NO completion:showAlert];
     }
     else {
@@ -1443,6 +1466,45 @@ static const NSInteger kStreamPerformanceOverlayPositionCustom = 6;
     [self showActionSheetWithTitle:StreamMenuLocalized(@"stream.menu.title") options:nil];
 }
 
+- (BOOL)streamOverlayWantsMouseInputSuppressed {
+    return _streamActionSheetHostingViewController != nil ||
+           _streamShortcutPanelHostingViewController != nil ||
+           _streamVirtualKeyboardPanelHostingViewController != nil ||
+           _streamVirtualButtonsPanelHostingViewController != nil ||
+           (_virtualButtonEditorView != nil && !_virtualButtonEditorView.hidden) ||
+           [_streamView isTemporaryVirtualButtonsEditingEnabled] ||
+           [_streamView isTemporaryVirtualGamepadEditingEnabled];
+}
+
+- (void)setStreamOverlayMouseInputSuppressed:(BOOL)suppressed {
+    if (_streamOverlayMouseInputSuppressed == suppressed) {
+        return;
+    }
+
+    _streamOverlayMouseInputSuppressed = suppressed;
+    [_streamView setMouseInputSuppressed:suppressed];
+    [_controllerSupport setMouseInputSuppressed:suppressed];
+}
+
+- (void)updateStreamOverlayMouseInputSuppression {
+    [self setStreamOverlayMouseInputSuppressed:[self streamOverlayWantsMouseInputSuppressed]];
+}
+
+- (void)clearPresentedStreamOverlayControllerIfNeeded:(UIViewController *)presentedController {
+    if (presentedController == _streamActionSheetHostingViewController) {
+        _streamActionSheetHostingViewController = nil;
+    }
+    if (presentedController == _streamShortcutPanelHostingViewController) {
+        _streamShortcutPanelHostingViewController = nil;
+    }
+    if (presentedController == _streamVirtualKeyboardPanelHostingViewController) {
+        _streamVirtualKeyboardPanelHostingViewController = nil;
+    }
+    if (presentedController == _streamVirtualButtonsPanelHostingViewController) {
+        _streamVirtualButtonsPanelHostingViewController = nil;
+    }
+    [self updateStreamOverlayMouseInputSuppression];
+}
 
 - (void)showActionSheetWithTitle:(NSString *)title options:(NSArray<NSString *> *)options {
     if (@available(iOS 13.0, *)) {
@@ -1543,9 +1605,12 @@ static const NSInteger kStreamPerformanceOverlayPositionCustom = 6;
         controller.modalPresentationStyle = UIModalPresentationOverFullScreen;
 
         _streamActionSheetHostingViewController = controller;
+        [self updateStreamOverlayMouseInputSuppression];
         [self presentViewController:controller animated:YES completion:nil];
         return;
     }
+
+    [self setStreamOverlayMouseInputSuppressed:YES];
 
     UIAlertController *alertController = [UIAlertController alertControllerWithTitle:title
                                                                              message:nil
@@ -1553,21 +1618,26 @@ static const NSInteger kStreamPerformanceOverlayPositionCustom = 6;
     [alertController addAction:[UIAlertAction actionWithTitle:StreamMenuLocalized(@"stream.menu.disconnect_fallback")
                                                         style:UIAlertActionStyleDestructive
                                                       handler:^(__unused UIAlertAction * _Nonnull action) {
+        [self updateStreamOverlayMouseInputSuppression];
         [self returnToMainFrame];
     }]];
     [alertController addAction:[UIAlertAction actionWithTitle:StreamMenuLocalized(@"stream.menu.toggle_stats_fallback")
                                                         style:UIAlertActionStyleDefault
                                                       handler:^(__unused UIAlertAction * _Nonnull action) {
+        [self updateStreamOverlayMouseInputSuppression];
         [self handleStreamMenuActionWithIdentifier:@"toggle_stats"];
     }]];
     [alertController addAction:[UIAlertAction actionWithTitle:StreamMenuLocalized(@"stream.menu.open_keyboard_fallback")
                                                         style:UIAlertActionStyleDefault
                                                       handler:^(__unused UIAlertAction * _Nonnull action) {
+        [self updateStreamOverlayMouseInputSuppression];
         [self handleStreamMenuActionWithIdentifier:@"keyboard"];
     }]];
     [alertController addAction:[UIAlertAction actionWithTitle:StreamMenuLocalized(@"common.cancel")
                                                         style:UIAlertActionStyleCancel
-                                                      handler:nil]];
+                                                      handler:^(__unused UIAlertAction * _Nonnull action) {
+        [self updateStreamOverlayMouseInputSuppression];
+    }]];
     [self presentViewController:alertController animated:YES completion:nil];
 }
 
@@ -2319,6 +2389,7 @@ static const NSInteger kStreamPerformanceOverlayPositionCustom = 6;
     NSDictionary *definition = editingVirtualButtons ? [self selectedVirtualButtonDefinition] : (editingVirtualGamepad ? [self selectedVirtualGamepadDefinition] : nil);
     if ((!editingVirtualButtons && !editingVirtualGamepad) || definition == nil) {
         _virtualButtonEditorView.hidden = YES;
+        [self updateStreamOverlayMouseInputSuppression];
         return;
     }
 
@@ -2353,6 +2424,7 @@ static const NSInteger kStreamPerformanceOverlayPositionCustom = 6;
     _virtualButtonEditorView.hidden = NO;
     [self.view bringSubviewToFront:_virtualButtonEditorView];
     [self layoutVirtualButtonEditorForCurrentBounds];
+    [self updateStreamOverlayMouseInputSuppression];
 }
 
 - (void)applyVirtualButtonEditorValuesToSelectedItem {
@@ -2464,6 +2536,7 @@ static const NSInteger kStreamPerformanceOverlayPositionCustom = 6;
 - (void)handleVirtualButtonEditorCloseTapped:(UIButton *)sender {
     (void)sender;
     _virtualButtonEditorView.hidden = YES;
+    [self updateStreamOverlayMouseInputSuppression];
 }
 
 - (void)handleVirtualButtonEditorDeleteTapped:(UIButton *)sender {
@@ -2490,6 +2563,7 @@ static const NSInteger kStreamPerformanceOverlayPositionCustom = 6;
     _selectedVirtualButtonIdentifier = nil;
     _selectedVirtualGamepadIdentifier = nil;
     _virtualButtonEditorView.hidden = YES;
+    [self updateStreamOverlayMouseInputSuppression];
     if (editingVirtualButtons) {
         [self applyVirtualButtonDefinitionsToStreamView];
         [self refreshVirtualButtonsPanelIfNeeded];
@@ -2513,6 +2587,7 @@ static const NSInteger kStreamPerformanceOverlayPositionCustom = 6;
                           buttonOpacity:[self currentVirtualButtonOpacity]];
         controller.modalPresentationStyle = UIModalPresentationOverFullScreen;
         _streamVirtualButtonsPanelHostingViewController = controller;
+        [self updateStreamOverlayMouseInputSuppression];
         [self presentViewController:controller animated:YES completion:nil];
     }
 }
@@ -2624,6 +2699,7 @@ static const NSInteger kStreamPerformanceOverlayPositionCustom = 6;
                            customItems:[self customShortcutItems]];
         controller.modalPresentationStyle = UIModalPresentationOverFullScreen;
         _streamShortcutPanelHostingViewController = controller;
+        [self updateStreamOverlayMouseInputSuppression];
         [self presentViewController:controller animated:YES completion:nil];
     }
 }
@@ -2645,6 +2721,7 @@ static const NSInteger kStreamPerformanceOverlayPositionCustom = 6;
         [controller configureWithTitle:StreamMenuLocalized(@"stream.menu.full_keyboard.title")];
         controller.modalPresentationStyle = UIModalPresentationOverFullScreen;
         _streamVirtualKeyboardPanelHostingViewController = controller;
+        [self updateStreamOverlayMouseInputSuppression];
         [self presentViewController:controller animated:YES completion:nil];
     }
 }
@@ -2673,11 +2750,12 @@ static const NSInteger kStreamPerformanceOverlayPositionCustom = 6;
             self->_stageLabel.hidden = YES;
 
             if (quitResponse.statusCode == 200) {
-                self->_suppressTerminationAlertForManualExit = YES;
                 [self returnToMainFrame];
                 return;
             }
 
+            self->_suppressTerminationAlertForManualExit = NO;
+            self->_manualExitInProgress = NO;
             UIAlertController *alert = [UIAlertController alertControllerWithTitle:StreamMenuLocalized(@"stream.quit_app.failed_title")
                                                                            message:StreamMenuLocalized(@"stream.quit_app.failed_message")
                                                                     preferredStyle:UIAlertControllerStyleAlert];
@@ -2689,11 +2767,13 @@ static const NSInteger kStreamPerformanceOverlayPositionCustom = 6;
 
 - (void)handleStreamMenuActionWithIdentifier:(NSString *)identifier {
     if ([identifier isEqualToString:@"disconnect"]) {
+        _suppressTerminationAlertForManualExit = YES;
         [self returnToMainFrame];
         return;
     }
 
     if ([identifier isEqualToString:@"quit_app"]) {
+        _suppressTerminationAlertForManualExit = YES;
         [self quitCurrentAppAndReturnToMainFrame];
         return;
     }
@@ -2739,6 +2819,8 @@ static const NSInteger kStreamPerformanceOverlayPositionCustom = 6;
             self->_selectedVirtualGamepadIdentifier = nil;
             self->_virtualButtonEditorView.hidden = YES;
         }
+        [self refreshVirtualButtonEditorForCurrentSelection];
+        [self updateStreamOverlayMouseInputSuppression];
         return;
     }
 
@@ -2806,12 +2888,14 @@ static const NSInteger kStreamPerformanceOverlayPositionCustom = 6;
     [self resetPictureInPictureState];
 #endif
 
+    if (_manualExitInProgress) {
+        return;
+    }
+
     if (_suppressTerminationAlertForManualExit) {
         dispatch_async(dispatch_get_main_queue(), ^{
-            self->_suppressTerminationAlertForManualExit = NO;
             [self returnToMainFrame];
         });
-        [_streamMan stopStream];
         return;
     }
     
@@ -2819,6 +2903,15 @@ static const NSInteger kStreamPerformanceOverlayPositionCustom = 6;
     unsigned int portTestResults = LiTestClientConnectivity(CONN_TEST_SERVER, 443, portFlags);
     
     dispatch_async(dispatch_get_main_queue(), ^{
+        if (self->_manualExitInProgress) {
+            return;
+        }
+
+        if (self->_suppressTerminationAlertForManualExit) {
+            [self returnToMainFrame];
+            return;
+        }
+
         // Allow the display to go to sleep now
         [UIApplication sharedApplication].idleTimerDisabled = NO;
         
@@ -3209,6 +3302,7 @@ static const NSInteger kStreamPerformanceOverlayPositionCustom = 6;
 - (void)streamActionSheetHostingViewController:(StreamActionSheetHostingViewController *)controller didSelectActionWithIdentifier:(NSString *)identifier {
     _streamActionSheetHostingViewController = nil;
     [controller dismissViewControllerAnimated:YES completion:^{
+        [self updateStreamOverlayMouseInputSuppression];
         [self handleStreamMenuActionWithIdentifier:identifier];
     }];
 }
@@ -3275,12 +3369,16 @@ static const NSInteger kStreamPerformanceOverlayPositionCustom = 6;
 - (void)streamActionSheetHostingViewControllerDidCancel:(StreamActionSheetHostingViewController *)controller {
     _streamActionSheetHostingViewController = nil;
 
-    [controller dismissViewControllerAnimated:YES completion:nil];
+    [controller dismissViewControllerAnimated:YES completion:^{
+        [self updateStreamOverlayMouseInputSuppression];
+    }];
 }
 
 - (void)streamShortcutPanelHostingViewControllerDidCancel:(StreamShortcutPanelHostingViewController *)controller {
     _streamShortcutPanelHostingViewController = nil;
-    [controller dismissViewControllerAnimated:YES completion:nil];
+    [controller dismissViewControllerAnimated:YES completion:^{
+        [self updateStreamOverlayMouseInputSuppression];
+    }];
 }
 
 - (void)streamShortcutPanelHostingViewController:(StreamShortcutPanelHostingViewController *)controller didSelectItemWithIdentifier:(NSString *)identifier {
@@ -3340,7 +3438,9 @@ static const NSInteger kStreamPerformanceOverlayPositionCustom = 6;
 
 - (void)streamVirtualKeyboardPanelHostingViewControllerDidCancel:(StreamVirtualKeyboardPanelHostingViewController *)controller {
     _streamVirtualKeyboardPanelHostingViewController = nil;
-    [controller dismissViewControllerAnimated:YES completion:nil];
+    [controller dismissViewControllerAnimated:YES completion:^{
+        [self updateStreamOverlayMouseInputSuppression];
+    }];
 }
 
 - (void)streamVirtualKeyboardPanelHostingViewController:(StreamVirtualKeyboardPanelHostingViewController *)controller didSubmitKeyCodes:(NSArray<NSNumber *> *)keyCodes {
@@ -3355,13 +3455,16 @@ static const NSInteger kStreamPerformanceOverlayPositionCustom = 6;
 - (void)streamVirtualKeyboardPanelHostingViewControllerDidRequestSystemKeyboard:(StreamVirtualKeyboardPanelHostingViewController *)controller {
     _streamVirtualKeyboardPanelHostingViewController = nil;
     [controller dismissViewControllerAnimated:YES completion:^{
+        [self updateStreamOverlayMouseInputSuppression];
         [self->_streamView showKeyInputBoard];
     }];
 }
 
 - (void)streamVirtualButtonsPanelHostingViewControllerDidCancel:(StreamVirtualButtonsPanelHostingViewController *)controller {
     _streamVirtualButtonsPanelHostingViewController = nil;
-    [controller dismissViewControllerAnimated:YES completion:nil];
+    [controller dismissViewControllerAnimated:YES completion:^{
+        [self updateStreamOverlayMouseInputSuppression];
+    }];
 }
 
 - (void)streamVirtualButtonsPanelHostingViewController:(StreamVirtualButtonsPanelHostingViewController *)controller didChangeEditingEnabled:(BOOL)enabled {
@@ -3369,7 +3472,9 @@ static const NSInteger kStreamPerformanceOverlayPositionCustom = 6;
     if (enabled) {
         [_streamView setTemporaryVirtualButtonsVisible:YES];
         _streamVirtualButtonsPanelHostingViewController = nil;
-        [controller dismissViewControllerAnimated:YES completion:nil];
+        [controller dismissViewControllerAnimated:YES completion:^{
+            [self updateStreamOverlayMouseInputSuppression];
+        }];
         [self showTemporaryTipText:StreamMenuLocalized(@"stream.virtual_buttons.editing_tip")];
     }
     else {
@@ -3378,6 +3483,7 @@ static const NSInteger kStreamPerformanceOverlayPositionCustom = 6;
     }
     [self refreshVirtualButtonsPanelIfNeeded];
     [self refreshVirtualButtonEditorForCurrentSelection];
+    [self updateStreamOverlayMouseInputSuppression];
 }
 
 - (void)streamVirtualButtonsPanelHostingViewController:(StreamVirtualButtonsPanelHostingViewController *)controller didDeleteItemWithIdentifier:(NSString *)identifier {

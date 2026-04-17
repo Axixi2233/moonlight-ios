@@ -539,6 +539,7 @@ typedef NS_OPTIONS(NSUInteger, StreamVirtualDirectionMask) {
     float lastMouseX;
     float lastMouseY;
     CGPoint lastScrollTranslation;
+    BOOL mouseInputSuppressed;
     
     // Citrix X1 mouse support
     X1Mouse* x1mouse;
@@ -770,6 +771,26 @@ typedef NS_OPTIONS(NSUInteger, StreamVirtualDirectionMask) {
     LiSendMouseButtonEvent(BUTTON_ACTION_RELEASE, BUTTON_MIDDLE);
 
     [self becomeFirstResponder];
+#endif
+}
+
+- (void)setMouseInputSuppressed:(BOOL)suppressed {
+#if !TARGET_OS_TV
+    mouseInputSuppressed = suppressed;
+
+    if (suppressed) {
+        lastMouseButtonMask = 0;
+        lastScrollTranslation = CGPointZero;
+        accumulatedMouseDeltaX = 0;
+        accumulatedMouseDeltaY = 0;
+        LiSendMouseButtonEvent(BUTTON_ACTION_RELEASE, BUTTON_LEFT);
+        LiSendMouseButtonEvent(BUTTON_ACTION_RELEASE, BUTTON_RIGHT);
+        LiSendMouseButtonEvent(BUTTON_ACTION_RELEASE, BUTTON_MIDDLE);
+        LiSendMouseButtonEvent(BUTTON_ACTION_RELEASE, BUTTON_X1);
+        LiSendMouseButtonEvent(BUTTON_ACTION_RELEASE, BUTTON_X2);
+    }
+#else
+    (void)suppressed;
 #endif
 }
 
@@ -2947,6 +2968,10 @@ typedef NS_OPTIONS(NSUInteger, StreamVirtualDirectionMask) {
     if (@available(iOS 13.4, *)) {
         UITouch* touch = [touches anyObject];
         if (touch.type == UITouchTypeIndirectPointer) {
+            if (mouseInputSuppressed) {
+                return YES;
+            }
+
             if (@available(iOS 14.0, *)) {
                 if ([GCMouse current] != nil && ![self shouldUseRemoteMouseMode]) {
                     // We'll handle this with GCMouse. Do nothing here.
@@ -3013,6 +3038,10 @@ typedef NS_OPTIONS(NSUInteger, StreamVirtualDirectionMask) {
     if (@available(iOS 13.4, *)) {
         UITouch *touch = [touches anyObject];
         if (touch.type == UITouchTypeIndirectPointer) {
+            if (mouseInputSuppressed) {
+                return;
+            }
+
             if (@available(iOS 14.0, *)) {
                 if ([GCMouse current] != nil && ![self shouldUseRemoteMouseMode]) {
                     // We'll handle this with GCMouse. Do nothing here.
@@ -3135,6 +3164,10 @@ typedef NS_OPTIONS(NSUInteger, StreamVirtualDirectionMask) {
 
 #if !TARGET_OS_TV
 - (void) updateCursorLocation:(CGPoint)location isMouse:(BOOL)isMouse {
+    if (isMouse && mouseInputSuppressed) {
+        return;
+    }
+
     CGPoint normalizedLocation = [self adjustCoordinatesForVideoArea:location];
     CGSize videoSize = [self getVideoAreaSize];
     
@@ -3165,6 +3198,10 @@ typedef NS_OPTIONS(NSUInteger, StreamVirtualDirectionMask) {
             // We'll handle this with GCMouse. Do nothing here.
             return nil;
         }
+    }
+
+    if (mouseInputSuppressed) {
+        return nil;
     }
     
     // This logic mimics what iOS does with AVLayerVideoGravityResizeAspect
@@ -3197,6 +3234,11 @@ typedef NS_OPTIONS(NSUInteger, StreamVirtualDirectionMask) {
 }
 
 - (void)mouseWheelMovedContinuous:(UIPanGestureRecognizer *)gesture {
+    if (mouseInputSuppressed) {
+        lastScrollTranslation = CGPointZero;
+        return;
+    }
+
     switch (gesture.state) {
         case UIGestureRecognizerStateBegan:
         case UIGestureRecognizerStateChanged:
@@ -3231,6 +3273,11 @@ typedef NS_OPTIONS(NSUInteger, StreamVirtualDirectionMask) {
 }
 
 - (void)mouseWheelMovedDiscrete:(UIPanGestureRecognizer *)gesture {
+    if (mouseInputSuppressed) {
+        lastScrollTranslation = CGPointZero;
+        return;
+    }
+
     switch (gesture.state) {
         case UIGestureRecognizerStateBegan:
         case UIGestureRecognizerStateChanged:
@@ -3426,6 +3473,12 @@ typedef NS_OPTIONS(NSUInteger, StreamVirtualDirectionMask) {
 }
 
 - (void)mouseDidMoveWithIdentifier:(NSUUID * _Nonnull)identifier deltaX:(int16_t)deltaX deltaY:(int16_t)deltaY {
+    if (mouseInputSuppressed) {
+        accumulatedMouseDeltaX = 0;
+        accumulatedMouseDeltaY = 0;
+        return;
+    }
+
     accumulatedMouseDeltaX += deltaX / X1_MOUSE_SPEED_DIVISOR;
     accumulatedMouseDeltaY += deltaY / X1_MOUSE_SPEED_DIVISOR;
     
@@ -3456,10 +3509,18 @@ typedef NS_OPTIONS(NSUInteger, StreamVirtualDirectionMask) {
 }
 
 - (void)mouseDownWithIdentifier:(NSUUID * _Nonnull)identifier button:(enum X1MouseButton)button {
+    if (mouseInputSuppressed) {
+        return;
+    }
+
     LiSendMouseButtonEvent(BUTTON_ACTION_PRESS, [self buttonFromX1ButtonCode:button]);
 }
 
 - (void)mouseUpWithIdentifier:(NSUUID * _Nonnull)identifier button:(enum X1MouseButton)button {
+    if (mouseInputSuppressed) {
+        return;
+    }
+
     LiSendMouseButtonEvent(BUTTON_ACTION_RELEASE, [self buttonFromX1ButtonCode:button]);
 }
 

@@ -64,6 +64,7 @@ typedef NS_ENUM(NSInteger, StreamViewVideoAlignmentMode) {
                    secondaryKeyCodes:(NSArray<NSNumber *> *)secondaryKeyCodes;
 - (void) applyTemporaryTouchModeSelection:(NSInteger)selection;
 - (void) resetAfterTemporaryTouchModeChange;
+- (void) setMouseInputSuppressed:(BOOL)suppressed;
 
 #if !TARGET_OS_TV
 - (void) updateCursorLocation:(CGPoint)location isMouse:(BOOL)isMouse;

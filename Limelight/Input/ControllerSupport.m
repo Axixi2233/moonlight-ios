@@ -284,6 +284,7 @@ static float ApplyAttackReleaseSmoothing(float current, float target, float atta
     
     NSInteger _rumbleMode;
     BOOL _remoteMouseMode;
+    BOOL _mouseInputSuppressed;
     float _relativeMouseSensitivityScale;
     BOOL _longPressStartForGameMenuEnabled;
     BOOL _audioHapticsEnabled;
@@ -303,6 +304,22 @@ static float ApplyAttackReleaseSmoothing(float current, float target, float atta
 #define MAX_MAGNITUDE(x, y) (abs(x) > abs(y) ? (x) : (y))
 
 #if !TARGET_OS_TV
+-(void) setMouseInputSuppressed:(BOOL)suppressed {
+    _mouseInputSuppressed = suppressed;
+
+    if (suppressed) {
+        accumulatedDeltaX = 0;
+        accumulatedDeltaY = 0;
+        accumulatedScrollX = 0;
+        accumulatedScrollY = 0;
+        LiSendMouseButtonEvent(BUTTON_ACTION_RELEASE, BUTTON_LEFT);
+        LiSendMouseButtonEvent(BUTTON_ACTION_RELEASE, BUTTON_RIGHT);
+        LiSendMouseButtonEvent(BUTTON_ACTION_RELEASE, BUTTON_MIDDLE);
+        LiSendMouseButtonEvent(BUTTON_ACTION_RELEASE, BUTTON_X1);
+        LiSendMouseButtonEvent(BUTTON_ACTION_RELEASE, BUTTON_X2);
+    }
+}
+
 - (void)startDeviceMotionUpdatesForController:(Controller *)controller reportRateHz:(uint16_t)reportRateHz {
     if (controller.motionManager == nil) {
         controller.motionManager = [[CMMotionManager alloc] init];
@@ -325,6 +342,10 @@ static float ApplyAttackReleaseSmoothing(float current, float target, float atta
     if (controller.accelTimer == nil && controller.gyroTimer == nil && controller.motionManager.isDeviceMotionActive) {
         [controller.motionManager stopDeviceMotionUpdates];
     }
+}
+#else
+-(void) setMouseInputSuppressed:(BOOL)suppressed {
+    (void)suppressed;
 }
 #endif
 
@@ -1669,7 +1690,7 @@ static float ApplyAttackReleaseSmoothing(float current, float target, float atta
 
 -(void) registerMouseCallbacks:(GCMouse*) mouse API_AVAILABLE(ios(14.0)) {
     mouse.mouseInput.mouseMovedHandler = ^(GCMouseInput * _Nonnull mouse, float deltaX, float deltaY) {
-        if (self->_remoteMouseMode) {
+        if (self->_remoteMouseMode || self->_mouseInputSuppressed) {
             return;
         }
 
@@ -1688,19 +1709,19 @@ static float ApplyAttackReleaseSmoothing(float current, float target, float atta
     };
     
     mouse.mouseInput.leftButton.pressedChangedHandler = ^(GCControllerButtonInput * _Nonnull button, float value, BOOL pressed) {
-        if (self->_remoteMouseMode) {
+        if (self->_remoteMouseMode || self->_mouseInputSuppressed) {
             return;
         }
         LiSendMouseButtonEvent(pressed ? BUTTON_ACTION_PRESS : BUTTON_ACTION_RELEASE, BUTTON_LEFT);
     };
     mouse.mouseInput.middleButton.pressedChangedHandler = ^(GCControllerButtonInput * _Nonnull button, float value, BOOL pressed) {
-        if (self->_remoteMouseMode) {
+        if (self->_remoteMouseMode || self->_mouseInputSuppressed) {
             return;
         }
         LiSendMouseButtonEvent(pressed ? BUTTON_ACTION_PRESS : BUTTON_ACTION_RELEASE, BUTTON_MIDDLE);
     };
     mouse.mouseInput.rightButton.pressedChangedHandler = ^(GCControllerButtonInput * _Nonnull button, float value, BOOL pressed) {
-        if (self->_remoteMouseMode) {
+        if (self->_remoteMouseMode || self->_mouseInputSuppressed) {
             return;
         }
         LiSendMouseButtonEvent(pressed ? BUTTON_ACTION_PRESS : BUTTON_ACTION_RELEASE, BUTTON_RIGHT);
@@ -1709,7 +1730,7 @@ static float ApplyAttackReleaseSmoothing(float current, float target, float atta
     if (mouse.mouseInput.auxiliaryButtons != nil) {
         if (mouse.mouseInput.auxiliaryButtons.count >= 1) {
             mouse.mouseInput.auxiliaryButtons[0].pressedChangedHandler = ^(GCControllerButtonInput * _Nonnull button, float value, BOOL pressed) {
-                if (self->_remoteMouseMode) {
+                if (self->_remoteMouseMode || self->_mouseInputSuppressed) {
                     return;
                 }
                 LiSendMouseButtonEvent(pressed ? BUTTON_ACTION_PRESS : BUTTON_ACTION_RELEASE, BUTTON_X1);
@@ -1717,7 +1738,7 @@ static float ApplyAttackReleaseSmoothing(float current, float target, float atta
         }
         if (mouse.mouseInput.auxiliaryButtons.count >= 2) {
             mouse.mouseInput.auxiliaryButtons[1].pressedChangedHandler = ^(GCControllerButtonInput * _Nonnull button, float value, BOOL pressed) {
-                if (self->_remoteMouseMode) {
+                if (self->_remoteMouseMode || self->_mouseInputSuppressed) {
                     return;
                 }
                 LiSendMouseButtonEvent(pressed ? BUTTON_ACTION_PRESS : BUTTON_ACTION_RELEASE, BUTTON_X2);

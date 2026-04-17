@@ -45,7 +45,7 @@ final class SettingsFormSnapshot: NSObject {
     var playAudioOnPC: Bool = false
     var btMouseSupport: Bool = false
     var remoteMouseMode: Bool = false
-    var captureMouseCursor: Bool = true
+    var captureMouseCursor: Bool = false
     var relativeMouseSensitivity: Int = 100
     var rendererSelection: Int = 0
     var supportsMetalRenderer: Bool = false
@@ -56,7 +56,7 @@ final class SettingsFormSnapshot: NSObject {
     var metalFxColorModeSelection: Int = 0
     var pictureInPictureEnabled: Bool = false
     var streamOrientationSelection: Int = 0
-    var gameMenuShortcutSelection: Int = 0
+    var gameMenuShortcutSelection: Int = 1
     var longPressStartForGameMenuEnabled: Bool = false
     var audioHapticsEnabled: Bool = false
     var audioHapticsOutputTarget: Int = 0
@@ -125,7 +125,7 @@ private final class SettingsFormViewModel: ObservableObject {
     @Published var playAudioOnPC: Bool = false
     @Published var btMouseSupport: Bool = false
     @Published var remoteMouseMode: Bool = false
-    @Published var captureMouseCursor: Bool = true
+    @Published var captureMouseCursor: Bool = false
     @Published var relativeMouseSensitivity: Double = 100
     @Published var rendererSelection: Int = 0
     @Published var supportsMetalRenderer: Bool = false
@@ -136,7 +136,7 @@ private final class SettingsFormViewModel: ObservableObject {
     @Published var metalFxColorModeSelection: Int = 0
     @Published var pictureInPictureEnabled: Bool = false
     @Published var streamOrientationSelection: Int = 0
-    @Published var gameMenuShortcutSelection: Int = 0
+    @Published var gameMenuShortcutSelection: Int = 1
     @Published var longPressStartForGameMenuEnabled: Bool = false
     @Published var audioHapticsEnabled: Bool = false
     @Published var audioHapticsOutputTarget: Int = 0

@@ -26,6 +26,7 @@
 -(void) cleanup;
 -(Controller*) getOscController;
 -(void) setOscEnabledForCurrentSession:(BOOL)enabled;
+-(void) setMouseInputSuppressed:(BOOL)suppressed;
 
 -(void) updateLeftStick:(Controller*)controller x:(short)x y:(short)y;
 -(void) updateRightStick:(Controller*)controller x:(short)x y:(short)y;
