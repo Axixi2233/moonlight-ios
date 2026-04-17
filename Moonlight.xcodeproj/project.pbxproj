@@ -1331,7 +1331,7 @@
 					"$(PROJECT_DIR)/libs/SDL2/lib/iOS-Sim",
 					"$(PROJECT_DIR)/libs/FFmpeg/lib/iOS-Sim",
 				);
-				MARKETING_VERSION = 1.0.0;
+				MARKETING_VERSION = 1.0.1;
 				PRODUCT_BUNDLE_IDENTIFIER = cn.axi.moonlight.ios;
 				PRODUCT_MODULE_NAME = Moonlight;
 				PRODUCT_NAME = Starlight;
@@ -1384,7 +1384,7 @@
 					"$(PROJECT_DIR)/libs/SDL2/lib/iOS-Sim",
 					"$(PROJECT_DIR)/libs/FFmpeg/lib/iOS-Sim",
 				);
-				MARKETING_VERSION = 1.0.0;
+				MARKETING_VERSION = 1.0.1;
 				PRODUCT_BUNDLE_IDENTIFIER = cn.axi.moonlight.ios;
 				PRODUCT_MODULE_NAME = Moonlight;
 				PRODUCT_NAME = Starlight;
