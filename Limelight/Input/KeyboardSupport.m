@@ -15,6 +15,12 @@
     if (press.key != nil) {
         return [KeyboardSupport sendKeyEvent:press.key down:down];
     }
+#if !TARGET_OS_TV
+    // On iPadOS, controller D-pads can also arrive as arrow UIPress events.
+    // Only forward real keyboard UIKey events on iOS to avoid duplicate
+    // gamepad + keyboard input during streaming.
+    return NO;
+#else
     else {
         short keyCode;
 
@@ -42,6 +48,7 @@
         
         return YES;
     }
+#endif
 }
 
 + (BOOL)sendKeyEvent:(UIKey*)key down:(BOOL)down API_AVAILABLE(ios(13.4)) {
