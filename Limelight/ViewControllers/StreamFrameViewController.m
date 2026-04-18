@@ -10,6 +10,7 @@
 #import "MainFrameViewController.h"
 #import "VideoDecoderRenderer.h"
 #import "StreamManager.h"
+#import "MicUplinkManager.h"
 #import "ControllerSupport.h"
 #import "DataManager.h"
 #import "Moonlight-Swift.h"
@@ -80,6 +81,9 @@ static const NSInteger kStreamPerformanceOverlayPositionCustom = 6;
     NSInteger _currentSessionVideoAlignmentSelection;
     CGFloat _currentSessionVideoAlignmentMargin;
     BOOL _extendedPerformanceMetricsEnabled;
+    BOOL _microphoneEnabled;
+    BOOL _microphoneStartRequested;
+    MicUplinkManager *_micUplinkManager;
     NSInteger _currentSessionPerformanceOverlayPositionSelection;
     CGFloat _currentSessionPerformanceOverlayMargin;
     BOOL _currentSessionPerformanceOverlayDragEnabled;
@@ -179,7 +183,15 @@ static const NSInteger kStreamPerformanceOverlayPositionCustom = 6;
         NSForegroundColorAttributeName: [UIColor whiteColor],
         NSFontAttributeName: font
     };
-    [attributedText appendAttributedString:[[NSAttributedString alloc] initWithString:text attributes:attributes]];
+    NSMutableAttributedString *textAttributes = [[NSMutableAttributedString alloc] initWithString:text attributes:attributes];
+    NSRange micRange = [text rangeOfString:@"Mic" options:NSBackwardsSearch];
+    if (micRange.location != NSNotFound && NSMaxRange(micRange) == text.length) {
+        [textAttributes addAttributes:@{
+            NSForegroundColorAttributeName: [UIColor colorWithRed:0.28 green:1.0 blue:0.55 alpha:1.0],
+            NSFontAttributeName: [UIFont boldSystemFontOfSize:font.pointSize]
+        } range:micRange];
+    }
+    [attributedText appendAttributedString:textAttributes];
     return attributedText;
 }
 
@@ -1226,9 +1238,10 @@ static const NSInteger kStreamPerformanceOverlayPositionCustom = 6;
 
 - (void)updateStatsOverlay {
     //    NSString* overlayText = [self->_streamMan getStatsOverlayText];
-    NSString* overlayText = [NSString stringWithFormat:@"%@ %@",
+    NSString* overlayText = [NSString stringWithFormat:@"%@ %@%@",
                              [self->_streamMan getBandwidthOverlayText],
-                             [self->_streamMan getStatsOverlayTextWithExtendedMetrics:_extendedPerformanceMetricsEnabled]];
+                             [self->_streamMan getStatsOverlayTextWithExtendedMetrics:_extendedPerformanceMetricsEnabled],
+                             _microphoneEnabled ? @" Mic" : @""];
     NSAttributedString *attributedText = [self statsOverlayAttributedTextForText:overlayText];
     
     dispatch_async(dispatch_get_main_queue(), ^{
@@ -1335,6 +1348,10 @@ static const NSInteger kStreamPerformanceOverlayPositionCustom = 6;
     
     [_statsUpdateTimer invalidate];
     _statsUpdateTimer = nil;
+    [_micUplinkManager stop];
+    _micUplinkManager = nil;
+    _microphoneStartRequested = NO;
+    _microphoneEnabled = NO;
     [self invalidateFloatingMenuDormancyTimer];
     
     _suppressTerminationAlertForManualExit = YES;
@@ -1533,6 +1550,13 @@ static const NSInteger kStreamPerformanceOverlayPositionCustom = 6;
         statsItem.symbolName = @"chart.bar.xaxis";
         [items addObject:statsItem];
 
+        StreamActionSheetItem *microphoneItem = [[StreamActionSheetItem alloc] init];
+        microphoneItem.identifier = @"toggle_microphone";
+        microphoneItem.title = StreamMenuLocalized(@"stream.menu.microphone.title");
+        microphoneItem.subtitle = StreamMenuLocalized(_microphoneEnabled ? @"stream.menu.microphone.subtitle_on" : @"stream.menu.microphone.subtitle_off");
+        microphoneItem.symbolName = _microphoneEnabled ? @"mic.fill" : @"mic.slash";
+        [items addObject:microphoneItem];
+
         StreamActionSheetItem *keyboardItem = [[StreamActionSheetItem alloc] init];
         keyboardItem.identifier = @"keyboard";
         keyboardItem.title = StreamMenuLocalized(@"stream.menu.phone_keyboard.title");
@@ -1626,6 +1650,12 @@ static const NSInteger kStreamPerformanceOverlayPositionCustom = 6;
                                                       handler:^(__unused UIAlertAction * _Nonnull action) {
         [self updateStreamOverlayMouseInputSuppression];
         [self handleStreamMenuActionWithIdentifier:@"toggle_stats"];
+    }]];
+    [alertController addAction:[UIAlertAction actionWithTitle:StreamMenuLocalized(@"stream.menu.toggle_microphone_fallback")
+                                                        style:UIAlertActionStyleDefault
+                                                      handler:^(__unused UIAlertAction * _Nonnull action) {
+        [self updateStreamOverlayMouseInputSuppression];
+        [self handleStreamMenuActionWithIdentifier:@"toggle_microphone"];
     }]];
     [alertController addAction:[UIAlertAction actionWithTitle:StreamMenuLocalized(@"stream.menu.open_keyboard_fallback")
                                                         style:UIAlertActionStyleDefault
@@ -1745,6 +1775,44 @@ static const NSInteger kStreamPerformanceOverlayPositionCustom = 6;
 
 - (void)applyExtendedPerformanceMetricsEnabled:(BOOL)enabled {
     _extendedPerformanceMetricsEnabled = enabled;
+
+    if (_overlayView != nil && !_overlayView.hidden) {
+        [self updateStatsOverlay];
+    }
+}
+
+- (void)applyMicrophoneEnabledToCurrentSession:(BOOL)enabled {
+    if (enabled) {
+        _microphoneStartRequested = YES;
+        if (_micUplinkManager == nil) {
+            _micUplinkManager = [[MicUplinkManager alloc] initWithStreamConfig:self.streamConfig];
+        }
+
+        [self showTemporaryTipText:StreamMenuLocalized(@"stream.menu.microphone.starting")];
+        [_micUplinkManager startWithCompletion:^(BOOL started, NSString *message) {
+            if (!self->_microphoneStartRequested) {
+                [self->_micUplinkManager stop];
+                self->_micUplinkManager = nil;
+                self->_microphoneEnabled = NO;
+                return;
+            }
+
+            self->_microphoneEnabled = started;
+            [self showTemporaryTipText:(started ? StreamMenuLocalized(@"stream.menu.microphone.enabled") :
+                                        (message.length > 0 ? message : StreamMenuLocalized(@"stream.menu.microphone.unavailable")))];
+
+            if (self->_overlayView != nil && !self->_overlayView.hidden) {
+                [self updateStatsOverlay];
+            }
+        }];
+        return;
+    }
+
+    [_micUplinkManager stop];
+    _micUplinkManager = nil;
+    _microphoneStartRequested = NO;
+    _microphoneEnabled = NO;
+    [self showTemporaryTipText:StreamMenuLocalized(@"stream.menu.microphone.disabled")];
 
     if (_overlayView != nil && !_overlayView.hidden) {
         [self updateStatsOverlay];
@@ -2799,6 +2867,11 @@ static const NSInteger kStreamPerformanceOverlayPositionCustom = 6;
         return;
     }
 
+    if ([identifier isEqualToString:@"toggle_microphone"]) {
+        [self applyMicrophoneEnabledToCurrentSession:!self->_microphoneEnabled];
+        return;
+    }
+
     if ([identifier isEqualToString:@"keyboard"] && self->_streamView != nil) {
         [self->_streamView showKeyInputBoard];
         return;
@@ -2883,6 +2956,10 @@ static const NSInteger kStreamPerformanceOverlayPositionCustom = 6;
 
 - (void)connectionTerminated:(int)errorCode {
     Log(LOG_I, @"Connection terminated: %d", errorCode);
+    [_micUplinkManager stop];
+    _micUplinkManager = nil;
+    _microphoneStartRequested = NO;
+    _microphoneEnabled = NO;
 
 #if !TARGET_OS_TV
     [self resetPictureInPictureState];
@@ -3146,6 +3223,7 @@ static const NSInteger kStreamPerformanceOverlayPositionCustom = 6;
 
 - (void)dealloc
 {
+    [_micUplinkManager stop];
 #if !TARGET_OS_TV
     [self stopObservingPictureInPictureController];
 #endif

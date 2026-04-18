@@ -298,7 +298,7 @@ performanceOverlayPositionSelection:(NSInteger)performanceOverlayPositionSelecti
         settingsToSave.touchSensitivity=[NSNumber numberWithInteger:touchSensitivity];
         settingsToSave.touchSensitivityGlobal=touchSensitivityGlobal;
         settingsToSave.motionMode = [NSNumber numberWithInteger:motionMode];
-        settingsToSave.virtualDisplayMode = [NSNumber numberWithInteger:virtualDisplayMode];
+        settingsToSave.virtualDisplayMode = [NSNumber numberWithInteger:MAX(0, MIN(virtualDisplayMode, 2))];
         NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
         [defaults setInteger:MAX(0, MIN(videoAlignmentSelection, 2)) forKey:StreamPreferenceVideoAlignmentSelectionKey];
         [defaults setDouble:MAX(0.0, MIN(videoAlignmentMargin, 150.0)) forKey:StreamPreferenceVideoAlignmentMarginKey];

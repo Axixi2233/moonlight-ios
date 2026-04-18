@@ -27,11 +27,11 @@
 - (NSURLRequest*) newHttpServerInfoRequest:(bool)fastFail;
 - (NSURLRequest*) newHttpServerInfoRequest;
 - (NSURLRequest*) newLaunchOrResumeRequest:(NSString*)verb config:(StreamConfiguration*)config;
+- (NSURLRequest*) newMicUplinkRequest;
 - (NSURLRequest*) newQuitAppRequest;
 - (NSURLRequest*) newAppAssetRequestWithAppId:(NSString*)appId;
 - (void) executeRequestSynchronously:(HttpRequest*)request;
 - (NSString*) getUrlParams:(StreamConfiguration*)config;
 //- (NSString*) getCurrentPCScale;
 @end
-
 

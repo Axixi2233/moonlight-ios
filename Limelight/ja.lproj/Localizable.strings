@@ -166,7 +166,10 @@
 "settings.video_alignment_margin.label" = "映像位置の余白 %d";
 "settings.virtual_button_scheme.title" = "仮想ボタン設定";
 "settings.virtual_buttons_enabled.toggle" = "仮想ボタンを有効化";
+"settings.virtual_display.extended" = "拡張モード";
+"settings.virtual_display.title" = "仮想ディスプレイ";
 "settings.virtual_display.toggle" = "仮想ディスプレイ";
+"settings.virtual_display.virtual_only" = "仮想ディスプレイのみ";
 "settings.virtual_gamepad_enabled.toggle" = "仮想ゲームパッドを有効化";
 "settings.virtual_gamepad_opacity.label" = "仮想ゲームパッドの不透明度 %d%%";
 "settings.virtual_gamepad_scheme.title" = "仮想ゲームパッド設定";
@@ -179,6 +182,17 @@
 "stream.menu.manage_virtual_buttons.title" = "仮想ボタンを編集";
 "stream.menu.manage_virtual_gamepad.subtitle" = "位置とサイズを調整します";
 "stream.menu.manage_virtual_gamepad.title" = "仮想ゲームパッドを編集";
+"stream.menu.microphone.disabled" = "マイクをオフにしました";
+"stream.menu.microphone.encoder_failed" = "マイクエンコーダーを開始できませんでした";
+"stream.menu.microphone.enabled" = "マイクをオンにしました";
+"stream.menu.microphone.invalid_session" = "マイクセッションが無効です";
+"stream.menu.microphone.network_failed" = "マイクのネットワーク接続に失敗しました";
+"stream.menu.microphone.permission_denied" = "マイクの権限が許可されていません";
+"stream.menu.microphone.starting" = "マイクを開始しています";
+"stream.menu.microphone.subtitle_off" = "タップしてマイクを有効化";
+"stream.menu.microphone.subtitle_on" = "タップしてマイクを無効化";
+"stream.menu.microphone.title" = "マイク";
+"stream.menu.microphone.unavailable" = "現在マイクを開始できません";
 "stream.menu.open_keyboard_fallback" = "キーボードを表示";
 "stream.menu.phone_keyboard.subtitle" = "上部のファンクションキーとシステムキーボードを開きます";
 "stream.menu.phone_keyboard.title" = "スマホキーボード";
@@ -196,6 +210,7 @@
 "stream.menu.stats.title" = "パフォーマンス";
 "stream.menu.subtitle" = "ゲーム中のクイック操作";
 "stream.menu.title" = "ゲームメニュー";
+"stream.menu.toggle_microphone_fallback" = "マイク切替";
 "stream.menu.toggle_stats_fallback" = "パフォーマンス切替";
 "stream.menu.view_only.subtitle" = "操作を無効にし、ズームとパンのみ許可します";
 "stream.menu.view_only.title" = "閲覧専用";

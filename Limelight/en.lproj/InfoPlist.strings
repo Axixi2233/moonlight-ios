@@ -4,3 +4,4 @@
 "NSBluetoothAlwaysUsageDescription" = "Bluetooth is used to connect to compatible peripherals.";
 "NSBluetoothPeripheralUsageDescription" = "Bluetooth is used to connect to compatible peripherals.";
 "NSLocalNetworkUsageDescription" = "Local network access is used to connect to your gaming PC for streaming.";
+"NSMicrophoneUsageDescription" = "When enabled, your voice will be sent to the connected computer for voice chat or voice input.";

@@ -928,7 +928,14 @@ private struct SettingsRootView: View {
                     descriptiveToggle(title: SettingsLocalized("settings.external_monitor.toggle"),
                                       description: SettingsLocalized("settings.external_monitor.description"),
                                       isOn: $model.externalMonitor)
-                    Toggle(SettingsLocalized("settings.virtual_display.toggle"), isOn: virtualDisplayToggle()).font(.headline)
+                    choiceSection(
+                        title: SettingsLocalized("settings.virtual_display.title"),
+                        subtitle: model.virtualDisplayModeTitle,
+                        options: Array(model.virtualDisplayModeTitles.enumerated()),
+                        selectedIndex: model.virtualDisplayModeSelection
+                    ) { index in
+                        model.virtualDisplayMode = index
+                    } isDisabled: { _ in false }
                     descriptiveToggle(title: SettingsLocalized("settings.audio_haptics.enable"),
                                       description: SettingsLocalized("settings.audio_haptics.enable_description"),
                                       isOn: $model.audioHapticsEnabled)
@@ -1098,15 +1105,6 @@ private struct SettingsRootView: View {
         )
     }
 
-    private func virtualDisplayToggle() -> Binding<Bool> {
-        Binding(
-            get: { model.virtualDisplayMode != 0 },
-            set: { isOn in
-                model.virtualDisplayMode = isOn ? 1 : 0
-            }
-        )
-    }
-
     private func boolSelection(_ value: Binding<Bool>) -> Binding<Int> {
         Binding(
             get: { value.wrappedValue ? 1 : 0 },
@@ -1237,6 +1235,25 @@ private extension SettingsFormViewModel {
             SettingsLocalized("settings.stream_orientation.landscape"),
             SettingsLocalized("settings.stream_orientation.portrait")
         ]
+    }
+
+    var virtualDisplayModeTitles: [String] {
+        [
+            SettingsLocalized("common.off"),
+            SettingsLocalized("settings.virtual_display.extended"),
+            SettingsLocalized("settings.virtual_display.virtual_only")
+        ]
+    }
+
+    var virtualDisplayModeSelection: Int {
+        min(max(virtualDisplayMode, 0), virtualDisplayModeTitles.count - 1)
+    }
+
+    var virtualDisplayModeTitle: String {
+        guard virtualDisplayModeTitles.indices.contains(virtualDisplayModeSelection) else {
+            return SettingsLocalized("common.off")
+        }
+        return virtualDisplayModeTitles[virtualDisplayModeSelection]
     }
 
     var gameMenuShortcutTitles: [String] {

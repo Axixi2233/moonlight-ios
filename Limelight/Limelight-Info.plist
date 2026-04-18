@@ -58,6 +58,8 @@
 	</array>
 	<key>NSLocalNetworkUsageDescription</key>
 	<string>Local network access is used to connect to your gaming PC for streaming.</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>When enabled, your voice will be sent to the connected computer for voice chat or voice input.</string>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
 	<key>UIBackgroundModes</key>

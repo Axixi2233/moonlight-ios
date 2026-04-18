@@ -286,9 +286,19 @@
     return [self createRequestFromString:urlString timeout:LONG_TIMEOUT_SEC];
 }
 
+- (NSURLRequest*) newMicUplinkRequest {
+    if (![self ensureHttpsUrlPopulated:NO]) {
+        return nil;
+    }
+
+    NSString* urlString = [NSString stringWithFormat:@"%@/mic-uplink?uniqueid=%@", _baseHTTPSURL, _uniqueId];
+    return [self createRequestFromString:urlString timeout:NORMAL_TIMEOUT_SEC];
+}
+
 
 - (NSString *)getUrlParams:(StreamConfiguration *)config {
-    if (config.virtualDisplayMode==0) {
+    int virtualDisplayMode = MAX(0, MIN(config.virtualDisplayMode, 2));
+    if (virtualDisplayMode == 0) {
         return @"";
     }
     
@@ -297,7 +307,7 @@
     NSMutableString *sb = [NSMutableString string];
     
     [sb appendString:@"&"];
-    [sb appendString:@"virtualDisplay=2"];
+    [sb appendFormat:@"virtualDisplay=%d", virtualDisplayMode];
     [sb appendString:@"&"];
     [sb appendString:@"virtualDisplayMode="];
     [sb appendFormat:@"%dx%dx%d", config.width, config.height,fps];

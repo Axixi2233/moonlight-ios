@@ -57,6 +57,7 @@
 		A1B2C3DB2D00000100000001 /* Localizable.strings in Resources */ = {isa = PBXBuildFile; fileRef = A1B2C3DC2D00000100000001 /* Localizable.strings */; };
 		A2C100032E10000100000001 /* MetalVideoRenderer.m in Sources */ = {isa = PBXBuildFile; fileRef = A2C100022E10000100000001 /* MetalVideoRenderer.m */; };
 		A2C100052E10000100000001 /* MetalTexturePresenter.metal in Sources */ = {isa = PBXBuildFile; fileRef = A2C100042E10000100000001 /* MetalTexturePresenter.metal */; };
+		A2C200032E20000100000001 /* MicUplinkManager.m in Sources */ = {isa = PBXBuildFile; fileRef = A2C200022E20000100000001 /* MicUplinkManager.m */; };
 		C21FF1892F7A813100CD4DAE /* MetalVideoRenderer.m in Sources */ = {isa = PBXBuildFile; fileRef = A2C100022E10000100000001 /* MetalVideoRenderer.m */; };
 		DC1F5A07206436B20037755F /* ConnectionHelper.m in Sources */ = {isa = PBXBuildFile; fileRef = DC1F5A06206436B20037755F /* ConnectionHelper.m */; };
 		F74BEF9C2C1A705600224667 /* OpenSSL in Frameworks */ = {isa = PBXBuildFile; productRef = F74BEF9B2C1A705600224667 /* OpenSSL */; };
@@ -253,6 +254,8 @@
 		A2C100012E10000100000001 /* MetalVideoRenderer.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = MetalVideoRenderer.h; sourceTree = "<group>"; };
 		A2C100022E10000100000001 /* MetalVideoRenderer.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = MetalVideoRenderer.m; sourceTree = "<group>"; };
 		A2C100042E10000100000001 /* MetalTexturePresenter.metal */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.metal; path = MetalTexturePresenter.metal; sourceTree = "<group>"; };
+		A2C200012E20000100000001 /* MicUplinkManager.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = MicUplinkManager.h; sourceTree = "<group>"; };
+		A2C200022E20000100000001 /* MicUplinkManager.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = MicUplinkManager.m; sourceTree = "<group>"; };
 		D4746EEA1CBC740C006FB401 /* Moonlight-Bridging-Header.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = "Moonlight-Bridging-Header.h"; path = "Input/Moonlight-Bridging-Header.h"; sourceTree = "<group>"; };
 		DC1F5A05206436B10037755F /* ConnectionHelper.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = ConnectionHelper.h; sourceTree = "<group>"; };
 		DC1F5A06206436B20037755F /* ConnectionHelper.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = ConnectionHelper.m; sourceTree = "<group>"; };
@@ -594,6 +597,8 @@
 				FB89461919F646E200339C8A /* StreamConfiguration.m */,
 				FB89461A19F646E200339C8A /* StreamManager.h */,
 				FB89461B19F646E200339C8A /* StreamManager.m */,
+				A2C200012E20000100000001 /* MicUplinkManager.h */,
+				A2C200022E20000100000001 /* MicUplinkManager.m */,
 				FB89461C19F646E200339C8A /* VideoDecoderRenderer.h */,
 				FB89461D19F646E200339C8A /* VideoDecoderRenderer.m */,
 				A2C100012E10000100000001 /* MetalVideoRenderer.h */,
@@ -1008,6 +1013,7 @@
 				FB9AFD3A1A7E05CE00872C98 /* ServerInfoResponse.m in Sources */,
 				FB89463119F646E200339C8A /* StreamManager.m in Sources */,
 				A2C100032E10000100000001 /* MetalVideoRenderer.m in Sources */,
+				A2C200032E20000100000001 /* MicUplinkManager.m in Sources */,
 				988FCD41293B091B003050E2 /* KeyboardInputField.m in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -1331,7 +1337,7 @@
 					"$(PROJECT_DIR)/libs/SDL2/lib/iOS-Sim",
 					"$(PROJECT_DIR)/libs/FFmpeg/lib/iOS-Sim",
 				);
-				MARKETING_VERSION = 1.0.1;
+				MARKETING_VERSION = 1.0.2;
 				PRODUCT_BUNDLE_IDENTIFIER = cn.axi.moonlight.ios;
 				PRODUCT_MODULE_NAME = Moonlight;
 				PRODUCT_NAME = Starlight;
@@ -1384,7 +1390,7 @@
 					"$(PROJECT_DIR)/libs/SDL2/lib/iOS-Sim",
 					"$(PROJECT_DIR)/libs/FFmpeg/lib/iOS-Sim",
 				);
-				MARKETING_VERSION = 1.0.1;
+				MARKETING_VERSION = 1.0.2;
 				PRODUCT_BUNDLE_IDENTIFIER = cn.axi.moonlight.ios;
 				PRODUCT_MODULE_NAME = Moonlight;
 				PRODUCT_NAME = Starlight;

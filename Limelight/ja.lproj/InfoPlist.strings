@@ -4,3 +4,4 @@
 "NSBluetoothAlwaysUsageDescription" = "対応する周辺機器に接続するために Bluetooth を使用します。";
 "NSBluetoothPeripheralUsageDescription" = "対応する周辺機器に接続するために Bluetooth を使用します。";
 "NSLocalNetworkUsageDescription" = "ゲーム用 PC に接続してストリーミングするためにローカルネットワークを使用します。";
+"NSMicrophoneUsageDescription" = "有効にすると、接続済みのコンピューターへ音声を送信し、ボイスチャットまたは音声入力に使用します。";

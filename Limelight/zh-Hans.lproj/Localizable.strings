@@ -166,7 +166,10 @@
 "settings.video_alignment_margin.label" = "画面位置边距 %d";
 "settings.virtual_button_scheme.title" = "虚拟按键方案";
 "settings.virtual_buttons_enabled.toggle" = "启用虚拟按键";
+"settings.virtual_display.extended" = "扩展模式";
+"settings.virtual_display.title" = "虚拟显示器";
 "settings.virtual_display.toggle" = "虚拟显示器";
+"settings.virtual_display.virtual_only" = "仅虚拟显示器";
 "settings.virtual_gamepad_enabled.toggle" = "启用虚拟手柄";
 "settings.virtual_gamepad_opacity.label" = "虚拟手柄透明度 %d%%";
 "settings.virtual_gamepad_scheme.title" = "虚拟手柄方案";
@@ -179,6 +182,17 @@
 "stream.menu.manage_virtual_buttons.title" = "编辑虚拟按键";
 "stream.menu.manage_virtual_gamepad.subtitle" = "调整位置和大小";
 "stream.menu.manage_virtual_gamepad.title" = "编辑虚拟手柄";
+"stream.menu.microphone.disabled" = "麦克风已关闭";
+"stream.menu.microphone.encoder_failed" = "麦克风编码器启动失败";
+"stream.menu.microphone.enabled" = "麦克风已开启";
+"stream.menu.microphone.invalid_session" = "麦克风会话参数无效";
+"stream.menu.microphone.network_failed" = "麦克风网络连接失败";
+"stream.menu.microphone.permission_denied" = "未授予麦克风权限";
+"stream.menu.microphone.starting" = "正在开启麦克风";
+"stream.menu.microphone.subtitle_off" = "点击开启麦克风";
+"stream.menu.microphone.subtitle_on" = "点击关闭麦克风";
+"stream.menu.microphone.title" = "麦克风";
+"stream.menu.microphone.unavailable" = "当前无法开启麦克风";
 "stream.menu.open_keyboard_fallback" = "弹出软键盘";
 "stream.menu.phone_keyboard.subtitle" = "打开顶部功能键和系统输入法";
 "stream.menu.phone_keyboard.title" = "手机键盘";
@@ -196,6 +210,7 @@
 "stream.menu.stats.title" = "性能信息";
 "stream.menu.subtitle" = "游戏内快捷操作";
 "stream.menu.title" = "游戏菜单";
+"stream.menu.toggle_microphone_fallback" = "切换麦克风";
 "stream.menu.toggle_stats_fallback" = "切换性能信息";
 "stream.menu.view_only.subtitle" = "禁用控制，仅允许缩放和平移画面";
 "stream.menu.view_only.title" = "仅查看";

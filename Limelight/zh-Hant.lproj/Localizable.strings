@@ -166,7 +166,10 @@
 "settings.video_alignment_margin.label" = "畫面位置邊距 %d";
 "settings.virtual_button_scheme.title" = "虛擬按鍵方案";
 "settings.virtual_buttons_enabled.toggle" = "啟用虛擬按鍵";
-"settings.virtual_display.toggle" = "虚拟顯示器";
+"settings.virtual_display.extended" = "延伸模式";
+"settings.virtual_display.title" = "虛擬顯示器";
+"settings.virtual_display.toggle" = "虛擬顯示器";
+"settings.virtual_display.virtual_only" = "僅虛擬顯示器";
 "settings.virtual_gamepad_enabled.toggle" = "啟用虛擬手把";
 "settings.virtual_gamepad_opacity.label" = "虚拟手把透明度 %d%%";
 "settings.virtual_gamepad_scheme.title" = "虛擬手把方案";
@@ -179,6 +182,17 @@
 "stream.menu.manage_virtual_buttons.title" = "編輯虛擬按鍵";
 "stream.menu.manage_virtual_gamepad.subtitle" = "调整位置和大小";
 "stream.menu.manage_virtual_gamepad.title" = "編輯虛擬手把";
+"stream.menu.microphone.disabled" = "麥克風已關閉";
+"stream.menu.microphone.encoder_failed" = "麥克風編碼器啟動失敗";
+"stream.menu.microphone.enabled" = "麥克風已開啟";
+"stream.menu.microphone.invalid_session" = "麥克風會話參數無效";
+"stream.menu.microphone.network_failed" = "麥克風網路連線失敗";
+"stream.menu.microphone.permission_denied" = "未授予麥克風權限";
+"stream.menu.microphone.starting" = "正在開啟麥克風";
+"stream.menu.microphone.subtitle_off" = "點擊開啟麥克風";
+"stream.menu.microphone.subtitle_on" = "點擊關閉麥克風";
+"stream.menu.microphone.title" = "麥克風";
+"stream.menu.microphone.unavailable" = "目前無法開啟麥克風";
 "stream.menu.open_keyboard_fallback" = "弹出软鍵盤";
 "stream.menu.phone_keyboard.subtitle" = "打開頂部功能鍵和系統輸入法";
 "stream.menu.phone_keyboard.title" = "手機鍵盤";
@@ -196,6 +210,7 @@
 "stream.menu.stats.title" = "效能資訊";
 "stream.menu.subtitle" = "遊戲內快捷操作";
 "stream.menu.title" = "遊戲選單";
+"stream.menu.toggle_microphone_fallback" = "切換麥克風";
 "stream.menu.toggle_stats_fallback" = "切换性能信息";
 "stream.menu.view_only.subtitle" = "禁用控制，僅允许缩放和平移畫面";
 "stream.menu.view_only.title" = "僅檢視";

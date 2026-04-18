@@ -166,7 +166,10 @@
 "settings.video_alignment_margin.label" = "Video position margin %d";
 "settings.virtual_button_scheme.title" = "Virtual Button Scheme";
 "settings.virtual_buttons_enabled.toggle" = "Enable Virtual Buttons";
+"settings.virtual_display.extended" = "Extended Mode";
+"settings.virtual_display.title" = "Virtual Display";
 "settings.virtual_display.toggle" = "Virtual Display";
+"settings.virtual_display.virtual_only" = "Virtual Display Only";
 "settings.virtual_gamepad_enabled.toggle" = "Enable Virtual Gamepad";
 "settings.virtual_gamepad_opacity.label" = "Virtual gamepad opacity %d%%";
 "settings.virtual_gamepad_scheme.title" = "Virtual Gamepad Scheme";
@@ -179,6 +182,17 @@
 "stream.menu.manage_virtual_buttons.title" = "Edit Virtual Buttons";
 "stream.menu.manage_virtual_gamepad.subtitle" = "Adjust position and size";
 "stream.menu.manage_virtual_gamepad.title" = "Edit Virtual Gamepad";
+"stream.menu.microphone.disabled" = "Microphone off";
+"stream.menu.microphone.encoder_failed" = "Failed to start microphone encoder";
+"stream.menu.microphone.enabled" = "Microphone on";
+"stream.menu.microphone.invalid_session" = "Invalid microphone session";
+"stream.menu.microphone.network_failed" = "Microphone network connection failed";
+"stream.menu.microphone.permission_denied" = "Microphone permission was not granted";
+"stream.menu.microphone.starting" = "Starting microphone";
+"stream.menu.microphone.subtitle_off" = "Tap to enable microphone";
+"stream.menu.microphone.subtitle_on" = "Tap to disable microphone";
+"stream.menu.microphone.title" = "Microphone";
+"stream.menu.microphone.unavailable" = "Microphone is unavailable";
 "stream.menu.open_keyboard_fallback" = "Show Keyboard";
 "stream.menu.phone_keyboard.subtitle" = "Open the top function keys and system keyboard";
 "stream.menu.phone_keyboard.title" = "Phone Keyboard";
@@ -196,6 +210,7 @@
 "stream.menu.stats.title" = "Performance";
 "stream.menu.subtitle" = "In-game quick actions";
 "stream.menu.title" = "Game Menu";
+"stream.menu.toggle_microphone_fallback" = "Toggle Microphone";
 "stream.menu.toggle_stats_fallback" = "Toggle Performance";
 "stream.menu.view_only.subtitle" = "Disable control and only allow zooming and panning";
 "stream.menu.view_only.title" = "View Only";
