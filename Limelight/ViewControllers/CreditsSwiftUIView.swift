@@ -461,7 +461,7 @@ private struct CreditsWallCard: View {
             GeometryReader { proxy in
                 let columnCount = proxy.size.width >= 720 ? 4 : (proxy.size.width >= 500 ? 3 : 2)
                 let columns = splitEntries(columnCount: columnCount)
-                let layoutID = "credits-wall-\(columnCount)-\(Int(proxy.size.width.rounded()))-\(Int(proxy.size.height.rounded()))"
+                let layoutID = "credits-wall-\(columnCount)-\(entriesLayoutSignature())-\(Int(proxy.size.width.rounded()))-\(Int(proxy.size.height.rounded()))"
 
                 HStack(alignment: .top, spacing: 12) {
                     ForEach(Array(columns.enumerated()), id: \.offset) { index, columnEntries in
@@ -510,6 +510,20 @@ private struct CreditsWallCard: View {
             columns[index % columns.count].append(entry)
         }
         return columns
+    }
+
+    private func entriesLayoutSignature() -> Int {
+        columnSignature(entries: entries)
+    }
+
+    private func columnSignature(entries: [CreditsEntry]) -> Int {
+        var hasher = Hasher()
+        hasher.combine(entries.count)
+        for entry in entries {
+            hasher.combine(entry.id)
+            hasher.combine(entry.normalizedAvatarURLString)
+        }
+        return hasher.finalize()
     }
 }
 
