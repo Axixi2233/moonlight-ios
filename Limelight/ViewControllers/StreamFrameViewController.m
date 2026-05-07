@@ -106,6 +106,7 @@ static const NSInteger kStreamPerformanceOverlayPositionCustom = 6;
     CGPoint _floatingMenuPanStartCenter;
     CGPoint _floatingMenuTouchOffset;
     BOOL _floatingMenuDragMoved;
+    BOOL _floatingMenuHasCustomPosition;
     NSMutableArray<NSDictionary *> *_virtualButtonDefinitions;
     NSMutableArray<NSDictionary *> *_virtualGamepadDefinitions;
     NSMutableArray<NSDictionary *> *_customShortcutDefinitions;
@@ -716,6 +717,7 @@ static const NSInteger kStreamPerformanceOverlayPositionCustom = 6;
     CGRect bounds = self.view.bounds;
     _floatingMenuAnchoredRight = NO;
     _floatingMenuCollapsed = NO;
+    _floatingMenuHasCustomPosition = NO;
     _floatingMenuCenterY = CGRectGetHeight(bounds) * 0.25f;
     _floatingMenuCenterY = MIN(MAX(_floatingMenuCenterY, [self floatingMenuMinimumCenterYForBounds:bounds]),
                                [self floatingMenuMaximumCenterYForBounds:bounds]);
@@ -756,7 +758,7 @@ static const NSInteger kStreamPerformanceOverlayPositionCustom = 6;
     CGRect bounds = self.view.bounds;
     CGFloat minCenterY = [self floatingMenuMinimumCenterYForBounds:bounds];
     CGFloat maxCenterY = [self floatingMenuMaximumCenterYForBounds:bounds];
-    if (_floatingMenuCenterY <= 0.0f) {
+    if (!_floatingMenuHasCustomPosition || _floatingMenuCenterY <= 0.0f) {
         _floatingMenuCenterY = CGRectGetHeight(bounds) * 0.25f;
     }
     _floatingMenuCenterY = MIN(MAX(_floatingMenuCenterY, minCenterY), maxCenterY);
@@ -875,6 +877,7 @@ static const NSInteger kStreamPerformanceOverlayPositionCustom = 6;
             CGFloat midpointX = CGRectGetMidX(bounds);
             _floatingMenuAnchoredRight = location.x >= midpointX;
             _floatingMenuCenterY = MIN(MAX(_floatingMenuButton.center.y, minCenterY), maxCenterY);
+            _floatingMenuHasCustomPosition = YES;
             [self setFloatingMenuCollapsed:NO animated:YES];
             [self scheduleFloatingMenuAutoCollapse];
             break;

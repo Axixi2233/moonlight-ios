@@ -33,6 +33,7 @@ private struct CreditsRemoteEntry: Decodable {
 private final class CreditsDataSource: ObservableObject {
     @Published private(set) var entries: [CreditsEntry] = creditsEntries
 
+    private let remoteLoadingEnabled = false
     private let session: URLSession
     private var hasLoaded = false
 
@@ -43,6 +44,7 @@ private final class CreditsDataSource: ObservableObject {
     func loadIfNeeded() {
         guard !hasLoaded else { return }
         hasLoaded = true
+        guard remoteLoadingEnabled else { return }
 
         var components = URLComponents(string: "https://axixi2233.github.io/res/config/sponsored.json")
         components?.queryItems = [
@@ -87,15 +89,18 @@ private final class CreditsDataSource: ObservableObject {
 }
 
 private let creditsEntries: [CreditsEntry] = [
+    CreditsEntry(name: "ih***an", avatarURLString: "https://i1.hdslb.com/bfs/face/eda7ce698ba39f829c9d0648ab520421416e059e.jpg@128w_1o.webp"),
     CreditsEntry(name: "鹿***路", avatarURLString: "https://i1.hdslb.com/bfs/face/f05e1dba1d95daa97da6c72cc0f56b21d11a65ce.jpg@128w_1o.webp"),
     CreditsEntry(name: "路***类", avatarURLString: "https://i1.hdslb.com/bfs/face/7f341960c6fb723a47d757b536793b5e07b5bb74.jpg@128w_1o.webp"),
     CreditsEntry(name: "千***s", avatarURLString: "https://i1.hdslb.com/bfs/face/a8946cc2028951bcc95a0707af554e7665119721.jpg@128w_1o.webp"),
+    CreditsEntry(name: "落***陨", avatarURLString: "https://i1.hdslb.com/bfs/face/dfe4f7c5ff85c679f7f9fe226af4f3a291f826b8.jpg@128w_1o.webp"),
     CreditsEntry(name: "日***a", avatarURLString: "https://i2.hdslb.com/bfs/face/050432c154105ff8bd337cb0bda2800821896018.jpg@128w_1o.webp"),
     CreditsEntry(name: "o***o", avatarURLString: "https://i1.hdslb.com/bfs/face/bd3d76161113ef0f7d91bc08d395ab49f0e83fba.jpg@128w_1o.webp"),
     CreditsEntry(name: "朝***阳", avatarURLString: "https://i2.hdslb.com/bfs/face/4e8cb5cc62296540f5c0de3c04427f802339e6f3.jpg@128w_1o.webp"),
     CreditsEntry(name: "N***Q", avatarURLString: "https://i2.hdslb.com/bfs/face/fd404932519cc91c2c1dfca5bdd7c4553d2584dd.jpg@128w_1o.webp"),
     CreditsEntry(name: "动***_", avatarURLString: "https://i1.hdslb.com/bfs/face/bf84fb0c25f2ceb5f770fffe60fc770d9b6b5c07.jpg@128w_1o.webp"),
     CreditsEntry(name: "8***i", avatarURLString: "https://i1.hdslb.com/bfs/face/member/noface.jpg@128w_1o.webp"),
+    CreditsEntry(name: "创***梦", avatarURLString: "https://i1.hdslb.com/bfs/face/member/noface.jpg@128w_1o.webp"),
     CreditsEntry(name: "在***象", avatarURLString: "https://i1.hdslb.com/bfs/face/51bd87b452ea333c77404f938b4df5683f155159.jpg@128w_1o.webp"),
     CreditsEntry(name: "五***紫", avatarURLString: "https://i1.hdslb.com/bfs/face/1b57cea01ebeb44fb6d42d2c9dc19b854d1a201d.jpg@128w_1o.webp"),
     CreditsEntry(name: "B***n", avatarURLString: "https://i2.hdslb.com/bfs/face/00a4ec4953b88a286cb669117a576a0d5d7d045f.jpg@128w_1o.webp"),
