@@ -89,6 +89,9 @@ performanceOverlayPositionSelection:(NSInteger)performanceOverlayPositionSelecti
                               opacity:(CGFloat)opacity
                    forSchemeSelection:(NSInteger)schemeSelection
                              portrait:(BOOL)portrait;
+- (NSData *)exportVirtualControlsBackupDataAndReturnError:(NSError **)error;
+- (BOOL)importVirtualControlsBackupData:(NSData *)data error:(NSError **)error;
+- (void)clearVirtualControls;
 - (NSArray<NSDictionary *> *)customShortcutDefinitions;
 - (void)saveCustomShortcutDefinitions:(NSArray<NSDictionary *> *)definitions;
 - (void)saveTouchModeSelection:(NSInteger)touchModeSelection;

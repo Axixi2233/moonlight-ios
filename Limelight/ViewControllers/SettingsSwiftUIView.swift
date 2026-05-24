@@ -88,6 +88,9 @@ final class SettingsFormSnapshot: NSObject {
 @objc protocol SettingsHostingViewControllerDelegate: NSObjectProtocol {
     func settingsHostingViewControllerDidRequestCustomResolution(_ controller: SettingsHostingViewController)
     func settingsHostingViewController(_ controller: SettingsHostingViewController, didRequestOpenExternalURL urlString: String)
+    func settingsHostingViewControllerDidRequestExportVirtualControls(_ controller: SettingsHostingViewController)
+    func settingsHostingViewControllerDidRequestImportVirtualControls(_ controller: SettingsHostingViewController)
+    func settingsHostingViewControllerDidRequestClearVirtualControls(_ controller: SettingsHostingViewController)
 }
 
 @available(iOS 13.0, *)
@@ -759,6 +762,9 @@ private struct CustomResolutionSheet: View {
 private struct SettingsRootView: View {
     @ObservedObject var model: SettingsFormViewModel
     let openExternalURL: (String) -> Void
+    let requestExportVirtualControls: () -> Void
+    let requestImportVirtualControls: () -> Void
+    let requestClearVirtualControls: () -> Void
 
     @State private var isPresentingCustomResolutionSheet = false
     @State private var customResolutionWidthText = ""
@@ -987,6 +993,25 @@ private struct SettingsRootView: View {
                             .font(.headline)
                         Slider(value: $model.virtualGamepadOpacity, in: 5...100, step: 1)
                     }
+                    actionSection(
+                        title: SettingsLocalized("settings.virtual_controls.export.button"),
+                        description: SettingsLocalized("settings.virtual_controls.export.description"),
+                        systemImage: "square.and.arrow.up",
+                        action: requestExportVirtualControls
+                    )
+                    actionSection(
+                        title: SettingsLocalized("settings.virtual_controls.import.button"),
+                        description: SettingsLocalized("settings.virtual_controls.import.description"),
+                        systemImage: "square.and.arrow.down",
+                        action: requestImportVirtualControls
+                    )
+                    actionSection(
+                        title: SettingsLocalized("settings.virtual_controls.clear.button"),
+                        description: SettingsLocalized("settings.virtual_controls.clear.description"),
+                        systemImage: "arrow.counterclockwise",
+                        tintColor: .red,
+                        action: requestClearVirtualControls
+                    )
                 }
 
                 Section(header: Text(SettingsLocalized("settings.section.performance_overlay"))) {
@@ -1142,6 +1167,35 @@ private struct SettingsRootView: View {
         Toggle(isOn: isOn) {
             settingHeader(title: title, description: description)
         }
+    }
+
+    private func actionSection(title: String, description: String, systemImage: String, tintColor: Color = .accentColor, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            HStack(alignment: .center, spacing: 12) {
+                Image(systemName: systemImage)
+                    .font(.system(size: 17, weight: .semibold))
+                    .foregroundColor(tintColor)
+                    .frame(width: 24)
+
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(title)
+                        .font(.headline)
+                        .foregroundColor(tintColor)
+                    Text(description)
+                        .font(.footnote)
+                        .foregroundColor(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+
+                Spacer(minLength: 12)
+
+                Image(systemName: "chevron.right")
+                    .font(.footnote.weight(.semibold))
+                    .foregroundColor(.secondary)
+            }
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(PlainButtonStyle())
     }
 
     @ViewBuilder
@@ -1427,6 +1481,18 @@ final class SettingsHostingViewController: UIViewController {
             openExternalURL: { [weak self] urlString in
                 guard let self = self else { return }
                 self.delegate?.settingsHostingViewController(self, didRequestOpenExternalURL: urlString)
+            },
+            requestExportVirtualControls: { [weak self] in
+                guard let self = self else { return }
+                self.delegate?.settingsHostingViewControllerDidRequestExportVirtualControls(self)
+            },
+            requestImportVirtualControls: { [weak self] in
+                guard let self = self else { return }
+                self.delegate?.settingsHostingViewControllerDidRequestImportVirtualControls(self)
+            },
+            requestClearVirtualControls: { [weak self] in
+                guard let self = self else { return }
+                self.delegate?.settingsHostingViewControllerDidRequestClearVirtualControls(self)
             }
         )
 

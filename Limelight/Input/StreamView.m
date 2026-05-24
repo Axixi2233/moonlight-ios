@@ -3061,6 +3061,10 @@ typedef NS_OPTIONS(NSUInteger, StreamVirtualDirectionMask) {
     }
 #endif
 
+    if ([settings disablesDirectScreenTouchInput]) {
+        return;
+    }
+
     hasUserInteracted = YES;
     
     [touchHandler touchesMoved:touches withEvent:event];

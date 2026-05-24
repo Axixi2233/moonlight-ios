@@ -26,8 +26,19 @@
 static NSString * const MainFrameSettingsDidCloseNotification = @"MainFrameSettingsDidCloseNotification";
 #define SettingsLocalized(key) NSLocalizedString((key), nil)
 
+typedef NS_ENUM(NSInteger, SettingsVirtualControlsDocumentOperation) {
+    SettingsVirtualControlsDocumentOperationNone = 0,
+    SettingsVirtualControlsDocumentOperationExport,
+    SettingsVirtualControlsDocumentOperationImport
+};
+
+@interface SettingsViewController () <SettingsHostingViewControllerDelegate, UIDocumentPickerDelegate>
+@end
+
 @implementation SettingsViewController {
     SettingsHostingViewController *_settingsHostingViewController;
+    SettingsVirtualControlsDocumentOperation _virtualControlsDocumentOperation;
+    NSURL *_virtualControlsExportFileURL;
 }
 
 @dynamic overrideUserInterfaceStyle;
@@ -99,6 +110,14 @@ static BOOL SupportsPictureInPicture(void) {
     }
 #endif
     return NO;
+}
+
+static NSString *VirtualControlsBackupFilename(void) {
+    NSDateFormatter *formatter = [[NSDateFormatter alloc] init];
+    formatter.locale = [NSLocale localeWithLocaleIdentifier:@"en_US_POSIX"];
+    formatter.dateFormat = @"yyyyMMdd-HHmmss";
+    NSString *timestamp = [formatter stringFromDate:[NSDate date]];
+    return [NSString stringWithFormat:@"moonlight-virtual-controls-%@.json", timestamp];
 }
 
 - (UIColor *)navigationAccentColor {
@@ -324,6 +343,167 @@ static BOOL SupportsPictureInPicture(void) {
 
     SettingsFormSnapshot *snapshot = [self makeSnapshotFromSettings:currentSettings];
     [_settingsHostingViewController configureWith:snapshot];
+}
+
+- (void)presentMessageAlertWithTitle:(NSString *)title message:(NSString *)message {
+    UIAlertController *alertController = [UIAlertController alertControllerWithTitle:title
+                                                                             message:message
+                                                                      preferredStyle:UIAlertControllerStyleAlert];
+    [alertController addAction:[UIAlertAction actionWithTitle:SettingsLocalized(@"common.ok")
+                                                        style:UIAlertActionStyleDefault
+                                                      handler:nil]];
+    [self presentViewController:alertController animated:YES completion:nil];
+}
+
+- (void)cleanupVirtualControlsExportFileIfNeeded {
+    if (_virtualControlsExportFileURL == nil) {
+        _virtualControlsDocumentOperation = SettingsVirtualControlsDocumentOperationNone;
+        return;
+    }
+
+    [[NSFileManager defaultManager] removeItemAtURL:_virtualControlsExportFileURL error:nil];
+    _virtualControlsExportFileURL = nil;
+    _virtualControlsDocumentOperation = SettingsVirtualControlsDocumentOperationNone;
+}
+
+- (NSData *)virtualControlsBackupDataForCurrentSnapshot:(SettingsFormSnapshot *)snapshot error:(NSError **)error {
+    DataManager *dataManager = [[DataManager alloc] init];
+    NSData *backupData = [dataManager exportVirtualControlsBackupDataAndReturnError:error];
+    if (backupData == nil || snapshot == nil) {
+        return backupData;
+    }
+
+    NSMutableDictionary *document = [[NSJSONSerialization JSONObjectWithData:backupData
+                                                                     options:NSJSONReadingMutableContainers
+                                                                       error:nil] mutableCopy];
+    if (![document isKindOfClass:[NSMutableDictionary class]]) {
+        return backupData;
+    }
+
+    NSMutableDictionary *virtualButtons = [document[@"virtualButtons"] mutableCopy];
+    if ([virtualButtons isKindOfClass:[NSMutableDictionary class]]) {
+        virtualButtons[@"enabled"] = @(snapshot.virtualButtonsEnabled);
+        virtualButtons[@"selectedScheme"] = @(MAX(0, MIN(snapshot.virtualButtonSchemeSelection, 4)));
+        document[@"virtualButtons"] = virtualButtons;
+    }
+
+    NSMutableDictionary *virtualGamepad = [document[@"virtualGamepad"] mutableCopy];
+    if ([virtualGamepad isKindOfClass:[NSMutableDictionary class]]) {
+        virtualGamepad[@"enabled"] = @(snapshot.virtualGamepadEnabled);
+        virtualGamepad[@"selectedScheme"] = @(MAX(0, MIN(snapshot.virtualGamepadSchemeSelection, 4)));
+        document[@"virtualGamepad"] = virtualGamepad;
+    }
+
+    return [NSJSONSerialization dataWithJSONObject:document
+                                           options:(NSJSONWritingPrettyPrinted | NSJSONWritingSortedKeys)
+                                             error:error];
+}
+
+- (void)applyImportedVirtualControlsToCurrentSettingsUI {
+    if (_settingsHostingViewController == nil) {
+        return;
+    }
+
+    SettingsFormSnapshot *snapshot = [_settingsHostingViewController currentSnapshot];
+    DataManager *dataManager = [[DataManager alloc] init];
+    TemporarySettings *currentSettings = [dataManager getSettings];
+    snapshot.virtualButtonsEnabled = currentSettings.virtualButtonsEnabled;
+    snapshot.virtualGamepadEnabled = currentSettings.virtualGamepadEnabled;
+    snapshot.virtualButtonSchemeSelection = currentSettings.virtualButtonSchemeSelection;
+    snapshot.virtualGamepadSchemeSelection = currentSettings.virtualGamepadSchemeSelection;
+
+    CGFloat importedGamepadOpacity = [dataManager virtualGamepadOpacityForSchemeSelection:currentSettings.virtualGamepadSchemeSelection];
+    snapshot.virtualGamepadOpacity = MAX(5, MIN((NSInteger)(importedGamepadOpacity * 100.0f + 0.5f), 100));
+    [_settingsHostingViewController configureWith:snapshot];
+}
+
+- (void)applyClearedVirtualControlsToCurrentSettingsUI {
+    if (_settingsHostingViewController == nil) {
+        return;
+    }
+
+    SettingsFormSnapshot *snapshot = [_settingsHostingViewController currentSnapshot];
+    snapshot.virtualButtonsEnabled = NO;
+    snapshot.virtualGamepadEnabled = NO;
+    snapshot.virtualButtonSchemeSelection = 0;
+    snapshot.virtualGamepadSchemeSelection = 0;
+    snapshot.virtualGamepadOpacity = 52;
+    [_settingsHostingViewController configureWith:snapshot];
+}
+
+- (void)presentVirtualControlsExportPicker {
+    NSError *exportError = nil;
+    NSData *backupData = [self virtualControlsBackupDataForCurrentSnapshot:[_settingsHostingViewController currentSnapshot]
+                                                                     error:&exportError];
+    if (backupData == nil) {
+        [self presentMessageAlertWithTitle:SettingsLocalized(@"settings.virtual_controls.export.failure_title")
+                                   message:exportError.localizedDescription ?: SettingsLocalized(@"settings.virtual_controls.backup.invalid")];
+        return;
+    }
+
+    NSString *temporaryPath = [NSTemporaryDirectory() stringByAppendingPathComponent:VirtualControlsBackupFilename()];
+    NSURL *temporaryURL = [NSURL fileURLWithPath:temporaryPath];
+    if (![backupData writeToURL:temporaryURL options:NSDataWritingAtomic error:&exportError]) {
+        [self presentMessageAlertWithTitle:SettingsLocalized(@"settings.virtual_controls.export.failure_title")
+                                   message:exportError.localizedDescription ?: SettingsLocalized(@"settings.virtual_controls.backup.invalid")];
+        return;
+    }
+
+    [self cleanupVirtualControlsExportFileIfNeeded];
+    _virtualControlsExportFileURL = temporaryURL;
+    _virtualControlsDocumentOperation = SettingsVirtualControlsDocumentOperationExport;
+
+    UIDocumentPickerViewController *picker = [[UIDocumentPickerViewController alloc] initWithURL:temporaryURL
+                                                                                           inMode:UIDocumentPickerModeExportToService];
+    picker.delegate = self;
+    picker.modalPresentationStyle = UIModalPresentationFormSheet;
+    [self presentViewController:picker animated:YES completion:nil];
+}
+
+- (void)presentVirtualControlsImportPicker {
+    _virtualControlsDocumentOperation = SettingsVirtualControlsDocumentOperationImport;
+    UIDocumentPickerViewController *picker = [[UIDocumentPickerViewController alloc] initWithDocumentTypes:@[@"public.json"]
+                                                                                                     inMode:UIDocumentPickerModeImport];
+    picker.delegate = self;
+    picker.allowsMultipleSelection = NO;
+    picker.modalPresentationStyle = UIModalPresentationFormSheet;
+    [self presentViewController:picker animated:YES completion:nil];
+}
+
+- (void)promptImportVirtualControls {
+    UIAlertController *alertController = [UIAlertController alertControllerWithTitle:SettingsLocalized(@"settings.virtual_controls.import.confirm_title")
+                                                                             message:SettingsLocalized(@"settings.virtual_controls.import.confirm_message")
+                                                                      preferredStyle:UIAlertControllerStyleAlert];
+    [alertController addAction:[UIAlertAction actionWithTitle:SettingsLocalized(@"common.cancel")
+                                                        style:UIAlertActionStyleCancel
+                                                      handler:nil]];
+    [alertController addAction:[UIAlertAction actionWithTitle:SettingsLocalized(@"settings.virtual_controls.import.button")
+                                                        style:UIAlertActionStyleDestructive
+                                                      handler:^(UIAlertAction *action) {
+        (void)action;
+        [self presentVirtualControlsImportPicker];
+    }]];
+    [self presentViewController:alertController animated:YES completion:nil];
+}
+
+- (void)promptClearVirtualControls {
+    UIAlertController *alertController = [UIAlertController alertControllerWithTitle:SettingsLocalized(@"settings.virtual_controls.clear.confirm_title")
+                                                                             message:SettingsLocalized(@"settings.virtual_controls.clear.confirm_message")
+                                                                      preferredStyle:UIAlertControllerStyleAlert];
+    [alertController addAction:[UIAlertAction actionWithTitle:SettingsLocalized(@"common.cancel")
+                                                        style:UIAlertActionStyleCancel
+                                                      handler:nil]];
+    [alertController addAction:[UIAlertAction actionWithTitle:SettingsLocalized(@"settings.virtual_controls.clear.button")
+                                                        style:UIAlertActionStyleDestructive
+                                                      handler:^(UIAlertAction *action) {
+        (void)action;
+        DataManager *dataManager = [[DataManager alloc] init];
+        [dataManager clearVirtualControls];
+        [self applyClearedVirtualControlsToCurrentSettingsUI];
+        [self presentMessageAlertWithTitle:SettingsLocalized(@"settings.virtual_controls.clear.success_title")
+                                   message:SettingsLocalized(@"settings.virtual_controls.clear.success_message")];
+    }]];
+    [self presentViewController:alertController animated:YES completion:nil];
 }
 
 
@@ -655,6 +835,21 @@ performanceOverlayPositionSelection:snapshot.performanceOverlayPositionSelection
     [self presentViewController:alertController animated:YES completion:nil];
 }
 
+- (void)settingsHostingViewControllerDidRequestExportVirtualControls:(SettingsHostingViewController *)controller {
+    (void)controller;
+    [self presentVirtualControlsExportPicker];
+}
+
+- (void)settingsHostingViewControllerDidRequestImportVirtualControls:(SettingsHostingViewController *)controller {
+    (void)controller;
+    [self promptImportVirtualControls];
+}
+
+- (void)settingsHostingViewControllerDidRequestClearVirtualControls:(SettingsHostingViewController *)controller {
+    (void)controller;
+    [self promptClearVirtualControls];
+}
+
 - (void)settingsHostingViewController:(SettingsHostingViewController *)controller didRequestOpenExternalURL:(NSString *)urlString {
     NSURL *url = [NSURL URLWithString:urlString];
     if (url == nil) {
@@ -664,6 +859,54 @@ performanceOverlayPositionSelection:snapshot.performanceOverlayPositionSelection
     if ([[UIApplication sharedApplication] canOpenURL:url]) {
         [[UIApplication sharedApplication] openURL:url options:@{} completionHandler:nil];
     }
+}
+
+- (void)documentPickerWasCancelled:(UIDocumentPickerViewController *)controller {
+    (void)controller;
+    if (_virtualControlsDocumentOperation == SettingsVirtualControlsDocumentOperationExport) {
+        [self cleanupVirtualControlsExportFileIfNeeded];
+    } else {
+        _virtualControlsDocumentOperation = SettingsVirtualControlsDocumentOperationNone;
+    }
+}
+
+- (void)documentPicker:(UIDocumentPickerViewController *)controller didPickDocumentsAtURLs:(NSArray<NSURL *> *)urls {
+    (void)controller;
+    if (_virtualControlsDocumentOperation == SettingsVirtualControlsDocumentOperationExport) {
+        [self cleanupVirtualControlsExportFileIfNeeded];
+        return;
+    }
+
+    _virtualControlsDocumentOperation = SettingsVirtualControlsDocumentOperationNone;
+    NSURL *selectedURL = urls.firstObject;
+    if (selectedURL == nil) {
+        return;
+    }
+
+    BOOL scoped = [selectedURL startAccessingSecurityScopedResource];
+    NSError *readError = nil;
+    NSData *data = [NSData dataWithContentsOfURL:selectedURL options:0 error:&readError];
+    if (scoped) {
+        [selectedURL stopAccessingSecurityScopedResource];
+    }
+
+    if (data == nil) {
+        [self presentMessageAlertWithTitle:SettingsLocalized(@"settings.virtual_controls.import.failure_title")
+                                   message:readError.localizedDescription ?: SettingsLocalized(@"settings.virtual_controls.backup.invalid")];
+        return;
+    }
+
+    DataManager *dataManager = [[DataManager alloc] init];
+    NSError *importError = nil;
+    if (![dataManager importVirtualControlsBackupData:data error:&importError]) {
+        [self presentMessageAlertWithTitle:SettingsLocalized(@"settings.virtual_controls.import.failure_title")
+                                   message:importError.localizedDescription ?: SettingsLocalized(@"settings.virtual_controls.backup.invalid")];
+        return;
+    }
+
+    [self applyImportedVirtualControlsToCurrentSettingsUI];
+    [self presentMessageAlertWithTitle:SettingsLocalized(@"settings.virtual_controls.import.success_title")
+                               message:SettingsLocalized(@"settings.virtual_controls.import.success_message")];
 }
 
 - (BOOL)shouldAutorotate {

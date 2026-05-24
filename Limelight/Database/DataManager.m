@@ -40,6 +40,70 @@ static NSString *VirtualGamepadOpacityDefaultsKeyForSchemeSelection(NSInteger sc
 }
 
 static NSString * const CustomShortcutDefinitionsDefaultsKey = @"StreamPreferenceCustomShortcutDefinitions";
+static NSString * const VirtualControlsBackupErrorDomain = @"VirtualControlsBackupErrorDomain";
+static NSInteger const VirtualControlsBackupSchemaVersion = 1;
+static NSString * const VirtualControlsBackupKind = @"virtual-controls";
+static NSString * const VirtualControlsBackupLegacyAppIdentifier = @"moonlight-ios";
+static NSString * const VirtualControlsBackupOfficialBundleIdentifier = @"com.moonlight-stream.Moonlight";
+
+static NSError *VirtualControlsBackupError(NSInteger code, NSString *localizedDescriptionKey) {
+    return [NSError errorWithDomain:VirtualControlsBackupErrorDomain
+                               code:code
+                           userInfo:@{ NSLocalizedDescriptionKey: NSLocalizedString(localizedDescriptionKey, nil) }];
+}
+
+static NSString *VirtualControlsBackupExportedAppIdentifier(void) {
+    NSString *bundleIdentifier = [[NSBundle mainBundle] bundleIdentifier];
+    if ([bundleIdentifier isKindOfClass:[NSString class]] && bundleIdentifier.length > 0) {
+        return bundleIdentifier;
+    }
+    return VirtualControlsBackupLegacyAppIdentifier;
+}
+
+static NSSet<NSString *> *VirtualControlsBackupAcceptedAppIdentifiers(void) {
+    NSMutableSet<NSString *> *identifiers = [NSMutableSet setWithObjects:
+                                             VirtualControlsBackupLegacyAppIdentifier,
+                                             VirtualControlsBackupOfficialBundleIdentifier,
+                                             nil];
+    NSString *bundleIdentifier = [[NSBundle mainBundle] bundleIdentifier];
+    if ([bundleIdentifier isKindOfClass:[NSString class]] && bundleIdentifier.length > 0) {
+        [identifiers addObject:bundleIdentifier];
+    }
+    return identifiers;
+}
+
+static BOOL VirtualControlsBackupIsDefinitionArray(id value) {
+    if (![value isKindOfClass:[NSArray class]]) {
+        return NO;
+    }
+
+    for (id item in (NSArray *)value) {
+        if (![item isKindOfClass:[NSDictionary class]]) {
+            return NO;
+        }
+    }
+
+    return YES;
+}
+
+static NSDictionary *VirtualControlsBackupSchemeRecordForSelection(NSArray *schemes, NSInteger schemeSelection) {
+    for (id entry in schemes) {
+        if (![entry isKindOfClass:[NSDictionary class]]) {
+            continue;
+        }
+
+        NSNumber *schemeNumber = entry[@"scheme"];
+        if (![schemeNumber isKindOfClass:[NSNumber class]]) {
+            continue;
+        }
+
+        if (MAX(0, MIN((NSInteger)schemeNumber.integerValue, 4)) == schemeSelection) {
+            return entry;
+        }
+    }
+
+    return nil;
+}
 
 static StreamTouchModeSelection NormalizedTouchModeSelection(NSInteger touchModeSelection) {
     switch (touchModeSelection) {
@@ -460,6 +524,232 @@ performanceOverlayPositionSelection:(NSInteger)performanceOverlayPositionSelecti
     NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
     [defaults setObject:(definitions ?: @[]) forKey:VirtualGamepadDefinitionsDefaultsKeyForSchemeSelectionAndOrientation(clampedSelection, portrait)];
     [defaults setDouble:MAX(0.05f, MIN(opacity, 1.0f)) forKey:VirtualGamepadOpacityDefaultsKeyForSchemeSelection(clampedSelection)];
+    [defaults synchronize];
+}
+
+- (NSData *)exportVirtualControlsBackupDataAndReturnError:(NSError **)error {
+    TemporarySettings *settings = [self getSettings];
+    NSMutableArray<NSDictionary *> *virtualButtonSchemes = [NSMutableArray arrayWithCapacity:5];
+    NSMutableArray<NSDictionary *> *virtualGamepadSchemes = [NSMutableArray arrayWithCapacity:5];
+
+    for (NSInteger schemeSelection = 0; schemeSelection < 5; schemeSelection++) {
+        NSArray<NSDictionary *> *virtualButtonPortraitDefinitions = [self virtualButtonDefinitionsForSchemeSelection:schemeSelection portrait:YES] ?: @[];
+        NSArray<NSDictionary *> *virtualButtonLandscapeDefinitions = [self virtualButtonDefinitionsForSchemeSelection:schemeSelection portrait:NO] ?: @[];
+        [virtualButtonSchemes addObject:@{
+            @"scheme": @(schemeSelection),
+            @"opacity": @([self virtualButtonOpacityForSchemeSelection:schemeSelection]),
+            @"portraitDefinitions": virtualButtonPortraitDefinitions,
+            @"landscapeDefinitions": virtualButtonLandscapeDefinitions
+        }];
+
+        NSArray<NSDictionary *> *virtualGamepadPortraitDefinitions = [self virtualGamepadDefinitionsForSchemeSelection:schemeSelection portrait:YES] ?: @[];
+        NSArray<NSDictionary *> *virtualGamepadLandscapeDefinitions = [self virtualGamepadDefinitionsForSchemeSelection:schemeSelection portrait:NO] ?: @[];
+        [virtualGamepadSchemes addObject:@{
+            @"scheme": @(schemeSelection),
+            @"opacity": @([self virtualGamepadOpacityForSchemeSelection:schemeSelection]),
+            @"portraitDefinitions": virtualGamepadPortraitDefinitions,
+            @"landscapeDefinitions": virtualGamepadLandscapeDefinitions
+        }];
+    }
+
+    NSDictionary *document = @{
+        @"schemaVersion": @(VirtualControlsBackupSchemaVersion),
+        @"app": VirtualControlsBackupExportedAppIdentifier(),
+        @"kind": VirtualControlsBackupKind,
+        @"exportedAt": @((long long)([[NSDate date] timeIntervalSince1970] * 1000.0)),
+        @"virtualButtons": @{
+            @"enabled": @(settings.virtualButtonsEnabled),
+            @"selectedScheme": @(MAX(0, MIN(settings.virtualButtonSchemeSelection, 4))),
+            @"schemes": virtualButtonSchemes
+        },
+        @"virtualGamepad": @{
+            @"enabled": @(settings.virtualGamepadEnabled),
+            @"selectedScheme": @(MAX(0, MIN(settings.virtualGamepadSchemeSelection, 4))),
+            @"schemes": virtualGamepadSchemes
+        }
+    };
+
+    if (![NSJSONSerialization isValidJSONObject:document]) {
+        if (error != NULL) {
+            *error = VirtualControlsBackupError(5, @"settings.virtual_controls.backup.invalid");
+        }
+        return nil;
+    }
+
+    return [NSJSONSerialization dataWithJSONObject:document
+                                           options:(NSJSONWritingPrettyPrinted | NSJSONWritingSortedKeys)
+                                             error:error];
+}
+
+- (BOOL)importVirtualControlsBackupData:(NSData *)data error:(NSError **)error {
+    if (data.length == 0) {
+        if (error != NULL) {
+            *error = VirtualControlsBackupError(1, @"settings.virtual_controls.backup.empty");
+        }
+        return NO;
+    }
+
+    id jsonObject = [NSJSONSerialization JSONObjectWithData:data options:0 error:nil];
+    if (![jsonObject isKindOfClass:[NSDictionary class]]) {
+        if (error != NULL) {
+            *error = VirtualControlsBackupError(2, @"settings.virtual_controls.backup.invalid");
+        }
+        return NO;
+    }
+
+    NSDictionary *document = (NSDictionary *)jsonObject;
+    NSNumber *schemaVersion = document[@"schemaVersion"];
+    NSString *appIdentifier = document[@"app"];
+    NSString *kind = document[@"kind"];
+    NSDictionary *virtualButtons = document[@"virtualButtons"];
+    NSDictionary *virtualGamepad = document[@"virtualGamepad"];
+
+    if (![schemaVersion isKindOfClass:[NSNumber class]] ||
+        schemaVersion.integerValue != VirtualControlsBackupSchemaVersion) {
+        if (error != NULL) {
+            *error = VirtualControlsBackupError(3, @"settings.virtual_controls.backup.unsupported_schema");
+        }
+        return NO;
+    }
+
+    if (![appIdentifier isKindOfClass:[NSString class]] ||
+        ![VirtualControlsBackupAcceptedAppIdentifiers() containsObject:appIdentifier] ||
+        ![kind isKindOfClass:[NSString class]] ||
+        ![kind isEqualToString:VirtualControlsBackupKind]) {
+        if (error != NULL) {
+            *error = VirtualControlsBackupError(4, @"settings.virtual_controls.backup.unsupported_app");
+        }
+        return NO;
+    }
+
+    if (![virtualButtons isKindOfClass:[NSDictionary class]] ||
+        ![virtualGamepad isKindOfClass:[NSDictionary class]]) {
+        if (error != NULL) {
+            *error = VirtualControlsBackupError(5, @"settings.virtual_controls.backup.incomplete");
+        }
+        return NO;
+    }
+
+    NSNumber *virtualButtonsEnabled = virtualButtons[@"enabled"];
+    NSNumber *virtualButtonsSelectedScheme = virtualButtons[@"selectedScheme"];
+    NSArray *virtualButtonSchemes = virtualButtons[@"schemes"];
+    NSNumber *virtualGamepadEnabled = virtualGamepad[@"enabled"];
+    NSNumber *virtualGamepadSelectedScheme = virtualGamepad[@"selectedScheme"];
+    NSArray *virtualGamepadSchemes = virtualGamepad[@"schemes"];
+
+    if (![virtualButtonsEnabled isKindOfClass:[NSNumber class]] ||
+        ![virtualButtonsSelectedScheme isKindOfClass:[NSNumber class]] ||
+        ![virtualButtonSchemes isKindOfClass:[NSArray class]] ||
+        ![virtualGamepadEnabled isKindOfClass:[NSNumber class]] ||
+        ![virtualGamepadSelectedScheme isKindOfClass:[NSNumber class]] ||
+        ![virtualGamepadSchemes isKindOfClass:[NSArray class]]) {
+        if (error != NULL) {
+            *error = VirtualControlsBackupError(5, @"settings.virtual_controls.backup.incomplete");
+        }
+        return NO;
+    }
+
+    NSMutableDictionary<NSNumber *, NSDictionary *> *virtualButtonSchemeMap = [NSMutableDictionary dictionaryWithCapacity:5];
+    NSMutableDictionary<NSNumber *, NSDictionary *> *virtualGamepadSchemeMap = [NSMutableDictionary dictionaryWithCapacity:5];
+
+    for (NSInteger schemeSelection = 0; schemeSelection < 5; schemeSelection++) {
+        NSDictionary *virtualButtonSchemeRecord = VirtualControlsBackupSchemeRecordForSelection(virtualButtonSchemes, schemeSelection);
+        NSDictionary *virtualGamepadSchemeRecord = VirtualControlsBackupSchemeRecordForSelection(virtualGamepadSchemes, schemeSelection);
+        if (virtualButtonSchemeRecord == nil || virtualGamepadSchemeRecord == nil) {
+            if (error != NULL) {
+                *error = VirtualControlsBackupError(5, @"settings.virtual_controls.backup.incomplete");
+            }
+            return NO;
+        }
+
+        NSArray *buttonPortraitDefinitions = virtualButtonSchemeRecord[@"portraitDefinitions"];
+        NSArray *buttonLandscapeDefinitions = virtualButtonSchemeRecord[@"landscapeDefinitions"];
+        NSNumber *buttonOpacity = virtualButtonSchemeRecord[@"opacity"];
+        NSArray *gamepadPortraitDefinitions = virtualGamepadSchemeRecord[@"portraitDefinitions"];
+        NSArray *gamepadLandscapeDefinitions = virtualGamepadSchemeRecord[@"landscapeDefinitions"];
+        NSNumber *gamepadOpacity = virtualGamepadSchemeRecord[@"opacity"];
+
+        if (!VirtualControlsBackupIsDefinitionArray(buttonPortraitDefinitions) ||
+            !VirtualControlsBackupIsDefinitionArray(buttonLandscapeDefinitions) ||
+            ![buttonOpacity isKindOfClass:[NSNumber class]] ||
+            !VirtualControlsBackupIsDefinitionArray(gamepadPortraitDefinitions) ||
+            !VirtualControlsBackupIsDefinitionArray(gamepadLandscapeDefinitions) ||
+            ![gamepadOpacity isKindOfClass:[NSNumber class]]) {
+            if (error != NULL) {
+                *error = VirtualControlsBackupError(5, @"settings.virtual_controls.backup.incomplete");
+            }
+            return NO;
+        }
+
+        virtualButtonSchemeMap[@(schemeSelection)] = @{
+            @"portraitDefinitions": buttonPortraitDefinitions,
+            @"landscapeDefinitions": buttonLandscapeDefinitions,
+            @"opacity": @(MAX(0.05f, MIN((CGFloat)buttonOpacity.doubleValue, 1.0f)))
+        };
+        virtualGamepadSchemeMap[@(schemeSelection)] = @{
+            @"portraitDefinitions": gamepadPortraitDefinitions,
+            @"landscapeDefinitions": gamepadLandscapeDefinitions,
+            @"opacity": @(MAX(0.05f, MIN((CGFloat)gamepadOpacity.doubleValue, 1.0f)))
+        };
+    }
+
+    NSInteger normalizedVirtualButtonSchemeSelection = MAX(0, MIN((NSInteger)virtualButtonsSelectedScheme.integerValue, 4));
+    NSInteger normalizedVirtualGamepadSchemeSelection = MAX(0, MIN((NSInteger)virtualGamepadSelectedScheme.integerValue, 4));
+
+    for (NSInteger schemeSelection = 0; schemeSelection < 5; schemeSelection++) {
+        NSDictionary *virtualButtonSchemeRecord = virtualButtonSchemeMap[@(schemeSelection)];
+        CGFloat buttonOpacity = [virtualButtonSchemeRecord[@"opacity"] doubleValue];
+        [self saveVirtualButtonDefinitions:virtualButtonSchemeRecord[@"portraitDefinitions"]
+                                   opacity:buttonOpacity
+                        forSchemeSelection:schemeSelection
+                                  portrait:YES];
+        [self saveVirtualButtonDefinitions:virtualButtonSchemeRecord[@"landscapeDefinitions"]
+                                   opacity:buttonOpacity
+                        forSchemeSelection:schemeSelection
+                                  portrait:NO];
+
+        NSDictionary *virtualGamepadSchemeRecord = virtualGamepadSchemeMap[@(schemeSelection)];
+        CGFloat gamepadOpacity = [virtualGamepadSchemeRecord[@"opacity"] doubleValue];
+        [self saveVirtualGamepadDefinitions:virtualGamepadSchemeRecord[@"portraitDefinitions"]
+                                    opacity:gamepadOpacity
+                         forSchemeSelection:schemeSelection
+                                   portrait:YES];
+        [self saveVirtualGamepadDefinitions:virtualGamepadSchemeRecord[@"landscapeDefinitions"]
+                                    opacity:gamepadOpacity
+                         forSchemeSelection:schemeSelection
+                                   portrait:NO];
+    }
+
+    CGFloat selectedGamepadOpacity = [virtualGamepadSchemeMap[@(normalizedVirtualGamepadSchemeSelection)][@"opacity"] doubleValue];
+    NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
+    [defaults setBool:virtualButtonsEnabled.boolValue forKey:StreamPreferenceVirtualButtonsEnabledKey];
+    [defaults setBool:virtualGamepadEnabled.boolValue forKey:StreamPreferenceVirtualGamepadEnabledKey];
+    [defaults setInteger:normalizedVirtualButtonSchemeSelection forKey:StreamPreferenceVirtualButtonSchemeSelectionKey];
+    [defaults setInteger:normalizedVirtualGamepadSchemeSelection forKey:StreamPreferenceVirtualGamepadSchemeSelectionKey];
+    [defaults setDouble:MAX(0.05f, MIN(selectedGamepadOpacity, 1.0f)) forKey:StreamPreferenceVirtualGamepadOpacityKey];
+    [defaults synchronize];
+
+    return YES;
+}
+
+- (void)clearVirtualControls {
+    NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
+
+    for (NSInteger schemeSelection = 0; schemeSelection < 5; schemeSelection++) {
+        [defaults removeObjectForKey:VirtualButtonDefinitionsDefaultsKeyForSchemeSelectionAndOrientation(schemeSelection, NO)];
+        [defaults removeObjectForKey:VirtualButtonDefinitionsDefaultsKeyForSchemeSelectionAndOrientation(schemeSelection, YES)];
+        [defaults removeObjectForKey:VirtualButtonOpacityDefaultsKeyForSchemeSelection(schemeSelection)];
+
+        [defaults removeObjectForKey:VirtualGamepadDefinitionsDefaultsKeyForSchemeSelectionAndOrientation(schemeSelection, NO)];
+        [defaults removeObjectForKey:VirtualGamepadDefinitionsDefaultsKeyForSchemeSelectionAndOrientation(schemeSelection, YES)];
+        [defaults removeObjectForKey:VirtualGamepadOpacityDefaultsKeyForSchemeSelection(schemeSelection)];
+    }
+
+    [defaults setBool:NO forKey:StreamPreferenceVirtualButtonsEnabledKey];
+    [defaults setBool:NO forKey:StreamPreferenceVirtualGamepadEnabledKey];
+    [defaults setInteger:0 forKey:StreamPreferenceVirtualButtonSchemeSelectionKey];
+    [defaults setInteger:0 forKey:StreamPreferenceVirtualGamepadSchemeSelectionKey];
+    [defaults setDouble:0.52f forKey:StreamPreferenceVirtualGamepadOpacityKey];
     [defaults synchronize];
 }
 

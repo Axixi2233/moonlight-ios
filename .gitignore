@@ -4,3 +4,8 @@
 .DS_Store
 Build
 DerivedData
+/moonlight-common/moonlight-common-c/
+/libs/
+/.idea/
+/.github/
+/X1Kit/
