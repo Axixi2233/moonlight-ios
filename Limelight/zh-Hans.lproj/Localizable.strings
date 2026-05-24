@@ -248,6 +248,7 @@
 "stream.touch_mode.toast" = "触控模式: %@";
 "stream.touch_mode.trackpad" = "触控板";
 "stream.video_alignment.title" = "画面位置";
+"stream.video_alignment_margin.title" = "边距";
 "stream.video_alignment_margin.label" = "画面位置边距 %d";
 "stream.menu.manage_virtual_gamepad.tip" = "点选虚拟手柄控件可调整位置和大小";
 "stream.menu.quit_stream.progress" = "正在退出应用...";
@@ -313,6 +314,8 @@
 "stream.virtual_buttons.empty_message" = "点击右上角加号，先添加一组自定义按键。";
 "stream.virtual_buttons.empty_title" = "还没有虚拟按键";
 "stream.virtual_buttons.finish_editing" = "完成编辑";
+"stream.virtual_controls.exit" = "退出";
+"stream.virtual_controls.exit_editing" = "退出编辑";
 "stream.virtual_buttons.mouse.left" = "鼠标左键";
 "stream.virtual_buttons.mouse.left_lock" = "鼠标左键锁定";
 "stream.virtual_buttons.mouse.left_lock_subtitle" = "点击锁定左键";
@@ -472,6 +475,7 @@
 "stream.launch.not_paired" = "设备尚未与电脑完成配对";
 "stream.connection.poor_slow" = "电脑连接速度缓慢，请降低码率！";
 "stream.connection.poor" = "电脑连接不良";
+"stream.performance.enabled.toggle" = "启动性能信息";
 "stream.stats.client" = " 客户端：%.1f ms";
 "stream.stats.audio" = " 音频：待播%.0f 队列%.0f 丢%d";
 "stream.stats.dropped" = " 丢帧：%.2f%%";

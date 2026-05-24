@@ -248,6 +248,7 @@
 "stream.touch_mode.toast" = "觸控模式: %@";
 "stream.touch_mode.trackpad" = "觸控板";
 "stream.video_alignment.title" = "畫面位置";
+"stream.video_alignment_margin.title" = "邊距";
 "stream.video_alignment_margin.label" = "畫面位置邊距 %d";
 "stream.menu.manage_virtual_gamepad.tip" = "点选虚拟手把控件可调整位置和大小";
 "stream.menu.quit_stream.progress" = "正在退出應用...";
@@ -313,6 +314,8 @@
 "stream.virtual_buttons.empty_message" = "点击右上角加號，先添加一组自定义按鍵。";
 "stream.virtual_buttons.empty_title" = "還沒有虚拟按鍵";
 "stream.virtual_buttons.finish_editing" = "完成编辑";
+"stream.virtual_controls.exit" = "退出";
+"stream.virtual_controls.exit_editing" = "退出編輯";
 "stream.virtual_buttons.mouse.left" = "滑鼠左鍵";
 "stream.virtual_buttons.mouse.left_lock" = "滑鼠左鍵锁定";
 "stream.virtual_buttons.mouse.left_lock_subtitle" = "点击锁定左鍵";
@@ -472,6 +475,7 @@
 "stream.launch.not_paired" = "裝置尚未與電腦完成配對";
 "stream.connection.poor_slow" = "電腦連線速度缓慢，請降低碼率！";
 "stream.connection.poor" = "電腦連線不良";
+"stream.performance.enabled.toggle" = "啟用效能資訊";
 "stream.performance.extended_metrics.toggle" = "顯示抖動/編碼/客戶端延遲/掉幀率";
 "stream.stats.client" = " 客戶端：%.1f ms";
 "stream.stats.audio" = " 音訊：待播%.0f 佇列%.0f 丟%d";

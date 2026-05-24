@@ -117,7 +117,7 @@ static NSString *VirtualControlsBackupFilename(void) {
     formatter.locale = [NSLocale localeWithLocaleIdentifier:@"en_US_POSIX"];
     formatter.dateFormat = @"yyyyMMdd-HHmmss";
     NSString *timestamp = [formatter stringFromDate:[NSDate date]];
-    return [NSString stringWithFormat:@"moonlight-virtual-controls-%@.json", timestamp];
+    return [NSString stringWithFormat:@"starlight-virtual-controls-%@.json", timestamp];
 }
 
 - (UIColor *)navigationAccentColor {

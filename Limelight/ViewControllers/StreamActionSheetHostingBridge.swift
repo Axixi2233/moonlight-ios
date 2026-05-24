@@ -9,6 +9,18 @@ private func StreamMenuLocalizedFormat(_ key: String, _ args: CVarArg...) -> Str
     String(format: StreamMenuLocalized(key), locale: Locale.current, arguments: args)
 }
 
+private let streamPanelDimmingUIColor = UIColor.black.withAlphaComponent(0.24)
+private let streamPanelDimmingColor = Color.black.opacity(0.24)
+private let streamPanelBackgroundUIColor = UIColor(red: 0.15, green: 0.13, blue: 0.22, alpha: 0.96)
+private let streamPanelDialogColor = Color(red: 0.16, green: 0.14, blue: 0.24).opacity(0.98)
+
+private func streamPanelRaisedGradient() -> LinearGradient {
+    LinearGradient(colors: [
+        Color(red: 0.22, green: 0.19, blue: 0.33),
+        Color(red: 0.15, green: 0.13, blue: 0.24)
+    ], startPoint: .topLeading, endPoint: .bottomTrailing)
+}
+
 private final class EdgeIgnoringHostingController<Content: View>: UIHostingController<Content> {
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -33,6 +45,8 @@ final class StreamActionSheetItem: NSObject {
     var subtitle: String = ""
     var symbolName: String = "circle"
     var destructive: Bool = false
+    var active: Bool = false
+    var accentColor: UIColor = .systemBlue
 }
 
 @objc protocol StreamActionSheetHostingViewControllerDelegate: NSObjectProtocol {
@@ -41,6 +55,7 @@ final class StreamActionSheetItem: NSObject {
     func streamActionSheetHostingViewController(_ controller: StreamActionSheetHostingViewController, didChangeTouchModeSelection selection: Int)
     func streamActionSheetHostingViewController(_ controller: StreamActionSheetHostingViewController, didChangeVideoAlignmentSelection selection: Int)
     func streamActionSheetHostingViewController(_ controller: StreamActionSheetHostingViewController, didChangeVideoAlignmentMargin margin: Double)
+    func streamActionSheetHostingViewController(_ controller: StreamActionSheetHostingViewController, didChangeStatsOverlayEnabled enabled: Bool)
     func streamActionSheetHostingViewController(_ controller: StreamActionSheetHostingViewController, didChangeExtendedPerformanceMetricsEnabled enabled: Bool)
     func streamActionSheetHostingViewController(_ controller: StreamActionSheetHostingViewController, didChangePerformanceOverlayDragEnabled enabled: Bool)
     func streamActionSheetHostingViewController(_ controller: StreamActionSheetHostingViewController, didChangeAudioHapticsEnabled enabled: Bool)
@@ -104,6 +119,7 @@ private final class StreamActionSheetViewModel: ObservableObject {
     @Published var touchModeSelection: Int = 0
     @Published var videoAlignmentSelection: Int = 0
     @Published var videoAlignmentMargin: Double = 0
+    @Published var statsOverlayEnabled: Bool = false
     @Published var extendedPerformanceMetricsEnabled: Bool = false
     @Published var performanceOverlayDragEnabled: Bool = true
     @Published var audioHapticsEnabled: Bool = false
@@ -112,6 +128,9 @@ private final class StreamActionSheetViewModel: ObservableObject {
     @Published var audioHapticsVoiceFilterSelection: Int = 0
     @Published var audioHapticsKeepControllerRumble: Bool = false
     @Published var touchModeToastText: String? = nil
+    @Published var isShowingPerformanceDialog: Bool = false
+    @Published var isShowingAudioHapticsDialog: Bool = false
+    @Published var isShowingVideoAlignmentDialog: Bool = false
 }
 
 private final class StreamShortcutPanelViewModel: ObservableObject {
@@ -230,6 +249,7 @@ private struct StreamActionSheetPanelView: View {
     let onTouchModeChange: (Int) -> Void
     let onVideoAlignmentChange: (Int) -> Void
     let onVideoAlignmentMarginChange: (Double) -> Void
+    let onStatsOverlayEnabledChange: (Bool) -> Void
     let onExtendedPerformanceMetricsChange: (Bool) -> Void
     let onPerformanceOverlayDragEnabledChange: (Bool) -> Void
     let onAudioHapticsEnabledChange: (Bool) -> Void
@@ -239,14 +259,14 @@ private struct StreamActionSheetPanelView: View {
     let onAudioHapticsKeepControllerRumbleChange: (Bool) -> Void
     let onCancel: () -> Void
 
-    private let horizontalPadding: CGFloat = 20
+    private let horizontalPadding: CGFloat = 18
     private let cardSpacing: CGFloat = 10
-    private let cardHeight: CGFloat = 96
+    private let cardHeight: CGFloat = 82
 
     var body: some View {
         GeometryReader { geometry in
             let contentWidth = max(geometry.size.width - horizontalPadding * 2, 0)
-            let minCardWidth: CGFloat = isLandscape ? 112 : 104
+            let minCardWidth: CGFloat = isLandscape ? 116 : 102
             let columns = max(Int((contentWidth + cardSpacing) / (minCardWidth + cardSpacing)), 1)
             let normalizedColumns = min(columns, max(viewModel.items.count, 1))
             let cardWidth = max(floor((contentWidth - CGFloat(max(normalizedColumns - 1, 0)) * cardSpacing) / CGFloat(normalizedColumns)), 88)
@@ -255,9 +275,9 @@ private struct StreamActionSheetPanelView: View {
             ZStack(alignment: .top) {
                 VStack(spacing: 0) {
                     header
-                        .padding(.horizontal, 24)
-                        .padding(.top, 22)
-                        .padding(.bottom, 18)
+                        .padding(.horizontal, 22)
+                        .padding(.top, 18)
+                        .padding(.bottom, 16)
 
                     ScrollView(.vertical, showsIndicators: false) {
                         VStack(spacing: 18) {
@@ -282,11 +302,6 @@ private struct StreamActionSheetPanelView: View {
                             }
 
                             touchModeSection
-                            audioHapticsSection
-                            videoAlignmentSection
-                            videoAlignmentMarginSection
-                            extendedPerformanceMetricsSection
-                            performanceOverlayDragSection
                         }
                         .padding(.horizontal, horizontalPadding)
                         .padding(.bottom, 20)
@@ -312,6 +327,106 @@ private struct StreamActionSheetPanelView: View {
                         .shadow(color: Color.black.opacity(0.20), radius: 10, x: 0, y: 4)
                         .padding(.top, 14)
                 }
+
+                if viewModel.isShowingAudioHapticsDialog {
+                    StreamActionSheetAudioHapticsDialog(enabled: Binding(get: {
+                        viewModel.audioHapticsEnabled
+                    }, set: { newValue in
+                        guard viewModel.audioHapticsEnabled != newValue else {
+                            return
+                        }
+                        viewModel.audioHapticsEnabled = newValue
+                        onAudioHapticsEnabledChange(newValue)
+                    }), outputTargetSelection: Binding(get: {
+                        viewModel.audioHapticsOutputTargetSelection
+                    }, set: { newValue in
+                        guard viewModel.audioHapticsOutputTargetSelection != newValue else {
+                            return
+                        }
+                        viewModel.audioHapticsOutputTargetSelection = newValue
+                        onAudioHapticsOutputTargetChange(newValue)
+                    }), strength: Binding(get: {
+                        viewModel.audioHapticsStrength
+                    }, set: { newValue in
+                        let steppedValue = Double(Int((newValue / 5.0).rounded()) * 5)
+                        guard viewModel.audioHapticsStrength != steppedValue else {
+                            return
+                        }
+                        viewModel.audioHapticsStrength = steppedValue
+                        onAudioHapticsStrengthChange(steppedValue)
+                    }), voiceFilterSelection: Binding(get: {
+                        viewModel.audioHapticsVoiceFilterSelection
+                    }, set: { newValue in
+                        guard viewModel.audioHapticsVoiceFilterSelection != newValue else {
+                            return
+                        }
+                        viewModel.audioHapticsVoiceFilterSelection = newValue
+                        onAudioHapticsVoiceFilterSelectionChange(newValue)
+                    }), keepControllerRumble: Binding(get: {
+                        viewModel.audioHapticsKeepControllerRumble
+                    }, set: { newValue in
+                        guard viewModel.audioHapticsKeepControllerRumble != newValue else {
+                            return
+                        }
+                        viewModel.audioHapticsKeepControllerRumble = newValue
+                        onAudioHapticsKeepControllerRumbleChange(newValue)
+                    }), onDismiss: {
+                        viewModel.isShowingAudioHapticsDialog = false
+                    })
+                }
+
+                if viewModel.isShowingVideoAlignmentDialog {
+                    StreamActionSheetVideoAlignmentDialog(selection: Binding(get: {
+                        viewModel.videoAlignmentSelection
+                    }, set: { newValue in
+                        guard viewModel.videoAlignmentSelection != newValue else {
+                            return
+                        }
+                        viewModel.videoAlignmentSelection = newValue
+                        onVideoAlignmentChange(newValue)
+                    }), margin: Binding(get: {
+                        viewModel.videoAlignmentMargin
+                    }, set: { newValue in
+                        let steppedValue = Double(Int(newValue.rounded()))
+                        guard viewModel.videoAlignmentMargin != steppedValue else {
+                            return
+                        }
+                        viewModel.videoAlignmentMargin = steppedValue
+                        onVideoAlignmentMarginChange(steppedValue)
+                    }), onDismiss: {
+                        viewModel.isShowingVideoAlignmentDialog = false
+                    })
+                }
+
+                if viewModel.isShowingPerformanceDialog {
+                    StreamActionSheetPerformanceDialog(enabled: Binding(get: {
+                        viewModel.statsOverlayEnabled
+                    }, set: { newValue in
+                        guard viewModel.statsOverlayEnabled != newValue else {
+                            return
+                        }
+                        viewModel.statsOverlayEnabled = newValue
+                        onStatsOverlayEnabledChange(newValue)
+                    }), extendedMetricsEnabled: Binding(get: {
+                        viewModel.extendedPerformanceMetricsEnabled
+                    }, set: { newValue in
+                        guard viewModel.extendedPerformanceMetricsEnabled != newValue else {
+                            return
+                        }
+                        viewModel.extendedPerformanceMetricsEnabled = newValue
+                        onExtendedPerformanceMetricsChange(newValue)
+                    }), dragEnabled: Binding(get: {
+                        viewModel.performanceOverlayDragEnabled
+                    }, set: { newValue in
+                        guard viewModel.performanceOverlayDragEnabled != newValue else {
+                            return
+                        }
+                        viewModel.performanceOverlayDragEnabled = newValue
+                        onPerformanceOverlayDragEnabledChange(newValue)
+                    }), onDismiss: {
+                        viewModel.isShowingPerformanceDialog = false
+                    })
+                }
             }
         }
     }
@@ -321,7 +436,7 @@ private struct StreamActionSheetPanelView: View {
             if isLandscape {
                 HStack(alignment: .center, spacing: 14) {
                     Text(viewModel.title)
-                        .font(.system(size: 24, weight: .bold))
+                        .font(.system(size: 22, weight: .bold))
                         .foregroundColor(.white)
                         .lineLimit(1)
 
@@ -336,7 +451,7 @@ private struct StreamActionSheetPanelView: View {
                 VStack(alignment: .leading, spacing: 10) {
                     HStack(spacing: 12) {
                         Text(viewModel.title)
-                            .font(.system(size: 24, weight: .bold))
+                            .font(.system(size: 22, weight: .bold))
                             .foregroundColor(.white)
                             .lineLimit(1)
 
@@ -358,8 +473,8 @@ private struct StreamActionSheetPanelView: View {
             metadataItem(icon: "clock", text: viewModel.timeText)
             metadataItem(icon: "battery.100.circle", text: viewModel.batteryText)
         }
-        .font(.system(size: 13, weight: .semibold))
-        .foregroundColor(Color.white.opacity(0.72))
+        .font(.system(size: 11, weight: .semibold))
+        .foregroundColor(Color.white.opacity(0.82))
         .lineLimit(1)
         .minimumScaleFactor(0.82)
     }
@@ -367,9 +482,9 @@ private struct StreamActionSheetPanelView: View {
     private var closeButton: some View {
         Button(action: onCancel) {
             Image(systemName: "xmark")
-                .font(.system(size: 16, weight: .semibold))
-                .foregroundColor(Color.white.opacity(0.82))
-                .frame(width: 40, height: 40)
+                .font(.system(size: 14, weight: .bold))
+                .foregroundColor(Color.white.opacity(0.86))
+                .frame(width: 32, height: 32)
                 .background(Color.white.opacity(0.08))
                 .clipShape(Circle())
         }
@@ -396,16 +511,18 @@ private struct StreamActionSheetPanelView: View {
             ("hand.raised.slash", StreamMenuLocalized("stream.touch_mode.disabled"))
         ]
 
-        return VStack(alignment: .leading, spacing: 10) {
-            Text(StreamMenuLocalized("stream.touch_mode.title"))
-                .font(.system(size: 13, weight: .medium))
-                .foregroundColor(Color.white.opacity(0.72))
+        return sectionSurface {
+            VStack(alignment: .leading, spacing: 10) {
+                Text(StreamMenuLocalized("stream.touch_mode.title"))
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundColor(Color.white.opacity(0.72))
 
-            HStack(spacing: 8) {
-                touchModeButton(index: 0, icon: items[0].icon, title: items[0].title)
-                touchModeButton(index: 1, icon: items[1].icon, title: items[1].title)
-                touchModeButton(index: 2, icon: items[2].icon, title: items[2].title)
-                touchModeButton(index: 3, icon: items[3].icon, title: items[3].title)
+                HStack(spacing: 8) {
+                    touchModeButton(index: 0, icon: items[0].icon, title: items[0].title)
+                    touchModeButton(index: 1, icon: items[1].icon, title: items[1].title)
+                    touchModeButton(index: 2, icon: items[2].icon, title: items[2].title)
+                    touchModeButton(index: 3, icon: items[3].icon, title: items[3].title)
+                }
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -423,253 +540,44 @@ private struct StreamActionSheetPanelView: View {
         }) {
             VStack(spacing: 7) {
                 Image(systemName: icon)
-                    .font(.system(size: 17, weight: .semibold))
-                    .foregroundColor(.white)
-                    .frame(width: 34, height: 34)
-                    .background(
-                        Circle()
-                            .fill(Color.white.opacity(isSelected ? 0.18 : 0.10))
-                    )
+                    .font(.system(size: 17, weight: .bold))
+                    .foregroundColor(isSelected ? Color(red: 0.44, green: 0.84, blue: 0.98) : Color.white.opacity(0.86))
+                    .frame(width: 30, height: 30)
 
                 Text(title)
-                    .font(.system(size: 12, weight: .semibold))
+                    .font(.system(size: 11, weight: .bold))
                     .foregroundColor(.white)
                     .lineLimit(1)
                     .minimumScaleFactor(0.72)
             }
             .frame(maxWidth: .infinity)
-            .frame(height: 74)
+            .frame(height: 72)
             .background(
-                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
                     .fill(isSelected ?
-                          Color(red: 0.50, green: 0.45, blue: 0.94) :
-                          Color.white.opacity(0.08))
+                          Color(red: 0.20, green: 0.39, blue: 0.46).opacity(0.92) :
+                          Color.white.opacity(0.06))
             )
             .overlay(
-                RoundedRectangle(cornerRadius: 14, style: .continuous)
-                    .stroke(Color.white.opacity(isSelected ? 0.0 : 0.10), lineWidth: 1)
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .stroke(isSelected ? Color(red: 0.39, green: 0.88, blue: 0.98).opacity(0.42) : Color.white.opacity(0.12), lineWidth: 1)
             )
         }
         .buttonStyle(PlainButtonStyle())
     }
 
-    private var videoAlignmentSection: some View {
-        let labels = [
-            StreamMenuLocalized("settings.video_alignment.top"),
-            StreamMenuLocalized("settings.video_alignment.center"),
-            StreamMenuLocalized("settings.video_alignment.bottom")
-        ]
-        let displayedSelection: Int
-        switch viewModel.videoAlignmentSelection {
-            case 1:
-                displayedSelection = 0
-            case 0:
-                displayedSelection = 1
-            default:
-                displayedSelection = 2
-        }
-
-        return VStack(alignment: .leading, spacing: 10) {
-            Text(StreamMenuLocalized("stream.video_alignment.title"))
-                .font(.system(size: 13, weight: .medium))
-                .foregroundColor(Color.white.opacity(0.72))
-
-            SegmentedOptionsControl(items: labels,
-                                    selection: displayedSelection) { newValue in
-                let actualSelection: Int
-                switch newValue {
-                    case 0:
-                        actualSelection = 1
-                    case 1:
-                        actualSelection = 0
-                    default:
-                        actualSelection = 2
-                }
-
-                guard viewModel.videoAlignmentSelection != actualSelection else {
-                    return
-                }
-                viewModel.videoAlignmentSelection = actualSelection
-                onVideoAlignmentChange(actualSelection)
-            }
-            .frame(height: 38)
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-    }
-
-    private var videoAlignmentMarginSection: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Text(StreamMenuLocalizedFormat("stream.video_alignment_margin.label", Int(viewModel.videoAlignmentMargin)))
-                .font(.system(size: 13, weight: .medium))
-                .foregroundColor(Color.white.opacity(0.72))
-
-            Slider(value: Binding(get: {
-                viewModel.videoAlignmentMargin
-            }, set: { newValue in
-                let steppedValue = Double(Int(newValue.rounded()))
-                guard viewModel.videoAlignmentMargin != steppedValue else {
-                    return
-                }
-                viewModel.videoAlignmentMargin = steppedValue
-                onVideoAlignmentMarginChange(steppedValue)
-            }), in: 0...150, step: 1)
-            .accentColor(Color(red: 0.50, green: 0.45, blue: 0.94))
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-    }
-
-    private var extendedPerformanceMetricsSection: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Text(StreamMenuLocalized("stream.performance.title"))
-                .font(.system(size: 13, weight: .medium))
-                .foregroundColor(Color.white.opacity(0.72))
-
-            Toggle(isOn: Binding(get: {
-                viewModel.extendedPerformanceMetricsEnabled
-            }, set: { newValue in
-                guard viewModel.extendedPerformanceMetricsEnabled != newValue else {
-                    return
-                }
-                viewModel.extendedPerformanceMetricsEnabled = newValue
-                onExtendedPerformanceMetricsChange(newValue)
-            })) {
-                Text(StreamMenuLocalized("stream.performance.extended_metrics.toggle"))
-                    .font(.system(size: 14, weight: .semibold))
-                    .foregroundColor(.white)
-            }
-            .accentColor(Color(red: 0.50, green: 0.45, blue: 0.94))
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-    }
-
-    private var audioHapticsSection: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Text(StreamMenuLocalized("stream.audio_haptics.title"))
-                .font(.system(size: 13, weight: .medium))
-                .foregroundColor(Color.white.opacity(0.72))
-
-            Toggle(isOn: Binding(get: {
-                viewModel.audioHapticsEnabled
-            }, set: { newValue in
-                guard viewModel.audioHapticsEnabled != newValue else {
-                    return
-                }
-                viewModel.audioHapticsEnabled = newValue
-                onAudioHapticsEnabledChange(newValue)
-            })) {
-                Text(StreamMenuLocalized("stream.audio_haptics.enable_toggle"))
-                    .font(.system(size: 14, weight: .semibold))
-                    .foregroundColor(.white)
-            }
-            .accentColor(Color(red: 0.50, green: 0.45, blue: 0.94))
-
-            if viewModel.audioHapticsEnabled {
-                audioHapticsOutputTargetSection
-                audioHapticsStrengthSection
-                audioHapticsVoiceFilterSection
-
-                if viewModel.audioHapticsOutputTargetSelection == 1 {
-                    Toggle(isOn: Binding(get: {
-                        viewModel.audioHapticsKeepControllerRumble
-                    }, set: { newValue in
-                        guard viewModel.audioHapticsKeepControllerRumble != newValue else {
-                            return
-                        }
-                        viewModel.audioHapticsKeepControllerRumble = newValue
-                        onAudioHapticsKeepControllerRumbleChange(newValue)
-                    })) {
-                        Text(StreamMenuLocalized("settings.audio_haptics.keep_controller_rumble"))
-                            .font(.system(size: 14, weight: .semibold))
-                            .foregroundColor(.white)
-                    }
-                    .accentColor(Color(red: 0.50, green: 0.45, blue: 0.94))
-                }
-            }
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-    }
-
-    private var audioHapticsOutputTargetSection: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Text(StreamMenuLocalized("settings.audio_haptics.output_target"))
-                .font(.system(size: 13, weight: .medium))
-                .foregroundColor(Color.white.opacity(0.72))
-
-            SegmentedOptionsControl(items: [
-                StreamMenuLocalized("common.device"),
-                StreamMenuLocalized("common.controller")
-            ], selection: viewModel.audioHapticsOutputTargetSelection) { newValue in
-                guard viewModel.audioHapticsOutputTargetSelection != newValue else {
-                    return
-                }
-                viewModel.audioHapticsOutputTargetSelection = newValue
-                onAudioHapticsOutputTargetChange(newValue)
-            }
-            .frame(height: 38)
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-    }
-
-    private var audioHapticsStrengthSection: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Text(StreamMenuLocalizedFormat("settings.audio_haptics.strength", Int(viewModel.audioHapticsStrength.rounded())))
-                .font(.system(size: 13, weight: .medium))
-                .foregroundColor(Color.white.opacity(0.72))
-
-            Slider(value: Binding(get: {
-                viewModel.audioHapticsStrength
-            }, set: { newValue in
-                let steppedValue = Double(Int((newValue / 5.0).rounded()) * 5)
-                guard viewModel.audioHapticsStrength != steppedValue else {
-                    return
-                }
-                viewModel.audioHapticsStrength = steppedValue
-                onAudioHapticsStrengthChange(steppedValue)
-            }), in: 25...200, step: 5)
-            .accentColor(Color(red: 0.50, green: 0.45, blue: 0.94))
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-    }
-
-    private var audioHapticsVoiceFilterSection: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Text(StreamMenuLocalized("settings.audio_haptics.voice_filter"))
-                .font(.system(size: 13, weight: .medium))
-                .foregroundColor(Color.white.opacity(0.72))
-
-            SegmentedOptionsControl(items: [
-                StreamMenuLocalized("common.off"),
-                StreamMenuLocalized("settings.audio_haptics.voice_filter.low"),
-                StreamMenuLocalized("settings.audio_haptics.voice_filter.medium"),
-                StreamMenuLocalized("settings.audio_haptics.voice_filter.high")
-            ], selection: viewModel.audioHapticsVoiceFilterSelection, fontSize: 12) { newValue in
-                guard viewModel.audioHapticsVoiceFilterSelection != newValue else {
-                    return
-                }
-                viewModel.audioHapticsVoiceFilterSelection = newValue
-                onAudioHapticsVoiceFilterSelectionChange(newValue)
-            }
-            .frame(height: 38)
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-    }
-
-    private var performanceOverlayDragSection: some View {
-        Toggle(isOn: Binding(get: {
-            viewModel.performanceOverlayDragEnabled
-        }, set: { newValue in
-            guard viewModel.performanceOverlayDragEnabled != newValue else {
-                return
-            }
-            viewModel.performanceOverlayDragEnabled = newValue
-            onPerformanceOverlayDragEnabledChange(newValue)
-        })) {
-            Text(StreamMenuLocalized("stream.menu.performance_overlay_drag.title"))
-                .font(.system(size: 14, weight: .semibold))
-                .foregroundColor(.white)
-        }
-        .accentColor(Color(red: 0.50, green: 0.45, blue: 0.94))
-        .frame(maxWidth: .infinity, alignment: .leading)
+    private func sectionSurface<Content: View>(@ViewBuilder content: () -> Content) -> some View {
+        content()
+            .padding(.horizontal, 14)
+            .padding(.vertical, 14)
+            .background(
+                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                    .fill(Color.white.opacity(0.045))
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                    .stroke(Color.white.opacity(0.10), lineWidth: 1)
+            )
     }
 
     private func chunkedItems(columnCount: Int) -> [[StreamActionSheetItem]] {
@@ -696,37 +604,406 @@ private struct StreamActionSheetCardView: View {
     let height: CGFloat
     let action: () -> Void
 
+    private var accentColor: Color {
+        Color(item.accentColor)
+    }
+
     var body: some View {
         Button(action: action) {
             VStack(spacing: 10) {
-                ZStack {
-                    RoundedRectangle(cornerRadius: 12, style: .continuous)
-                        .fill(Color.white.opacity(item.destructive ? 0.14 : 0.09))
-                        .frame(width: 42, height: 42)
-
-                    Image(systemName: item.symbolName)
-                        .font(.system(size: 20, weight: .semibold))
-                        .foregroundColor(item.destructive ? Color(red: 0.96, green: 0.46, blue: 0.46) : .white)
-                }
+                Image(systemName: item.symbolName)
+                    .font(.system(size: 18, weight: .bold))
+                    .foregroundColor(accentColor)
+                    .frame(width: 30, height: 30)
 
                 Text(item.title)
-                    .font(.system(size: 15, weight: .semibold))
+                    .font(.system(size: 12, weight: .bold))
                     .foregroundColor(.white)
                     .lineLimit(1)
-                    .minimumScaleFactor(0.82)
+                    .minimumScaleFactor(0.62)
+                    .allowsTightening(true)
+                    .multilineTextAlignment(.center)
             }
-            .frame(width: width, height: height)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 12)
+            .frame(width: width, height: height, alignment: .center)
+            .contentShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+        }
+        .buttonStyle(StreamActionSheetCardButtonStyle(item: item))
+    }
+}
+
+private let streamDialogAccentColor = Color(red: 0.48, green: 0.77, blue: 0.98)
+
+private struct StreamActionSheetDialogSection<Content: View>: View {
+    let content: Content
+
+    init(@ViewBuilder content: () -> Content) {
+        self.content = content()
+    }
+
+    var body: some View {
+        content
+            .padding(.horizontal, 14)
+            .padding(.vertical, 14)
             .background(
-                RoundedRectangle(cornerRadius: 18, style: .continuous)
-                    .fill(Color.white.opacity(item.destructive ? 0.10 : 0.08))
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .fill(Color.white.opacity(0.06))
             )
             .overlay(
-                RoundedRectangle(cornerRadius: 18, style: .continuous)
-                    .stroke(Color.white.opacity(item.destructive ? 0.14 : 0.09), lineWidth: 1)
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .stroke(Color.white.opacity(0.10), lineWidth: 1)
             )
-            .contentShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+    }
+}
+
+private struct StreamActionSheetDialogChoiceRow: View {
+    let title: String
+    let selected: Bool
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 12) {
+                Text(title)
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundColor(.white)
+
+                Spacer()
+
+                Image(systemName: selected ? "checkmark.circle.fill" : "circle")
+                    .font(.system(size: 20, weight: .semibold))
+                    .foregroundColor(selected ? streamDialogAccentColor : Color.white.opacity(0.28))
+            }
+            .padding(.horizontal, 14)
+            .padding(.vertical, 14)
+            .background(
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .fill(selected ? streamDialogAccentColor.opacity(0.16) : Color.white.opacity(0.06))
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .stroke(selected ? streamDialogAccentColor.opacity(0.34) : Color.white.opacity(0.10), lineWidth: 1)
+            )
         }
         .buttonStyle(PlainButtonStyle())
+    }
+}
+
+private struct StreamActionSheetPerformanceDialog: View {
+    @Binding var enabled: Bool
+    @Binding var extendedMetricsEnabled: Bool
+    @Binding var dragEnabled: Bool
+    let onDismiss: () -> Void
+
+    private let panelShape = RoundedRectangle(cornerRadius: 18, style: .continuous)
+
+    var body: some View {
+        ZStack {
+            streamPanelDimmingColor
+                .edgesIgnoringSafeArea(.all)
+                .onTapGesture(perform: onDismiss)
+
+            VStack(alignment: .leading, spacing: 16) {
+                HStack {
+                    Text(StreamMenuLocalized("stream.performance.title"))
+                        .font(.headline.weight(.semibold))
+                        .foregroundColor(.white)
+
+                    Spacer()
+
+                    Button(StreamMenuLocalized("common.ok"), action: onDismiss)
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundColor(Color.white.opacity(0.88))
+                }
+
+                StreamActionSheetDialogSection {
+                    Toggle(isOn: $enabled) {
+                        Text(StreamMenuLocalized("stream.performance.enabled.toggle"))
+                            .font(.system(size: 14, weight: .semibold))
+                            .foregroundColor(.white)
+                    }
+                    .accentColor(streamDialogAccentColor)
+                }
+
+                StreamActionSheetDialogSection {
+                    Toggle(isOn: $extendedMetricsEnabled) {
+                        Text(StreamMenuLocalized("stream.performance.extended_metrics.toggle"))
+                            .font(.system(size: 14, weight: .semibold))
+                            .foregroundColor(.white)
+                    }
+                    .accentColor(streamDialogAccentColor)
+                }
+
+                StreamActionSheetDialogSection {
+                    Toggle(isOn: $dragEnabled) {
+                        Text(StreamMenuLocalized("stream.menu.performance_overlay_drag.title"))
+                            .font(.system(size: 14, weight: .semibold))
+                            .foregroundColor(.white)
+                    }
+                    .accentColor(streamDialogAccentColor)
+                }
+            }
+            .padding(18)
+            .frame(maxWidth: 360)
+            .background(panelShape.fill(streamPanelDialogColor))
+            .overlay(
+                panelShape
+                    .stroke(Color.white.opacity(0.12), lineWidth: 1)
+            )
+            .padding(.horizontal, 20)
+        }
+    }
+}
+
+private struct StreamActionSheetVideoAlignmentDialog: View {
+    @Binding var selection: Int
+    @Binding var margin: Double
+    let onDismiss: () -> Void
+
+    private let panelShape = RoundedRectangle(cornerRadius: 18, style: .continuous)
+    private let options: [(id: Int, title: String)] = [
+        (1, StreamMenuLocalized("settings.video_alignment.top")),
+        (0, StreamMenuLocalized("settings.video_alignment.center")),
+        (2, StreamMenuLocalized("settings.video_alignment.bottom"))
+    ]
+
+    var body: some View {
+        GeometryReader { geometry in
+            ZStack {
+                streamPanelDimmingColor
+                    .edgesIgnoringSafeArea(.all)
+                    .onTapGesture(perform: onDismiss)
+
+                VStack(alignment: .leading, spacing: 0) {
+                    HStack {
+                        Text(StreamMenuLocalized("stream.video_alignment.title"))
+                            .font(.headline.weight(.semibold))
+                            .foregroundColor(.white)
+
+                        Spacer()
+
+                        Button(StreamMenuLocalized("common.ok"), action: onDismiss)
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundColor(Color.white.opacity(0.88))
+                    }
+                    .padding(.horizontal, 18)
+                    .padding(.top, 18)
+                    .padding(.bottom, 14)
+
+                    ScrollView(showsIndicators: false) {
+                        VStack(alignment: .leading, spacing: 16) {
+                            VStack(spacing: 10) {
+                                ForEach(options, id: \.id) { option in
+                                    StreamActionSheetDialogChoiceRow(title: option.title,
+                                                                     selected: selection == option.id) {
+                                        selection = option.id
+                                    }
+                                }
+                            }
+
+                            if selection != 0 {
+                                StreamActionSheetDialogSection {
+                                    VStack(alignment: .leading, spacing: 8) {
+                                        HStack {
+                                            Text(StreamMenuLocalized("stream.video_alignment_margin.title"))
+                                                .font(.caption.weight(.semibold))
+                                                .foregroundColor(Color.white.opacity(0.74))
+
+                                            Spacer()
+
+                                            Text("\(Int(margin.rounded())) pt")
+                                                .font(.caption.weight(.semibold))
+                                                .foregroundColor(.white)
+                                        }
+
+                                        Slider(value: $margin, in: 0...150, step: 1)
+                                            .accentColor(streamDialogAccentColor)
+                                    }
+                                }
+                            }
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.horizontal, 18)
+                        .padding(.bottom, 18)
+                    }
+                }
+                .frame(maxWidth: 360, maxHeight: max(260.0, min(geometry.size.height - 40.0, 420.0)))
+                .background(panelShape.fill(streamPanelDialogColor))
+                .overlay(
+                    panelShape
+                        .stroke(Color.white.opacity(0.12), lineWidth: 1)
+                )
+                .padding(.horizontal, 20)
+                .padding(.vertical, 20)
+            }
+        }
+    }
+}
+
+private struct StreamActionSheetAudioHapticsDialog: View {
+    @Binding var enabled: Bool
+    @Binding var outputTargetSelection: Int
+    @Binding var strength: Double
+    @Binding var voiceFilterSelection: Int
+    @Binding var keepControllerRumble: Bool
+    let onDismiss: () -> Void
+
+    private let panelShape = RoundedRectangle(cornerRadius: 18, style: .continuous)
+
+    var body: some View {
+        GeometryReader { geometry in
+            ZStack {
+                streamPanelDimmingColor
+                    .edgesIgnoringSafeArea(.all)
+                    .onTapGesture(perform: onDismiss)
+
+                VStack(alignment: .leading, spacing: 0) {
+                    HStack {
+                        Text(StreamMenuLocalized("stream.audio_haptics.title"))
+                            .font(.headline.weight(.semibold))
+                            .foregroundColor(.white)
+
+                        Spacer()
+
+                        Button(StreamMenuLocalized("common.ok"), action: onDismiss)
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundColor(Color.white.opacity(0.88))
+                    }
+                    .padding(.horizontal, 18)
+                    .padding(.top, 18)
+                    .padding(.bottom, 14)
+
+                    ScrollView(showsIndicators: false) {
+                        VStack(alignment: .leading, spacing: 16) {
+                            StreamActionSheetDialogSection {
+                                Toggle(isOn: $enabled) {
+                                    Text(StreamMenuLocalized("stream.audio_haptics.enable_toggle"))
+                                        .font(.system(size: 14, weight: .semibold))
+                                        .foregroundColor(.white)
+                                }
+                                .accentColor(streamDialogAccentColor)
+                            }
+
+                            if enabled {
+                                StreamActionSheetDialogSection {
+                                    VStack(alignment: .leading, spacing: 10) {
+                                        Text(StreamMenuLocalized("settings.audio_haptics.output_target"))
+                                            .font(.system(size: 13, weight: .medium))
+                                            .foregroundColor(Color.white.opacity(0.72))
+
+                                        SegmentedOptionsControl(items: [
+                                            StreamMenuLocalized("common.device"),
+                                            StreamMenuLocalized("common.controller")
+                                        ], selection: outputTargetSelection) { newValue in
+                                            outputTargetSelection = newValue
+                                        }
+                                        .frame(height: 38)
+                                    }
+                                }
+
+                                StreamActionSheetDialogSection {
+                                    VStack(alignment: .leading, spacing: 10) {
+                                        Text(StreamMenuLocalizedFormat("settings.audio_haptics.strength", Int(strength.rounded())))
+                                            .font(.system(size: 13, weight: .medium))
+                                            .foregroundColor(Color.white.opacity(0.72))
+
+                                        Slider(value: $strength, in: 25...200, step: 5)
+                                            .accentColor(streamDialogAccentColor)
+                                    }
+                                }
+
+                                StreamActionSheetDialogSection {
+                                    VStack(alignment: .leading, spacing: 10) {
+                                        Text(StreamMenuLocalized("settings.audio_haptics.voice_filter"))
+                                            .font(.system(size: 13, weight: .medium))
+                                            .foregroundColor(Color.white.opacity(0.72))
+
+                                        SegmentedOptionsControl(items: [
+                                            StreamMenuLocalized("common.off"),
+                                            StreamMenuLocalized("settings.audio_haptics.voice_filter.low"),
+                                            StreamMenuLocalized("settings.audio_haptics.voice_filter.medium"),
+                                            StreamMenuLocalized("settings.audio_haptics.voice_filter.high")
+                                        ], selection: voiceFilterSelection, fontSize: 12) { newValue in
+                                            voiceFilterSelection = newValue
+                                        }
+                                        .frame(height: 38)
+                                    }
+                                }
+
+                                if outputTargetSelection == 1 {
+                                    StreamActionSheetDialogSection {
+                                        Toggle(isOn: $keepControllerRumble) {
+                                            Text(StreamMenuLocalized("settings.audio_haptics.keep_controller_rumble"))
+                                                .font(.system(size: 14, weight: .semibold))
+                                                .foregroundColor(.white)
+                                        }
+                                        .accentColor(streamDialogAccentColor)
+                                    }
+                                }
+                            }
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.horizontal, 18)
+                        .padding(.bottom, 18)
+                    }
+                }
+                .frame(maxWidth: 360, maxHeight: max(280.0, min(geometry.size.height - 40.0, 560.0)))
+                .background(panelShape.fill(streamPanelDialogColor))
+                .overlay(
+                    panelShape
+                        .stroke(Color.white.opacity(0.12), lineWidth: 1)
+                )
+                .padding(.horizontal, 20)
+                .padding(.vertical, 20)
+            }
+        }
+    }
+}
+
+private struct StreamActionSheetCardButtonStyle: ButtonStyle {
+    let item: StreamActionSheetItem
+
+    private var accentColor: Color {
+        Color(item.accentColor)
+    }
+
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .background(
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .fill(cardBackgroundColor(pressed: configuration.isPressed))
+            )
+            .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .stroke(cardBorderColor(pressed: configuration.isPressed), lineWidth: 1)
+            )
+            .contentShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+    }
+
+    private func cardBackgroundColor(pressed: Bool) -> Color {
+        if item.active {
+            return accentColor.opacity(pressed ? 0.26 : 0.16)
+        }
+
+        if item.destructive {
+            return accentColor.opacity(pressed ? 0.18 : 0.10)
+        }
+
+        return Color.white.opacity(pressed ? 0.12 : 0.06)
+    }
+
+    private func cardBorderColor(pressed: Bool) -> Color {
+        if item.active {
+            return accentColor.opacity(pressed ? 0.54 : 0.34)
+        }
+
+        if item.destructive {
+            return accentColor.opacity(pressed ? 0.42 : 0.22)
+        }
+
+        return .white.opacity(pressed ? 0.20 : 0.12)
     }
 }
 
@@ -741,7 +1018,6 @@ private struct StreamShortcutPanelView: View {
     private let horizontalPadding: CGFloat = 18
     private let verticalSpacing: CGFloat = 12
     private let horizontalSpacing: CGFloat = 12
-    private let cardHeight: CGFloat = 88
     private let maxSelectedKeys = 5
 
     var body: some View {
@@ -802,6 +1078,7 @@ private struct StreamShortcutPanelView: View {
         let columnCount = isLandscape ? 5 : 3
         let contentWidth = max(geometry.size.width - horizontalPadding * 2, 0)
         let cardWidth = max(floor((contentWidth - CGFloat(columnCount - 1) * horizontalSpacing) / CGFloat(columnCount)), 88)
+        let cardHeight: CGFloat = UIDevice.current.userInterfaceIdiom == .phone ? 76 : 88
         let rows = chunkedItems(columnCount: columnCount)
 
         return ScrollView(.vertical, showsIndicators: false) {
@@ -1263,55 +1540,49 @@ private struct StreamShortcutCardView: View {
     let onDelete: (() -> Void)?
     let action: () -> Void
 
+    private var compactLayout: Bool {
+        height <= 80
+    }
+
     var body: some View {
         ZStack(alignment: .topTrailing) {
             Button(action: action) {
                 VStack(spacing: 0) {
-                    Spacer(minLength: 8)
+                    Spacer(minLength: compactLayout ? 6 : 8)
 
                     ZStack {
                         RoundedRectangle(cornerRadius: 12, style: .continuous)
-                            .fill(
-                                LinearGradient(colors: [
-                                    Color.white.opacity(0.16),
-                                    Color.white.opacity(0.08)
-                                ], startPoint: .topLeading, endPoint: .bottomTrailing)
-                            )
-                            .frame(width: 40, height: 40)
+                            .fill(streamPanelRaisedGradient())
+                            .frame(width: compactLayout ? 34 : 40, height: compactLayout ? 34 : 40)
 
                         Image(systemName: item.symbolName)
-                            .font(.system(size: 18, weight: .semibold))
+                            .font(.system(size: compactLayout ? 16 : 18, weight: .semibold))
                             .foregroundColor(.white)
                     }
 
-                    VStack(spacing: 3) {
+                    VStack(spacing: compactLayout ? 2 : 3) {
                         Text(item.title)
-                            .font(.system(size: 13, weight: .semibold))
+                            .font(.system(size: compactLayout ? 12 : 13, weight: .semibold))
                             .foregroundColor(.white)
                             .lineLimit(1)
                             .minimumScaleFactor(0.72)
 
                         if !item.subtitle.isEmpty {
                             Text(item.subtitle)
-                                .font(.system(size: 10, weight: .medium))
+                                .font(.system(size: compactLayout ? 9 : 10, weight: .medium))
                                 .foregroundColor(Color.white.opacity(0.72))
                                 .lineLimit(1)
                                 .minimumScaleFactor(0.7)
                         }
                     }
-                    .padding(.top, 9)
+                    .padding(.top, compactLayout ? 6 : 9)
 
-                    Spacer(minLength: 10)
+                    Spacer(minLength: compactLayout ? 8 : 10)
                 }
                 .frame(width: width, height: height)
                 .background(
                     RoundedRectangle(cornerRadius: 18, style: .continuous)
-                        .fill(
-                            LinearGradient(colors: [
-                                Color.white.opacity(0.11),
-                                Color.white.opacity(0.06)
-                            ], startPoint: .topLeading, endPoint: .bottomTrailing)
-                        )
+                        .fill(streamPanelRaisedGradient())
                 )
                 .overlay(
                     RoundedRectangle(cornerRadius: 18, style: .continuous)
@@ -1381,7 +1652,7 @@ private struct StreamVirtualButtonsPanelView: View {
                 .frame(width: geometry.size.width, height: geometry.size.height, alignment: .top)
 
                 if viewModel.isShowingMousePicker {
-                    Color.black.opacity(0.36)
+                    streamPanelDimmingColor
                         .edgesIgnoringSafeArea(.all)
                         .onTapGesture {
                             viewModel.isShowingMousePicker = false
@@ -1391,7 +1662,7 @@ private struct StreamVirtualButtonsPanelView: View {
                 }
 
                 if viewModel.isShowingTouchpadPicker {
-                    Color.black.opacity(0.36)
+                    streamPanelDimmingColor
                         .edgesIgnoringSafeArea(.all)
                         .onTapGesture {
                             viewModel.isShowingTouchpadPicker = false
@@ -1401,7 +1672,7 @@ private struct StreamVirtualButtonsPanelView: View {
                 }
 
                 if viewModel.isShowingDirectionalPicker {
-                    Color.black.opacity(0.36)
+                    streamPanelDimmingColor
                         .edgesIgnoringSafeArea(.all)
                         .onTapGesture {
                             viewModel.isShowingDirectionalPicker = false
@@ -2049,7 +2320,7 @@ private struct StreamVirtualButtonsPanelView: View {
                             HStack(spacing: 12) {
                                 mousePickerIcon(for: item, size: 18)
                                     .frame(width: 36, height: 36)
-                                    .background(Color.white.opacity(0.08))
+                                    .background(streamPanelRaisedGradient())
                                     .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
 
                                 VStack(alignment: .leading, spacing: 4) {
@@ -2067,7 +2338,7 @@ private struct StreamVirtualButtonsPanelView: View {
                             .padding(.vertical, 10)
                             .background(
                                 RoundedRectangle(cornerRadius: 16, style: .continuous)
-                                    .fill(Color.white.opacity(0.08))
+                                    .fill(streamPanelRaisedGradient())
                             )
                             .overlay(
                                 RoundedRectangle(cornerRadius: 16, style: .continuous)
@@ -2085,7 +2356,7 @@ private struct StreamVirtualButtonsPanelView: View {
         .frame(maxWidth: maxWidth)
         .background(
             RoundedRectangle(cornerRadius: 22, style: .continuous)
-                .fill(Color(red: 0.16, green: 0.16, blue: 0.18).opacity(0.98))
+                .fill(streamPanelDialogColor)
         )
         .overlay(
             RoundedRectangle(cornerRadius: 22, style: .continuous)
@@ -2130,7 +2401,7 @@ private struct StreamVirtualButtonsPanelView: View {
                             HStack(spacing: 12) {
                                 mousePickerIcon(for: item, size: 18)
                                     .frame(width: 36, height: 36)
-                                    .background(Color.white.opacity(0.08))
+                                    .background(streamPanelRaisedGradient())
                                     .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
 
                                 VStack(alignment: .leading, spacing: 4) {
@@ -2148,7 +2419,7 @@ private struct StreamVirtualButtonsPanelView: View {
                             .padding(.vertical, 10)
                             .background(
                                 RoundedRectangle(cornerRadius: 16, style: .continuous)
-                                    .fill(Color.white.opacity(0.08))
+                                    .fill(streamPanelRaisedGradient())
                             )
                             .overlay(
                                 RoundedRectangle(cornerRadius: 16, style: .continuous)
@@ -2166,7 +2437,7 @@ private struct StreamVirtualButtonsPanelView: View {
         .frame(maxWidth: maxWidth)
         .background(
             RoundedRectangle(cornerRadius: 22, style: .continuous)
-                .fill(Color(red: 0.16, green: 0.16, blue: 0.18).opacity(0.98))
+                .fill(streamPanelDialogColor)
         )
         .overlay(
             RoundedRectangle(cornerRadius: 22, style: .continuous)
@@ -2213,7 +2484,7 @@ private struct StreamVirtualButtonsPanelView: View {
                                     .font(.system(size: 18, weight: .semibold))
                                     .foregroundColor(.white)
                                     .frame(width: 36, height: 36)
-                                    .background(Color.white.opacity(0.08))
+                                    .background(streamPanelRaisedGradient())
                                     .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
 
                                 VStack(alignment: .leading, spacing: 4) {
@@ -2231,7 +2502,7 @@ private struct StreamVirtualButtonsPanelView: View {
                             .padding(.vertical, 10)
                             .background(
                                 RoundedRectangle(cornerRadius: 16, style: .continuous)
-                                    .fill(Color.white.opacity(0.08))
+                                    .fill(streamPanelRaisedGradient())
                             )
                             .overlay(
                                 RoundedRectangle(cornerRadius: 16, style: .continuous)
@@ -2249,7 +2520,7 @@ private struct StreamVirtualButtonsPanelView: View {
         .frame(maxWidth: maxWidth)
         .background(
             RoundedRectangle(cornerRadius: 22, style: .continuous)
-                .fill(Color(red: 0.16, green: 0.16, blue: 0.18).opacity(0.98))
+                .fill(streamPanelDialogColor)
         )
         .overlay(
             RoundedRectangle(cornerRadius: 22, style: .continuous)
@@ -2391,12 +2662,7 @@ private struct StreamVirtualButtonCardView: View {
         .frame(width: width, height: actualHeight, alignment: .top)
         .background(
             RoundedRectangle(cornerRadius: 18, style: .continuous)
-                .fill(
-                    LinearGradient(colors: [
-                        Color.white.opacity(0.11),
-                        Color.white.opacity(0.06)
-                    ], startPoint: .topLeading, endPoint: .bottomTrailing)
-                )
+                .fill(streamPanelRaisedGradient())
         )
         .overlay(
             RoundedRectangle(cornerRadius: 18, style: .continuous)
@@ -2786,10 +3052,7 @@ private struct StreamVirtualKeyboardKeyView: View {
             ], startPoint: .topLeading, endPoint: .bottomTrailing)
         }
 
-        return LinearGradient(colors: [
-            Color.white.opacity(0.11),
-            Color.white.opacity(0.05)
-        ], startPoint: .topLeading, endPoint: .bottomTrailing)
+        return streamPanelRaisedGradient()
     }
 
     private var borderColor: Color {
@@ -2814,6 +3077,7 @@ final class StreamActionSheetHostingViewController: UIViewController {
     @objc var touchModeSelection: NSNumber = 0
     @objc var videoAlignmentSelection: NSNumber = 0
     @objc var videoAlignmentMargin: NSNumber = 0
+    @objc var statsOverlayEnabled: Bool = false
     @objc var extendedPerformanceMetricsEnabled: Bool = false
     @objc var performanceOverlayDragEnabled: Bool = true
     @objc var audioHapticsEnabled: Bool = false
@@ -2849,8 +3113,16 @@ final class StreamActionSheetHostingViewController: UIViewController {
             isLandscapeLayout = newIsLandscapeLayout
         }
 
-        let panelWidth = isLandscapeLayout ? bounds.width * 0.8 : bounds.width
-        let panelHeight = isLandscapeLayout ? bounds.height * 0.75 : bounds.height * 0.6
+        let isPhone = traitCollection.userInterfaceIdiom == .phone
+        let panelWidth = isLandscapeLayout ? (isPhone ? min(bounds.width * 0.88, 760.0) : bounds.width * 0.8) : bounds.width
+        let panelHeightRatio: CGFloat
+        if isPhone {
+            panelHeightRatio = isLandscapeLayout ? 0.80 : 0.60
+        }
+        else {
+            panelHeightRatio = isLandscapeLayout ? 0.68 : 0.54
+        }
+        let panelHeight = bounds.height * panelHeightRatio
         let panelX = floor((bounds.width - panelWidth) / 2.0)
         let panelContainerHeight = panelHeight + bottomInset
         let panelY = bounds.height - panelContainerHeight
@@ -2868,6 +3140,7 @@ final class StreamActionSheetHostingViewController: UIViewController {
         viewModel.touchModeSelection = touchModeSelection.intValue
         viewModel.videoAlignmentSelection = videoAlignmentSelection.intValue
         viewModel.videoAlignmentMargin = videoAlignmentMargin.doubleValue
+        viewModel.statsOverlayEnabled = statsOverlayEnabled
         viewModel.extendedPerformanceMetricsEnabled = extendedPerformanceMetricsEnabled
         viewModel.performanceOverlayDragEnabled = performanceOverlayDragEnabled
         viewModel.audioHapticsEnabled = audioHapticsEnabled
@@ -2891,12 +3164,12 @@ final class StreamActionSheetHostingViewController: UIViewController {
     }
 
     private func buildViewHierarchy() {
-        dimmingView.backgroundColor = UIColor.black.withAlphaComponent(0.42)
+        dimmingView.backgroundColor = streamPanelDimmingUIColor
         dimmingView.addGestureRecognizer(UITapGestureRecognizer(target: self, action: #selector(cancelTapped)))
         view.addSubview(dimmingView)
 
-        panelContainerView.backgroundColor = UIColor(red: 0.15, green: 0.15, blue: 0.17, alpha: 0.94)
-        panelContainerView.layer.cornerRadius = 30
+        panelContainerView.backgroundColor = streamPanelBackgroundUIColor
+        panelContainerView.layer.cornerRadius = 24
         panelContainerView.layer.maskedCorners = [.layerMinXMinYCorner, .layerMaxXMinYCorner]
         panelContainerView.layer.masksToBounds = true
         panelContainerView.layer.borderWidth = 1
@@ -2933,6 +3206,21 @@ final class StreamActionSheetHostingViewController: UIViewController {
                                            return
                                        }
 
+                                       if identifier == "open_audio_haptics" {
+                                           self.viewModel.isShowingAudioHapticsDialog = true
+                                           return
+                                       }
+
+                                       if identifier == "open_performance" {
+                                           self.viewModel.isShowingPerformanceDialog = true
+                                           return
+                                       }
+
+                                       if identifier == "open_video_alignment" {
+                                           self.viewModel.isShowingVideoAlignmentDialog = true
+                                           return
+                                       }
+
                                        self.delegate?.streamActionSheetHostingViewController(self, didSelectActionWithIdentifier: identifier)
                                    },
                                    onTouchModeChange: { [weak self] selection in
@@ -2960,6 +3248,14 @@ final class StreamActionSheetHostingViewController: UIViewController {
 
                                        self.videoAlignmentMargin = NSNumber(value: margin)
                                        self.delegate?.streamActionSheetHostingViewController(self, didChangeVideoAlignmentMargin: margin)
+                                   },
+                                   onStatsOverlayEnabledChange: { [weak self] enabled in
+                                       guard let self = self else {
+                                           return
+                                       }
+
+                                       self.statsOverlayEnabled = enabled
+                                       self.delegate?.streamActionSheetHostingViewController(self, didChangeStatsOverlayEnabled: enabled)
                                    },
                                    onExtendedPerformanceMetricsChange: { [weak self] enabled in
                                        guard let self = self else {
@@ -3141,12 +3437,12 @@ final class StreamShortcutPanelHostingViewController: UIViewController {
     }
 
     private func buildViewHierarchy() {
-        dimmingView.backgroundColor = UIColor.black.withAlphaComponent(0.42)
+        dimmingView.backgroundColor = streamPanelDimmingUIColor
         dimmingView.addGestureRecognizer(UITapGestureRecognizer(target: self, action: #selector(cancelTapped)))
         view.addSubview(dimmingView)
 
-        panelContainerView.backgroundColor = UIColor(red: 0.15, green: 0.15, blue: 0.17, alpha: 0.94)
-        panelContainerView.layer.cornerRadius = 30
+        panelContainerView.backgroundColor = streamPanelBackgroundUIColor
+        panelContainerView.layer.cornerRadius = 24
         panelContainerView.layer.maskedCorners = [.layerMinXMinYCorner, .layerMaxXMinYCorner]
         panelContainerView.layer.masksToBounds = true
         panelContainerView.layer.borderWidth = 1
@@ -3256,12 +3552,12 @@ final class StreamVirtualKeyboardPanelHostingViewController: UIViewController {
     }
 
     private func buildViewHierarchy() {
-        dimmingView.backgroundColor = UIColor.black.withAlphaComponent(0.42)
+        dimmingView.backgroundColor = streamPanelDimmingUIColor
         dimmingView.addGestureRecognizer(UITapGestureRecognizer(target: self, action: #selector(cancelTapped)))
         view.addSubview(dimmingView)
 
-        panelContainerView.backgroundColor = UIColor(red: 0.15, green: 0.15, blue: 0.17, alpha: 0.94)
-        panelContainerView.layer.cornerRadius = 30
+        panelContainerView.backgroundColor = streamPanelBackgroundUIColor
+        panelContainerView.layer.cornerRadius = 24
         panelContainerView.layer.maskedCorners = [.layerMinXMinYCorner, .layerMaxXMinYCorner]
         panelContainerView.layer.masksToBounds = true
         panelContainerView.layer.borderWidth = 1
@@ -3366,12 +3662,12 @@ final class StreamVirtualButtonsPanelHostingViewController: UIViewController {
     }
 
     private func buildViewHierarchy() {
-        dimmingView.backgroundColor = UIColor.black.withAlphaComponent(0.42)
+        dimmingView.backgroundColor = streamPanelDimmingUIColor
         dimmingView.addGestureRecognizer(UITapGestureRecognizer(target: self, action: #selector(cancelTapped)))
         view.addSubview(dimmingView)
 
-        panelContainerView.backgroundColor = UIColor(red: 0.15, green: 0.15, blue: 0.17, alpha: 0.94)
-        panelContainerView.layer.cornerRadius = 30
+        panelContainerView.backgroundColor = streamPanelBackgroundUIColor
+        panelContainerView.layer.cornerRadius = 24
         panelContainerView.layer.maskedCorners = [.layerMinXMinYCorner, .layerMaxXMinYCorner]
         panelContainerView.layer.masksToBounds = true
         panelContainerView.layer.borderWidth = 1

@@ -1177,11 +1177,18 @@ int DrSubmitDecodeUnit(PDECODE_UNIT decodeUnit);
     }
 
     CGRect targetRect = [self targetRectForDrawableSize:drawableSize];
+    // Core Image renders into Metal textures using a bottom-left origin, while targetRect is
+    // computed in UIKit's top-left coordinate space. Convert the destination rect so top/bottom
+    // alignment matches the system renderer.
+    CGRect ciTargetRect = CGRectMake(CGRectGetMinX(targetRect),
+                                     drawableSize.height - CGRectGetMaxY(targetRect),
+                                     CGRectGetWidth(targetRect),
+                                     CGRectGetHeight(targetRect));
     CGAffineTransform transform = CGAffineTransformIdentity;
-    transform = CGAffineTransformTranslate(transform, CGRectGetMinX(targetRect), CGRectGetMinY(targetRect));
+    transform = CGAffineTransformTranslate(transform, CGRectGetMinX(ciTargetRect), CGRectGetMinY(ciTargetRect));
     transform = CGAffineTransformScale(transform,
-                                       CGRectGetWidth(targetRect) / CGRectGetWidth(imageExtent),
-                                       CGRectGetHeight(targetRect) / CGRectGetHeight(imageExtent));
+                                       CGRectGetWidth(ciTargetRect) / CGRectGetWidth(imageExtent),
+                                       CGRectGetHeight(ciTargetRect) / CGRectGetHeight(imageExtent));
     transform = CGAffineTransformTranslate(transform, -CGRectGetMinX(imageExtent), -CGRectGetMinY(imageExtent));
 
     _cachedHostBoundsSize = hostBoundsSize;

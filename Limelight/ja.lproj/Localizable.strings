@@ -248,6 +248,7 @@
 "stream.touch_mode.toast" = "タッチモード: %@";
 "stream.touch_mode.trackpad" = "トラックパッド";
 "stream.video_alignment.title" = "映像位置";
+"stream.video_alignment_margin.title" = "余白";
 "stream.video_alignment_margin.label" = "映像位置の余白 %d";
 "stream.menu.manage_virtual_gamepad.tip" = "仮想ゲームパッドの各コントロールをタップして位置とサイズを調整します";
 "stream.menu.quit_stream.progress" = "アプリを終了しています...";
@@ -313,6 +314,8 @@
 "stream.virtual_buttons.empty_message" = "右上のプラスボタンをタップして、まず自分のボタンセットを追加してください。";
 "stream.virtual_buttons.empty_title" = "仮想ボタンはまだありません";
 "stream.virtual_buttons.finish_editing" = "編集完了";
+"stream.virtual_controls.exit" = "終了";
+"stream.virtual_controls.exit_editing" = "編集を終了";
 "stream.virtual_buttons.mouse.left" = "マウス左";
 "stream.virtual_buttons.mouse.left_lock" = "マウス左固定";
 "stream.virtual_buttons.mouse.left_lock_subtitle" = "タップで左ボタンを固定";
@@ -472,6 +475,7 @@
 "stream.launch.not_paired" = "このデバイスはPCとまだペアリングされていません";
 "stream.connection.poor_slow" = "PCとの接続が遅いです。ビットレートを下げてください。";
 "stream.connection.poor" = "PCとの接続状態が不安定です";
+"stream.performance.enabled.toggle" = "パフォーマンス表示を有効化";
 "stream.performance.extended_metrics.toggle" = "ジッター/エンコード/クライアント遅延/ドロップを表示";
 "stream.stats.client" = " クライアント: %.1f ms";
 "stream.stats.audio" = " 音声: pend %.0f queue %.0f drop %d";

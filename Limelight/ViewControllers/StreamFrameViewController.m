@@ -126,6 +126,11 @@ static const NSInteger kStreamPerformanceOverlayPositionCustom = 6;
     UIButton *_virtualButtonEditorCloseButton;
     UIButton *_virtualButtonEditorDeleteButton;
     UIButton *_virtualButtonEditorSaveButton;
+    UIView *_virtualControlsEditingToolbarView;
+    UIButton *_virtualControlsEditingCollapseButton;
+    UIButton *_virtualControlsEditingExitButton;
+    UIButton *_virtualControlsEditingResetButton;
+    UIButton *_virtualControlsEditingDoneButton;
     NSString *_selectedVirtualButtonIdentifier;
     NSString *_selectedVirtualGamepadIdentifier;
     CGFloat _currentSessionVirtualButtonOpacity;
@@ -134,6 +139,11 @@ static const NSInteger kStreamPerformanceOverlayPositionCustom = 6;
     NSInteger _currentSessionVirtualGamepadSchemeSelection;
     BOOL _currentSessionVirtualButtonLayoutPortrait;
     BOOL _currentSessionVirtualGamepadLayoutPortrait;
+    BOOL _virtualButtonsEditingSessionActive;
+    BOOL _virtualButtonsEditingPreviousVisibility;
+    BOOL _virtualGamepadEditingSessionActive;
+    BOOL _virtualGamepadEditingPreviousVisibility;
+    BOOL _virtualControlsEditingToolbarCollapsed;
     
 #if !TARGET_OS_TV
     UIScreenEdgePanGestureRecognizer *_exitSwipeRecognizer;
@@ -616,6 +626,7 @@ static const NSInteger kStreamPerformanceOverlayPositionCustom = 6;
 
     [self layoutOverlayViewForCurrentBounds];
     [self layoutVirtualButtonEditorForCurrentBounds];
+    [self layoutVirtualControlsEditingToolbarForCurrentBounds];
     [self layoutFloatingMenuButtonForCurrentBounds];
 }
 
@@ -892,6 +903,7 @@ static const NSInteger kStreamPerformanceOverlayPositionCustom = 6;
 {
     [super viewDidAppear:animated];
     [self applyPreferredOrientationIfNeeded];
+    [self reloadVirtualControlSchemesFromSavedSettingsIfNeeded];
 #if defined(__IPHONE_14_0)
     if (@available(iOS 14.0, *)) {
         [self setNeedsUpdateOfPrefersPointerLocked];
@@ -1451,6 +1463,7 @@ static const NSInteger kStreamPerformanceOverlayPositionCustom = 6;
 #if !TARGET_OS_TV
     _pictureInPictureStartingForBackground = NO;
 #endif
+    [self reloadVirtualControlSchemesFromSavedSettingsIfNeeded];
     // Stop the background timer, since we're foregrounded again
     if (_inactivityTimer != nil) {
         Log(LOG_I, @"Stopping inactivity timer after becoming active again");
@@ -1536,6 +1549,7 @@ static const NSInteger kStreamPerformanceOverlayPositionCustom = 6;
         disconnectItem.subtitle = StreamMenuLocalized(@"stream.menu.disconnect.subtitle");
         disconnectItem.symbolName = @"xmark.circle";
         disconnectItem.destructive = YES;
+        disconnectItem.accentColor = [UIColor systemRedColor];
         [items addObject:disconnectItem];
 
         StreamActionSheetItem *quitStreamItem = [[StreamActionSheetItem alloc] init];
@@ -1544,13 +1558,16 @@ static const NSInteger kStreamPerformanceOverlayPositionCustom = 6;
         quitStreamItem.subtitle = StreamMenuLocalized(@"stream.menu.quit_stream.subtitle");
         quitStreamItem.symbolName = @"rectangle.portrait.and.arrow.right";
         quitStreamItem.destructive = YES;
+        quitStreamItem.accentColor = [UIColor systemOrangeColor];
         [items addObject:quitStreamItem];
 
         StreamActionSheetItem *statsItem = [[StreamActionSheetItem alloc] init];
-        statsItem.identifier = @"toggle_stats";
+        statsItem.identifier = @"open_performance";
         statsItem.title = StreamMenuLocalized(@"stream.menu.stats.title");
         statsItem.subtitle = StreamMenuLocalized(@"stream.menu.stats.subtitle");
         statsItem.symbolName = @"chart.bar.xaxis";
+        statsItem.active = [self isPerformanceOverlayVisible];
+        statsItem.accentColor = [UIColor systemTealColor];
         [items addObject:statsItem];
 
         StreamActionSheetItem *microphoneItem = [[StreamActionSheetItem alloc] init];
@@ -1558,6 +1575,8 @@ static const NSInteger kStreamPerformanceOverlayPositionCustom = 6;
         microphoneItem.title = StreamMenuLocalized(@"stream.menu.microphone.title");
         microphoneItem.subtitle = StreamMenuLocalized(_microphoneEnabled ? @"stream.menu.microphone.subtitle_on" : @"stream.menu.microphone.subtitle_off");
         microphoneItem.symbolName = _microphoneEnabled ? @"mic.fill" : @"mic.slash";
+        microphoneItem.active = _microphoneEnabled;
+        microphoneItem.accentColor = [UIColor systemPinkColor];
         [items addObject:microphoneItem];
 
         StreamActionSheetItem *keyboardItem = [[StreamActionSheetItem alloc] init];
@@ -1565,6 +1584,7 @@ static const NSInteger kStreamPerformanceOverlayPositionCustom = 6;
         keyboardItem.title = StreamMenuLocalized(@"stream.menu.phone_keyboard.title");
         keyboardItem.subtitle = StreamMenuLocalized(@"stream.menu.phone_keyboard.subtitle");
         keyboardItem.symbolName = @"keyboard";
+        keyboardItem.accentColor = [UIColor systemBlueColor];
         [items addObject:keyboardItem];
 
         StreamActionSheetItem *virtualGamepadItem = [[StreamActionSheetItem alloc] init];
@@ -1572,6 +1592,8 @@ static const NSInteger kStreamPerformanceOverlayPositionCustom = 6;
         virtualGamepadItem.title = StreamMenuLocalized(@"stream.menu.virtual_gamepad.title");
         virtualGamepadItem.subtitle = StreamMenuLocalized(@"stream.menu.virtual_gamepad.subtitle");
         virtualGamepadItem.symbolName = @"gamecontroller";
+        virtualGamepadItem.active = [_streamView isTemporaryVirtualGamepadVisible];
+        virtualGamepadItem.accentColor = [UIColor systemIndigoColor];
         [items addObject:virtualGamepadItem];
 
         StreamActionSheetItem *manageVirtualGamepadItem = [[StreamActionSheetItem alloc] init];
@@ -1579,12 +1601,16 @@ static const NSInteger kStreamPerformanceOverlayPositionCustom = 6;
         manageVirtualGamepadItem.title = StreamMenuLocalized(@"stream.menu.manage_virtual_gamepad.title");
         manageVirtualGamepadItem.subtitle = StreamMenuLocalized(@"stream.menu.manage_virtual_gamepad.subtitle");
         manageVirtualGamepadItem.symbolName = @"gamecontroller.fill";
+        manageVirtualGamepadItem.active = [_streamView isTemporaryVirtualGamepadEditingEnabled];
+        manageVirtualGamepadItem.accentColor = [UIColor systemPurpleColor];
 
         StreamActionSheetItem *virtualButtonsItem = [[StreamActionSheetItem alloc] init];
         virtualButtonsItem.identifier = @"virtual_buttons";
         virtualButtonsItem.title = StreamMenuLocalized(@"stream.menu.virtual_buttons.title");
         virtualButtonsItem.subtitle = StreamMenuLocalized(@"stream.menu.virtual_buttons.subtitle");
         virtualButtonsItem.symbolName = @"square.grid.2x2";
+        virtualButtonsItem.active = [_streamView isTemporaryVirtualButtonsVisible];
+        virtualButtonsItem.accentColor = [UIColor colorWithRed:0.36 green:0.88 blue:0.79 alpha:1.0];
         [items addObject:virtualButtonsItem];
 
         StreamActionSheetItem *manageVirtualButtonsItem = [[StreamActionSheetItem alloc] init];
@@ -1592,19 +1618,22 @@ static const NSInteger kStreamPerformanceOverlayPositionCustom = 6;
         manageVirtualButtonsItem.title = StreamMenuLocalized(@"stream.menu.manage_virtual_buttons.title");
         manageVirtualButtonsItem.subtitle = StreamMenuLocalized(@"stream.menu.manage_virtual_buttons.subtitle");
         manageVirtualButtonsItem.symbolName = @"square.and.pencil";
+        manageVirtualButtonsItem.accentColor = [UIColor systemTealColor];
 
         StreamActionSheetItem *shortcutItem = [[StreamActionSheetItem alloc] init];
         shortcutItem.identifier = @"shortcuts";
         shortcutItem.title = StreamMenuLocalized(@"stream.menu.shortcuts.title");
         shortcutItem.subtitle = StreamMenuLocalized(@"stream.menu.shortcuts.subtitle");
         shortcutItem.symbolName = @"command.square";
+        shortcutItem.accentColor = [UIColor systemBlueColor];
         [items addObject:shortcutItem];
 
         StreamActionSheetItem *fullKeyboardItem = [[StreamActionSheetItem alloc] init];
         fullKeyboardItem.identifier = @"full_keyboard";
         fullKeyboardItem.title = StreamMenuLocalized(@"stream.menu.full_keyboard.title");
         fullKeyboardItem.subtitle = StreamMenuLocalized(@"stream.menu.full_keyboard.subtitle");
-        fullKeyboardItem.symbolName = @"keyboard";
+        fullKeyboardItem.symbolName = @"keyboard.badge.ellipsis";
+        fullKeyboardItem.accentColor = [UIColor systemOrangeColor];
         [items addObject:fullKeyboardItem];
 
         StreamActionSheetItem *viewOnlyItem = [[StreamActionSheetItem alloc] init];
@@ -1612,7 +1641,28 @@ static const NSInteger kStreamPerformanceOverlayPositionCustom = 6;
         viewOnlyItem.title = StreamMenuLocalized(@"stream.menu.view_only.title");
         viewOnlyItem.subtitle = StreamMenuLocalized(@"stream.menu.view_only.subtitle");
         viewOnlyItem.symbolName = @"eye";
+        viewOnlyItem.active = _viewOnlyModeEnabled;
+        viewOnlyItem.accentColor = [UIColor systemGreenColor];
         [items addObject:viewOnlyItem];
+
+        StreamActionSheetItem *audioHapticsItem = [[StreamActionSheetItem alloc] init];
+        audioHapticsItem.identifier = @"open_audio_haptics";
+        audioHapticsItem.title = StreamMenuLocalized(@"stream.audio_haptics.title");
+        audioHapticsItem.subtitle = StreamMenuLocalized(@"stream.audio_haptics.title");
+        audioHapticsItem.symbolName = @"waveform.path";
+        audioHapticsItem.active = _settings.audioHapticsEnabled;
+        audioHapticsItem.accentColor = [UIColor colorWithRed:0.38 green:0.84 blue:0.98 alpha:1.0];
+        [items addObject:audioHapticsItem];
+
+        StreamActionSheetItem *videoAlignmentItem = [[StreamActionSheetItem alloc] init];
+        videoAlignmentItem.identifier = @"open_video_alignment";
+        videoAlignmentItem.title = StreamMenuLocalized(@"stream.video_alignment.title");
+        videoAlignmentItem.subtitle = StreamMenuLocalized(@"stream.video_alignment.title");
+        videoAlignmentItem.symbolName = @"rectangle.center.inset.filled";
+        videoAlignmentItem.active = ([self currentVideoAlignmentSelection] != 0 || _currentSessionVideoAlignmentMargin > 0.5f);
+        videoAlignmentItem.accentColor = [UIColor colorWithRed:0.38 green:0.84 blue:0.98 alpha:1.0];
+        [items addObject:videoAlignmentItem];
+
         [items addObject:manageVirtualGamepadItem];
         [items addObject:manageVirtualButtonsItem];
 
@@ -1621,6 +1671,7 @@ static const NSInteger kStreamPerformanceOverlayPositionCustom = 6;
         controller.touchModeSelection = @([self currentTouchModeSelection]);
         controller.videoAlignmentSelection = @([self currentVideoAlignmentSelection]);
         controller.videoAlignmentMargin = @(_currentSessionVideoAlignmentMargin);
+        controller.statsOverlayEnabled = [self isPerformanceOverlayVisible];
         controller.extendedPerformanceMetricsEnabled = _extendedPerformanceMetricsEnabled;
         controller.performanceOverlayDragEnabled = _currentSessionPerformanceOverlayDragEnabled;
         controller.audioHapticsEnabled = _settings.audioHapticsEnabled;
@@ -1760,6 +1811,9 @@ static const NSInteger kStreamPerformanceOverlayPositionCustom = 6;
     if (_virtualButtonEditorView != nil && _virtualButtonEditorView.superview == self.view) {
         [self.view bringSubviewToFront:_virtualButtonEditorView];
     }
+    if (_virtualControlsEditingToolbarView != nil && _virtualControlsEditingToolbarView.superview == self.view) {
+        [self.view bringSubviewToFront:_virtualControlsEditingToolbarView];
+    }
 
     [self layoutStreamingSubviewsForCurrentBounds];
 }
@@ -1781,6 +1835,34 @@ static const NSInteger kStreamPerformanceOverlayPositionCustom = 6;
 
     if (_overlayView != nil && !_overlayView.hidden) {
         [self updateStatsOverlay];
+    }
+}
+
+- (BOOL)isPerformanceOverlayVisible {
+    return _statsUpdateTimer != nil && (_overlayView == nil || !_overlayView.hidden);
+}
+
+- (void)applyPerformanceOverlayEnabledToCurrentSession:(BOOL)enabled {
+    if (enabled) {
+        if (_overlayView != nil) {
+            [_overlayView setHidden:NO];
+        }
+
+        if (_statsUpdateTimer == nil) {
+            [self startHUD];
+        }
+
+        [self updateStatsOverlay];
+        return;
+    }
+
+    if (_statsUpdateTimer != nil) {
+        [_statsUpdateTimer invalidate];
+        _statsUpdateTimer = nil;
+    }
+
+    if (_overlayView != nil) {
+        [_overlayView setHidden:YES];
     }
 }
 
@@ -1965,7 +2047,7 @@ static const NSInteger kStreamPerformanceOverlayPositionCustom = 6;
     ];
 }
 
-- (NSArray<NSDictionary *> *)defaultVirtualGamepadDefinitionsForPortrait:(BOOL)portrait {
+- (NSArray<NSDictionary *> *)legacyDefaultVirtualGamepadDefinitionsForPortrait:(BOOL)portrait {
     if (portrait) {
         return @[
             @{@"id": @"gamepad_left_stick", @"title": @"LS", @"controlAction": @"gamepad_left_stick", @"shape": @"circle", @"scale": @0.96, @"xRatio": @0.24, @"yRatio": @0.80},
@@ -1999,6 +2081,232 @@ static const NSInteger kStreamPerformanceOverlayPositionCustom = 6;
     ];
 }
 
+- (BOOL)virtualGamepadDefinitions:(NSArray<NSDictionary *> *)definitions matchesTemplate:(NSArray<NSDictionary *> *)templateDefinitions {
+    if (definitions.count != templateDefinitions.count) {
+        return NO;
+    }
+
+    NSArray<NSString *> *stringKeys = @[@"id", @"title", @"role", @"controlAction", @"shape"];
+    NSArray<NSString *> *numericKeys = @[@"scale", @"widthScale", @"heightScale", @"xRatio", @"yRatio"];
+
+    for (NSUInteger index = 0; index < definitions.count; index++) {
+        NSDictionary *definition = definitions[index];
+        NSDictionary *templateDefinition = templateDefinitions[index];
+
+        for (NSString *key in stringKeys) {
+            id value = definition[key];
+            id templateValue = templateDefinition[key];
+            if (value == nil && templateValue == nil) {
+                continue;
+            }
+            if (![value isEqual:templateValue]) {
+                return NO;
+            }
+        }
+
+        for (NSString *key in numericKeys) {
+            NSNumber *value = definition[key];
+            NSNumber *templateValue = templateDefinition[key];
+            if (value == nil && templateValue == nil) {
+                continue;
+            }
+            if (value == nil || templateValue == nil) {
+                return NO;
+            }
+            if (fabs(value.doubleValue - templateValue.doubleValue) > 0.0001) {
+                return NO;
+            }
+        }
+    }
+
+    return YES;
+}
+
+- (NSDictionary *)virtualGamepadStyleDefaultsForRole:(NSString *)role portrait:(BOOL)portrait {
+    CGFloat defaultScale = portrait ? 0.66f : 0.64f;
+
+    if ([role isEqualToString:@"select"]) {
+        return @{
+            @"title": @"Select",
+            @"systemImage": @"square.on.circle",
+            @"shape": @"circle",
+            @"scale": @(defaultScale)
+        };
+    }
+    if ([role isEqualToString:@"start"]) {
+        return @{
+            @"title": @"Start",
+            @"systemImage": @"line.3.horizontal.circle",
+            @"shape": @"circle",
+            @"scale": @(defaultScale)
+        };
+    }
+    if ([role isEqualToString:@"special"] || [role isEqualToString:@"guide"] || [role isEqualToString:@"xbox"]) {
+        return @{
+            @"title": @"Xbox",
+            @"systemImage": @"xbox.logo",
+            @"shape": @"circle",
+            @"scale": @(defaultScale)
+        };
+    }
+
+    return nil;
+}
+
+- (NSArray<NSDictionary *> *)normalizedVirtualGamepadDefinitions:(NSArray<NSDictionary *> *)definitions
+                                                        portrait:(BOOL)portrait
+                                                       didMutate:(BOOL *)didMutate {
+    NSMutableArray<NSMutableDictionary *> *normalizedDefinitions = [NSMutableArray arrayWithCapacity:definitions.count + 1];
+    NSMutableDictionary *selectDefinition = nil;
+    NSMutableDictionary *startDefinition = nil;
+    BOOL hasSpecialDefinition = NO;
+    BOOL mutated = NO;
+
+    for (NSDictionary *definition in definitions) {
+        if (![definition isKindOfClass:[NSDictionary class]]) {
+            mutated = YES;
+            continue;
+        }
+
+        NSMutableDictionary *updatedDefinition = [definition mutableCopy];
+        NSString *role = updatedDefinition[@"role"];
+        NSDictionary *styleDefaults = [self virtualGamepadStyleDefaultsForRole:role portrait:portrait];
+        if (styleDefaults != nil) {
+            NSString *shape = updatedDefinition[@"shape"];
+            NSNumber *scale = updatedDefinition[@"scale"];
+            NSString *systemImage = updatedDefinition[@"systemImage"];
+
+            updatedDefinition[@"title"] = styleDefaults[@"title"];
+            updatedDefinition[@"shape"] = styleDefaults[@"shape"];
+            if (![shape isEqual:styleDefaults[@"shape"]] ||
+                ![updatedDefinition[@"title"] isEqual:styleDefaults[@"title"]]) {
+                mutated = YES;
+            }
+            if (scale == nil) {
+                updatedDefinition[@"scale"] = styleDefaults[@"scale"];
+                mutated = YES;
+            }
+            if (![systemImage isKindOfClass:[NSString class]] || systemImage.length == 0) {
+                updatedDefinition[@"systemImage"] = styleDefaults[@"systemImage"];
+                mutated = YES;
+            }
+            [updatedDefinition removeObjectForKey:@"widthScale"];
+            [updatedDefinition removeObjectForKey:@"heightScale"];
+        }
+
+        if ([role isEqualToString:@"select"]) {
+            selectDefinition = updatedDefinition;
+        }
+        else if ([role isEqualToString:@"start"]) {
+            startDefinition = updatedDefinition;
+        }
+        else if ([role isEqualToString:@"special"] || [role isEqualToString:@"guide"] || [role isEqualToString:@"xbox"]) {
+            hasSpecialDefinition = YES;
+            updatedDefinition[@"id"] = @"gamepad_special";
+            updatedDefinition[@"role"] = @"special";
+            updatedDefinition[@"title"] = @"Xbox";
+            updatedDefinition[@"systemImage"] = @"xbox.logo";
+            updatedDefinition[@"shape"] = @"circle";
+        }
+
+        [normalizedDefinitions addObject:updatedDefinition];
+    }
+
+    if (!hasSpecialDefinition) {
+        NSArray<NSDictionary *> *defaultDefinitions = [self defaultVirtualGamepadDefinitionsForPortrait:portrait];
+        NSDictionary *defaultSpecialDefinition = [defaultDefinitions filteredArrayUsingPredicate:[NSPredicate predicateWithFormat:@"id == %@", @"gamepad_special"]].firstObject;
+        if (defaultSpecialDefinition != nil) {
+            NSMutableDictionary *specialDefinition = [defaultSpecialDefinition mutableCopy];
+            CGFloat specialX = [defaultSpecialDefinition[@"xRatio"] doubleValue];
+            CGFloat specialY = [defaultSpecialDefinition[@"yRatio"] doubleValue];
+
+            if (selectDefinition != nil || startDefinition != nil) {
+                CGFloat selectX = [selectDefinition[@"xRatio"] doubleValue];
+                CGFloat startX = [startDefinition[@"xRatio"] doubleValue];
+                CGFloat selectY = [selectDefinition[@"yRatio"] doubleValue];
+                CGFloat startY = [startDefinition[@"yRatio"] doubleValue];
+
+                if (selectDefinition != nil && startDefinition != nil) {
+                    specialX = (selectX + startX) * 0.5f;
+                    specialY = (selectY + startY) * 0.5f;
+                    CGFloat minimumGap = portrait ? 0.12f : 0.14f;
+                    CGFloat currentGap = fabs(startX - selectX);
+                    if (currentGap < minimumGap) {
+                        CGFloat halfGap = minimumGap * 0.5f;
+                        selectDefinition[@"xRatio"] = @(MAX(0.0f, specialX - halfGap));
+                        startDefinition[@"xRatio"] = @(MIN(1.0f, specialX + halfGap));
+                    }
+                }
+                else if (selectDefinition != nil) {
+                    specialX = MIN(1.0f, selectX + (portrait ? 0.08f : 0.07f));
+                    specialY = selectY;
+                }
+                else if (startDefinition != nil) {
+                    specialX = MAX(0.0f, startX - (portrait ? 0.08f : 0.07f));
+                    specialY = startY;
+                }
+            }
+
+            specialDefinition[@"xRatio"] = @(specialX);
+            specialDefinition[@"yRatio"] = @(specialY);
+
+            NSUInteger insertIndex = [normalizedDefinitions indexOfObjectPassingTest:^BOOL(NSDictionary *definition, NSUInteger idx, BOOL *stop) {
+                return [definition[@"role"] isEqualToString:@"start"];
+            }];
+            if (insertIndex == NSNotFound) {
+                [normalizedDefinitions addObject:specialDefinition];
+            }
+            else {
+                [normalizedDefinitions insertObject:specialDefinition atIndex:insertIndex];
+            }
+            mutated = YES;
+        }
+    }
+
+    if (didMutate != NULL) {
+        *didMutate = mutated;
+    }
+
+    return normalizedDefinitions;
+}
+
+- (NSArray<NSDictionary *> *)defaultVirtualGamepadDefinitionsForPortrait:(BOOL)portrait {
+    BOOL isPad = UIDevice.currentDevice.userInterfaceIdiom == UIUserInterfaceIdiomPad;
+    if (portrait) {
+        return @[
+            @{@"id": @"gamepad_left_stick", @"title": @"LS", @"controlAction": @"gamepad_left_stick", @"shape": @"circle", @"scale": isPad ? @0.96 : @0.94, @"xRatio": isPad ? @0.24 : @0.22, @"yRatio": isPad ? @0.84 : @0.86},
+            @{@"id": @"gamepad_dpad", @"title": @"DPad", @"controlAction": @"gamepad_dpad", @"shape": @"circle", @"scale": isPad ? @0.90 : @0.86, @"xRatio": isPad ? @0.20 : @0.20, @"yRatio": isPad ? @0.58 : @0.60},
+            @{@"id": @"gamepad_right_stick", @"title": @"RS", @"controlAction": @"gamepad_right_stick", @"shape": @"circle", @"scale": isPad ? @0.96 : @0.94, @"xRatio": isPad ? @0.76 : @0.78, @"yRatio": isPad ? @0.84 : @0.86},
+            @{@"id": @"gamepad_l3", @"title": @"L3", @"role": @"l3", @"shape": @"circle", @"scale": isPad ? @0.72 : @0.68, @"xRatio": isPad ? @0.34 : @0.34, @"yRatio": isPad ? @0.46 : @0.48},
+            @{@"id": @"gamepad_select", @"title": @"Select", @"role": @"select", @"systemImage": @"square.on.circle", @"shape": @"circle", @"scale": isPad ? @0.70 : @0.66, @"xRatio": @0.42, @"yRatio": isPad ? @0.34 : @0.36},
+            @{@"id": @"gamepad_special", @"title": @"Xbox", @"role": @"special", @"systemImage": @"xbox.logo", @"shape": @"circle", @"scale": isPad ? @0.70 : @0.66, @"xRatio": @0.50, @"yRatio": isPad ? @0.32 : @0.34},
+            @{@"id": @"gamepad_start", @"title": @"Start", @"role": @"start", @"systemImage": @"line.3.horizontal.circle", @"shape": @"circle", @"scale": isPad ? @0.70 : @0.66, @"xRatio": @0.58, @"yRatio": isPad ? @0.34 : @0.36},
+            @{@"id": @"gamepad_r3", @"title": @"R3", @"role": @"r3", @"shape": @"circle", @"scale": isPad ? @0.72 : @0.68, @"xRatio": isPad ? @0.66 : @0.66, @"yRatio": isPad ? @0.46 : @0.48},
+            @{@"id": @"gamepad_face_buttons", @"title": @"ABXY", @"controlAction": @"gamepad_face_buttons", @"shape": @"circle", @"scale": isPad ? @0.90 : @0.86, @"xRatio": isPad ? @0.80 : @0.80, @"yRatio": isPad ? @0.58 : @0.60},
+            @{@"id": @"gamepad_l1", @"title": @"L1", @"role": @"l1", @"shape": @"roundedRect", @"widthScale": @0.92, @"heightScale": @0.92, @"xRatio": isPad ? @0.22 : @0.18, @"yRatio": isPad ? @0.18 : @0.18},
+            @{@"id": @"gamepad_r1", @"title": @"R1", @"role": @"r1", @"shape": @"roundedRect", @"widthScale": @0.92, @"heightScale": @0.92, @"xRatio": isPad ? @0.78 : @0.82, @"yRatio": isPad ? @0.18 : @0.18},
+            @{@"id": @"gamepad_l2", @"title": @"L2", @"role": @"l2", @"shape": @"roundedRect", @"widthScale": @0.92, @"heightScale": @0.92, @"xRatio": isPad ? @0.22 : @0.18, @"yRatio": isPad ? @0.10 : @0.08},
+            @{@"id": @"gamepad_r2", @"title": @"R2", @"role": @"r2", @"shape": @"roundedRect", @"widthScale": @0.92, @"heightScale": @0.92, @"xRatio": isPad ? @0.78 : @0.82, @"yRatio": isPad ? @0.10 : @0.08}
+        ];
+    }
+
+    return @[
+        @{@"id": @"gamepad_left_stick", @"title": @"LS", @"controlAction": @"gamepad_left_stick", @"shape": @"circle", @"scale": isPad ? @0.96 : @0.96, @"xRatio": isPad ? @0.16 : @0.14, @"yRatio": isPad ? @0.86 : @0.88},
+        @{@"id": @"gamepad_dpad", @"title": @"DPad", @"controlAction": @"gamepad_dpad", @"shape": @"circle", @"scale": isPad ? @0.88 : @0.86, @"xRatio": isPad ? @0.14 : @0.14, @"yRatio": isPad ? @0.44 : @0.46},
+        @{@"id": @"gamepad_right_stick", @"title": @"RS", @"controlAction": @"gamepad_right_stick", @"shape": @"circle", @"scale": isPad ? @0.96 : @0.96, @"xRatio": isPad ? @0.84 : @0.86, @"yRatio": isPad ? @0.86 : @0.88},
+        @{@"id": @"gamepad_l3", @"title": @"L3", @"role": @"l3", @"shape": @"circle", @"scale": isPad ? @0.70 : @0.68, @"xRatio": isPad ? @0.32 : @0.30, @"yRatio": isPad ? @0.64 : @0.66},
+        @{@"id": @"gamepad_select", @"title": @"Select", @"role": @"select", @"systemImage": @"square.on.circle", @"shape": @"circle", @"scale": isPad ? @0.68 : @0.64, @"xRatio": @0.42, @"yRatio": isPad ? @0.58 : @0.60},
+        @{@"id": @"gamepad_special", @"title": @"Xbox", @"role": @"special", @"systemImage": @"xbox.logo", @"shape": @"circle", @"scale": isPad ? @0.68 : @0.64, @"xRatio": @0.50, @"yRatio": isPad ? @0.56 : @0.58},
+        @{@"id": @"gamepad_start", @"title": @"Start", @"role": @"start", @"systemImage": @"line.3.horizontal.circle", @"shape": @"circle", @"scale": isPad ? @0.68 : @0.64, @"xRatio": @0.58, @"yRatio": isPad ? @0.58 : @0.60},
+        @{@"id": @"gamepad_r3", @"title": @"R3", @"role": @"r3", @"shape": @"circle", @"scale": isPad ? @0.70 : @0.68, @"xRatio": isPad ? @0.68 : @0.70, @"yRatio": isPad ? @0.64 : @0.66},
+        @{@"id": @"gamepad_face_buttons", @"title": @"ABXY", @"controlAction": @"gamepad_face_buttons", @"shape": @"circle", @"scale": isPad ? @0.88 : @0.86, @"xRatio": isPad ? @0.86 : @0.86, @"yRatio": isPad ? @0.46 : @0.48},
+        @{@"id": @"gamepad_l1", @"title": @"L1", @"role": @"l1", @"shape": @"roundedRect", @"widthScale": @0.92, @"heightScale": @0.92, @"xRatio": isPad ? @0.12 : @0.10, @"yRatio": @0.13},
+        @{@"id": @"gamepad_l2", @"title": @"L2", @"role": @"l2", @"shape": @"roundedRect", @"widthScale": @0.92, @"heightScale": @0.92, @"xRatio": isPad ? @0.24 : @0.24, @"yRatio": @0.13},
+        @{@"id": @"gamepad_r1", @"title": @"R1", @"role": @"r1", @"shape": @"roundedRect", @"widthScale": @0.92, @"heightScale": @0.92, @"xRatio": isPad ? @0.76 : @0.76, @"yRatio": @0.13},
+        @{@"id": @"gamepad_r2", @"title": @"R2", @"role": @"r2", @"shape": @"roundedRect", @"widthScale": @0.92, @"heightScale": @0.92, @"xRatio": isPad ? @0.88 : @0.90, @"yRatio": @0.13}
+    ];
+}
+
 - (void)loadDefaultVirtualGamepadDefinitionsForCurrentOrientation {
     _virtualGamepadDefinitions = [[self defaultVirtualGamepadDefinitionsForPortrait:_currentSessionVirtualGamepadLayoutPortrait] mutableCopy];
 }
@@ -2009,6 +2317,40 @@ static const NSInteger kStreamPerformanceOverlayPositionCustom = 6;
 
 - (NSInteger)currentVirtualGamepadSchemeSelection {
     return MAX(0, MIN(_currentSessionVirtualGamepadSchemeSelection, 4));
+}
+
+- (void)reloadVirtualControlSchemesFromSavedSettingsIfNeeded {
+    DataManager *dataManager = [[DataManager alloc] init];
+    TemporarySettings *latestSettings = [dataManager getSettings];
+
+    NSInteger latestVirtualButtonSchemeSelection = MAX(0, MIN(latestSettings.virtualButtonSchemeSelection, 4));
+    NSInteger latestVirtualGamepadSchemeSelection = MAX(0, MIN(latestSettings.virtualGamepadSchemeSelection, 4));
+    BOOL virtualButtonsReloaded = NO;
+    BOOL virtualGamepadReloaded = NO;
+
+    if (_currentSessionVirtualButtonSchemeSelection != latestVirtualButtonSchemeSelection) {
+        _currentSessionVirtualButtonSchemeSelection = latestVirtualButtonSchemeSelection;
+        _settings.virtualButtonSchemeSelection = latestVirtualButtonSchemeSelection;
+        [self loadVirtualButtonDefinitionsFromCurrentScheme];
+        [self applyVirtualButtonDefinitionsToStreamView];
+        virtualButtonsReloaded = YES;
+    }
+
+    if (_currentSessionVirtualGamepadSchemeSelection != latestVirtualGamepadSchemeSelection) {
+        _currentSessionVirtualGamepadSchemeSelection = latestVirtualGamepadSchemeSelection;
+        _settings.virtualGamepadSchemeSelection = latestVirtualGamepadSchemeSelection;
+        [self loadVirtualGamepadDefinitionsFromCurrentScheme];
+        [self applyVirtualGamepadDefinitionsToStreamView];
+        virtualGamepadReloaded = YES;
+    }
+
+    if (virtualButtonsReloaded) {
+        [self refreshVirtualButtonsPanelIfNeeded];
+    }
+
+    if (virtualButtonsReloaded || virtualGamepadReloaded) {
+        [self refreshVirtualButtonEditorForCurrentSelection];
+    }
 }
 
 - (BOOL)isVirtualButtonLayoutPortraitForSize:(CGSize)size {
@@ -2064,13 +2406,22 @@ static const NSInteger kStreamPerformanceOverlayPositionCustom = 6;
     NSInteger schemeSelection = [self currentVirtualGamepadSchemeSelection];
     NSArray<NSDictionary *> *savedDefinitions = [dataManager virtualGamepadDefinitionsForSchemeSelection:schemeSelection
                                                                                                portrait:portrait];
+    NSArray<NSDictionary *> *legacyDefaultDefinitions = [self legacyDefaultVirtualGamepadDefinitionsForPortrait:portrait];
+    BOOL shouldMigrateSavedDefinitions = (savedDefinitions.count > 0 &&
+                                          [self virtualGamepadDefinitions:savedDefinitions matchesTemplate:legacyDefaultDefinitions]);
+    NSArray<NSDictionary *> *effectiveSavedDefinitions = shouldMigrateSavedDefinitions ? [self defaultVirtualGamepadDefinitionsForPortrait:portrait] : savedDefinitions;
+    BOOL didNormalizeDefinitions = NO;
 
     _currentSessionVirtualGamepadLayoutPortrait = portrait;
-    if (savedDefinitions != nil && savedDefinitions.count > 0) {
-        _virtualGamepadDefinitions = [savedDefinitions mutableCopy];
+    if (effectiveSavedDefinitions != nil && effectiveSavedDefinitions.count > 0) {
+        _virtualGamepadDefinitions = [[self normalizedVirtualGamepadDefinitions:effectiveSavedDefinitions
+                                                                       portrait:portrait
+                                                                      didMutate:&didNormalizeDefinitions] mutableCopy];
     }
     else if (fallbackDefinitions.count > 0) {
-        _virtualGamepadDefinitions = [fallbackDefinitions mutableCopy];
+        _virtualGamepadDefinitions = [[self normalizedVirtualGamepadDefinitions:fallbackDefinitions
+                                                                       portrait:portrait
+                                                                      didMutate:&didNormalizeDefinitions] mutableCopy];
     }
     else {
         _virtualGamepadDefinitions = [[self defaultVirtualGamepadDefinitionsForPortrait:portrait] mutableCopy];
@@ -2079,6 +2430,13 @@ static const NSInteger kStreamPerformanceOverlayPositionCustom = 6;
     _currentSessionVirtualGamepadOpacity = [dataManager virtualGamepadOpacityForSchemeSelection:schemeSelection];
     if (_currentSessionVirtualGamepadOpacity <= 0.0f) {
         _currentSessionVirtualGamepadOpacity = fallbackOpacity;
+    }
+
+    if (shouldMigrateSavedDefinitions || didNormalizeDefinitions) {
+        [dataManager saveVirtualGamepadDefinitions:[self virtualGamepadDefinitions]
+                                           opacity:[self currentVirtualGamepadOpacity]
+                                forSchemeSelection:schemeSelection
+                                          portrait:portrait];
     }
 }
 
@@ -2201,6 +2559,321 @@ static const NSInteger kStreamPerformanceOverlayPositionCustom = 6;
     }
 
     return [[self virtualGamepadDefinitions] objectAtIndex:index];
+}
+
+- (BOOL)isVirtualButtonsEditingActive {
+    return _streamView != nil && [_streamView isTemporaryVirtualButtonsEditingEnabled];
+}
+
+- (BOOL)isVirtualGamepadEditingActive {
+    return _streamView != nil && [_streamView isTemporaryVirtualGamepadEditingEnabled];
+}
+
+- (BOOL)isAnyVirtualControlsEditingActive {
+    return [self isVirtualButtonsEditingActive] || [self isVirtualGamepadEditingActive];
+}
+
+- (void)installVirtualControlsEditingToolbarIfNeeded {
+    if (_virtualControlsEditingToolbarView != nil) {
+        return;
+    }
+
+    _virtualControlsEditingToolbarView = [[UIView alloc] initWithFrame:CGRectZero];
+    _virtualControlsEditingToolbarView.backgroundColor = [[UIColor blackColor] colorWithAlphaComponent:0.72f];
+    _virtualControlsEditingToolbarView.layer.cornerRadius = 14.0f;
+    _virtualControlsEditingToolbarView.layer.masksToBounds = YES;
+    _virtualControlsEditingToolbarView.layer.borderWidth = 1.0f;
+    _virtualControlsEditingToolbarView.layer.borderColor = [[UIColor whiteColor] colorWithAlphaComponent:0.14f].CGColor;
+    _virtualControlsEditingToolbarView.hidden = YES;
+
+    _virtualControlsEditingCollapseButton = [UIButton buttonWithType:UIButtonTypeSystem];
+    if (@available(iOS 13.0, *)) {
+        [_virtualControlsEditingCollapseButton setImage:[UIImage systemImageNamed:@"chevron.right"] forState:UIControlStateNormal];
+    }
+    [_virtualControlsEditingCollapseButton setTintColor:[UIColor whiteColor]];
+    _virtualControlsEditingCollapseButton.backgroundColor = [[UIColor whiteColor] colorWithAlphaComponent:0.10f];
+    _virtualControlsEditingCollapseButton.layer.cornerRadius = 11.0f;
+    _virtualControlsEditingCollapseButton.layer.borderWidth = 1.0f;
+    _virtualControlsEditingCollapseButton.layer.borderColor = [[UIColor whiteColor] colorWithAlphaComponent:0.12f].CGColor;
+    [_virtualControlsEditingCollapseButton addTarget:self action:@selector(handleVirtualControlsCollapseToolbarTapped:) forControlEvents:UIControlEventTouchUpInside];
+    [_virtualControlsEditingToolbarView addSubview:_virtualControlsEditingCollapseButton];
+
+    _virtualControlsEditingExitButton = [UIButton buttonWithType:UIButtonTypeSystem];
+    [_virtualControlsEditingExitButton setTitle:StreamMenuLocalized(@"stream.virtual_controls.exit") forState:UIControlStateNormal];
+    _virtualControlsEditingExitButton.titleLabel.font = [UIFont systemFontOfSize:13.0f weight:UIFontWeightSemibold];
+    [_virtualControlsEditingExitButton setTitleColor:[UIColor whiteColor] forState:UIControlStateNormal];
+    _virtualControlsEditingExitButton.backgroundColor = [[UIColor whiteColor] colorWithAlphaComponent:0.10f];
+    _virtualControlsEditingExitButton.layer.cornerRadius = 11.0f;
+    _virtualControlsEditingExitButton.layer.borderWidth = 1.0f;
+    _virtualControlsEditingExitButton.layer.borderColor = [[UIColor whiteColor] colorWithAlphaComponent:0.12f].CGColor;
+    [_virtualControlsEditingExitButton addTarget:self action:@selector(handleVirtualControlsExitEditingTapped:) forControlEvents:UIControlEventTouchUpInside];
+    [_virtualControlsEditingToolbarView addSubview:_virtualControlsEditingExitButton];
+
+    _virtualControlsEditingResetButton = [UIButton buttonWithType:UIButtonTypeSystem];
+    [_virtualControlsEditingResetButton setTitle:StreamMenuLocalized(@"settings.reset.button") forState:UIControlStateNormal];
+    _virtualControlsEditingResetButton.titleLabel.font = [UIFont systemFontOfSize:13.0f weight:UIFontWeightSemibold];
+    [_virtualControlsEditingResetButton setTitleColor:[UIColor whiteColor] forState:UIControlStateNormal];
+    _virtualControlsEditingResetButton.backgroundColor = [[UIColor whiteColor] colorWithAlphaComponent:0.10f];
+    _virtualControlsEditingResetButton.layer.cornerRadius = 11.0f;
+    _virtualControlsEditingResetButton.layer.borderWidth = 1.0f;
+    _virtualControlsEditingResetButton.layer.borderColor = [[UIColor whiteColor] colorWithAlphaComponent:0.12f].CGColor;
+    [_virtualControlsEditingResetButton addTarget:self action:@selector(handleVirtualControlsResetEditingTapped:) forControlEvents:UIControlEventTouchUpInside];
+    [_virtualControlsEditingToolbarView addSubview:_virtualControlsEditingResetButton];
+
+    _virtualControlsEditingDoneButton = [UIButton buttonWithType:UIButtonTypeSystem];
+    [_virtualControlsEditingDoneButton setTitle:StreamMenuLocalized(@"stream.virtual_buttons.save") forState:UIControlStateNormal];
+    _virtualControlsEditingDoneButton.titleLabel.font = [UIFont systemFontOfSize:13.0f weight:UIFontWeightSemibold];
+    [_virtualControlsEditingDoneButton setTitleColor:[UIColor whiteColor] forState:UIControlStateNormal];
+    _virtualControlsEditingDoneButton.backgroundColor = [[UIColor colorWithRed:0.50f green:0.45f blue:0.94f alpha:1.0f] colorWithAlphaComponent:0.92f];
+    _virtualControlsEditingDoneButton.layer.cornerRadius = 11.0f;
+    [_virtualControlsEditingDoneButton addTarget:self action:@selector(handleVirtualControlsDoneEditingTapped:) forControlEvents:UIControlEventTouchUpInside];
+    [_virtualControlsEditingToolbarView addSubview:_virtualControlsEditingDoneButton];
+
+    [self.view addSubview:_virtualControlsEditingToolbarView];
+}
+
+- (void)layoutVirtualControlsEditingToolbarForCurrentBounds {
+    if (_virtualControlsEditingToolbarView == nil || _virtualControlsEditingToolbarView.hidden) {
+        return;
+    }
+
+    CGRect bounds = self.view.bounds;
+    UIEdgeInsets safeInsets = UIEdgeInsetsZero;
+    if (@available(iOS 11.0, *)) {
+        safeInsets = self.view.safeAreaInsets;
+    }
+
+    CGFloat buttonHeight = 32.0f;
+    CGFloat collapseButtonWidth = 32.0f;
+    CGFloat horizontalPadding = 10.0f;
+    CGFloat verticalPadding = 10.0f;
+    CGFloat spacing = 8.0f;
+    CGFloat exitWidth = MAX(72.0f, ceil([_virtualControlsEditingExitButton sizeThatFits:CGSizeMake(CGFLOAT_MAX, buttonHeight)].width) + 28.0f);
+    CGFloat resetWidth = MAX(72.0f, ceil([_virtualControlsEditingResetButton sizeThatFits:CGSizeMake(CGFLOAT_MAX, buttonHeight)].width) + 28.0f);
+    CGFloat doneWidth = MAX(72.0f, ceil([_virtualControlsEditingDoneButton sizeThatFits:CGSizeMake(CGFLOAT_MAX, buttonHeight)].width) + 28.0f);
+    CGFloat toolbarWidth = 0.0f;
+    CGFloat toolbarHeight = verticalPadding * 2.0f + buttonHeight;
+    if (_virtualControlsEditingToolbarCollapsed) {
+        toolbarWidth = horizontalPadding * 2.0f + collapseButtonWidth;
+    }
+    else {
+        toolbarWidth = horizontalPadding * 2.0f + collapseButtonWidth + spacing + exitWidth + spacing + resetWidth + spacing + doneWidth;
+    }
+    CGFloat x = CGRectGetWidth(bounds) - safeInsets.right - toolbarWidth - 12.0f;
+    CGFloat y = safeInsets.top + 12.0f;
+
+    _virtualControlsEditingToolbarView.frame = CGRectMake(MAX(x, 12.0f),
+                                                          y,
+                                                          toolbarWidth,
+                                                          toolbarHeight);
+    _virtualControlsEditingCollapseButton.frame = CGRectMake(horizontalPadding,
+                                                             verticalPadding,
+                                                             collapseButtonWidth,
+                                                             buttonHeight);
+    if (@available(iOS 13.0, *)) {
+        NSString *symbolName = _virtualControlsEditingToolbarCollapsed ? @"chevron.left" : @"chevron.right";
+        [_virtualControlsEditingCollapseButton setImage:[UIImage systemImageNamed:symbolName] forState:UIControlStateNormal];
+    }
+
+    BOOL expanded = !_virtualControlsEditingToolbarCollapsed;
+    _virtualControlsEditingExitButton.hidden = !expanded;
+    _virtualControlsEditingResetButton.hidden = !expanded;
+    _virtualControlsEditingDoneButton.hidden = !expanded;
+    if (!expanded) {
+        return;
+    }
+
+    CGFloat cursorX = CGRectGetMaxX(_virtualControlsEditingCollapseButton.frame) + spacing;
+    _virtualControlsEditingExitButton.frame = CGRectMake(cursorX,
+                                                         verticalPadding,
+                                                         exitWidth,
+                                                         buttonHeight);
+    cursorX = CGRectGetMaxX(_virtualControlsEditingExitButton.frame) + spacing;
+    _virtualControlsEditingResetButton.frame = CGRectMake(cursorX,
+                                                          verticalPadding,
+                                                          resetWidth,
+                                                          buttonHeight);
+    cursorX = CGRectGetMaxX(_virtualControlsEditingResetButton.frame) + spacing;
+    _virtualControlsEditingDoneButton.frame = CGRectMake(cursorX,
+                                                         verticalPadding,
+                                                         doneWidth,
+                                                         buttonHeight);
+}
+
+- (void)refreshVirtualControlsEditingToolbarIfNeeded {
+    [self installVirtualControlsEditingToolbarIfNeeded];
+
+    BOOL shouldShow = [self isAnyVirtualControlsEditingActive];
+    _virtualControlsEditingToolbarView.hidden = !shouldShow;
+    if (!shouldShow) {
+        return;
+    }
+
+    [self.view bringSubviewToFront:_virtualControlsEditingToolbarView];
+    [self layoutVirtualControlsEditingToolbarForCurrentBounds];
+}
+
+- (void)beginVirtualButtonsEditingSessionIfNeeded {
+    if (_virtualButtonsEditingSessionActive || _streamView == nil) {
+        return;
+    }
+
+    _virtualButtonsEditingSessionActive = YES;
+    _virtualButtonsEditingPreviousVisibility = [_streamView isTemporaryVirtualButtonsVisible];
+    _virtualControlsEditingToolbarCollapsed = NO;
+}
+
+- (void)beginVirtualGamepadEditingSessionIfNeeded {
+    if (_virtualGamepadEditingSessionActive || _streamView == nil) {
+        return;
+    }
+
+    _virtualGamepadEditingSessionActive = YES;
+    _virtualGamepadEditingPreviousVisibility = [_streamView isTemporaryVirtualGamepadVisible];
+    _virtualControlsEditingToolbarCollapsed = NO;
+}
+
+- (void)enterVirtualButtonsEditingMode {
+    if (_streamView == nil) {
+        return;
+    }
+
+    [self beginVirtualButtonsEditingSessionIfNeeded];
+    [_streamView setTemporaryVirtualButtonsEditingEnabled:YES];
+    [_streamView setTemporaryVirtualButtonsVisible:YES];
+    [self refreshVirtualButtonsPanelIfNeeded];
+    [self refreshVirtualButtonEditorForCurrentSelection];
+    [self refreshVirtualControlsEditingToolbarIfNeeded];
+    [self updateStreamOverlayMouseInputSuppression];
+}
+
+- (void)enterVirtualGamepadEditingMode {
+    if (_streamView == nil) {
+        return;
+    }
+
+    [self beginVirtualGamepadEditingSessionIfNeeded];
+    [_streamView setTemporaryVirtualGamepadEditingEnabled:YES];
+    [_streamView setTemporaryVirtualGamepadVisible:YES];
+    [self refreshVirtualButtonEditorForCurrentSelection];
+    [self refreshVirtualControlsEditingToolbarIfNeeded];
+    [self updateStreamOverlayMouseInputSuppression];
+}
+
+- (void)finishVirtualButtonsEditingModeRestoringPreviousVisibility:(BOOL)restorePreviousVisibility {
+    if (_streamView == nil) {
+        _virtualButtonsEditingSessionActive = NO;
+        return;
+    }
+
+    BOOL targetVisible = restorePreviousVisibility ? _virtualButtonsEditingPreviousVisibility : [_streamView isTemporaryVirtualButtonsVisible];
+    [_streamView setTemporaryVirtualButtonsEditingEnabled:NO];
+    [_streamView setTemporaryVirtualButtonsVisible:targetVisible];
+    _selectedVirtualButtonIdentifier = nil;
+    _virtualButtonEditorView.hidden = YES;
+    _virtualButtonsEditingSessionActive = NO;
+    [self refreshVirtualButtonsPanelIfNeeded];
+    [self refreshVirtualButtonEditorForCurrentSelection];
+    [self refreshVirtualControlsEditingToolbarIfNeeded];
+    [self updateStreamOverlayMouseInputSuppression];
+}
+
+- (void)finishVirtualGamepadEditingModeRestoringPreviousVisibility:(BOOL)restorePreviousVisibility {
+    if (_streamView == nil) {
+        _virtualGamepadEditingSessionActive = NO;
+        return;
+    }
+
+    BOOL targetVisible = restorePreviousVisibility ? _virtualGamepadEditingPreviousVisibility : [_streamView isTemporaryVirtualGamepadVisible];
+    [_streamView setTemporaryVirtualGamepadEditingEnabled:NO];
+    [_streamView setTemporaryVirtualGamepadVisible:targetVisible];
+    _selectedVirtualGamepadIdentifier = nil;
+    _virtualButtonEditorView.hidden = YES;
+    _virtualGamepadEditingSessionActive = NO;
+    [self refreshVirtualButtonEditorForCurrentSelection];
+    [self refreshVirtualControlsEditingToolbarIfNeeded];
+    [self updateStreamOverlayMouseInputSuppression];
+}
+
+- (void)handleVirtualControlsDoneEditingTapped:(UIButton *)sender {
+    (void)sender;
+
+    [self applyVirtualButtonEditorValuesToSelectedItem];
+
+    BOOL handled = NO;
+    if ([self isVirtualButtonsEditingActive]) {
+        [self finishVirtualButtonsEditingModeRestoringPreviousVisibility:NO];
+        handled = YES;
+    }
+    if ([self isVirtualGamepadEditingActive]) {
+        [self finishVirtualGamepadEditingModeRestoringPreviousVisibility:NO];
+        handled = YES;
+    }
+    if (handled) {
+        [self showTemporaryTipText:StreamMenuLocalized(@"stream.virtual_buttons.save")];
+    }
+}
+
+- (void)handleVirtualControlsExitEditingTapped:(UIButton *)sender {
+    (void)sender;
+
+    BOOL handled = NO;
+    if ([self isVirtualButtonsEditingActive]) {
+        [self finishVirtualButtonsEditingModeRestoringPreviousVisibility:YES];
+        handled = YES;
+    }
+    if ([self isVirtualGamepadEditingActive]) {
+        [self finishVirtualGamepadEditingModeRestoringPreviousVisibility:YES];
+        handled = YES;
+    }
+    if (handled) {
+        [self showTemporaryTipText:StreamMenuLocalized(@"stream.virtual_controls.exit")];
+    }
+}
+
+- (void)handleVirtualControlsCollapseToolbarTapped:(UIButton *)sender {
+    (void)sender;
+
+    _virtualControlsEditingToolbarCollapsed = !_virtualControlsEditingToolbarCollapsed;
+    [self layoutVirtualControlsEditingToolbarForCurrentBounds];
+}
+
+- (void)resetCurrentVirtualButtonsLayoutToDefaults {
+    _virtualButtonDefinitions = [[self defaultVirtualButtonDefinitions] mutableCopy];
+    _selectedVirtualButtonIdentifier = nil;
+    _virtualButtonEditorView.hidden = YES;
+    [self applyVirtualButtonDefinitionsToStreamView];
+    [self persistCurrentVirtualButtonScheme];
+    [self refreshVirtualButtonsPanelIfNeeded];
+    [self refreshVirtualButtonEditorForCurrentSelection];
+    [self refreshVirtualControlsEditingToolbarIfNeeded];
+}
+
+- (void)resetCurrentVirtualGamepadLayoutToDefaults {
+    _virtualGamepadDefinitions = [[self defaultVirtualGamepadDefinitionsForPortrait:_currentSessionVirtualGamepadLayoutPortrait] mutableCopy];
+    _selectedVirtualGamepadIdentifier = nil;
+    _virtualButtonEditorView.hidden = YES;
+    [self applyVirtualGamepadDefinitionsToStreamView];
+    [self persistCurrentVirtualGamepadScheme];
+    [self refreshVirtualButtonEditorForCurrentSelection];
+    [self refreshVirtualControlsEditingToolbarIfNeeded];
+}
+
+- (void)handleVirtualControlsResetEditingTapped:(UIButton *)sender {
+    (void)sender;
+
+    BOOL handled = NO;
+    if ([self isVirtualButtonsEditingActive]) {
+        [self resetCurrentVirtualButtonsLayoutToDefaults];
+        handled = YES;
+    }
+    if ([self isVirtualGamepadEditingActive]) {
+        [self resetCurrentVirtualGamepadLayoutToDefaults];
+        handled = YES;
+    }
+    if (handled) {
+        [self showTemporaryTipText:StreamMenuLocalized(@"settings.reset.button")];
+    }
 }
 
 - (void)installVirtualButtonEditorIfNeeded {
@@ -2460,6 +3133,7 @@ static const NSInteger kStreamPerformanceOverlayPositionCustom = 6;
     NSDictionary *definition = editingVirtualButtons ? [self selectedVirtualButtonDefinition] : (editingVirtualGamepad ? [self selectedVirtualGamepadDefinition] : nil);
     if ((!editingVirtualButtons && !editingVirtualGamepad) || definition == nil) {
         _virtualButtonEditorView.hidden = YES;
+        [self refreshVirtualControlsEditingToolbarIfNeeded];
         [self updateStreamOverlayMouseInputSuppression];
         return;
     }
@@ -2494,6 +3168,7 @@ static const NSInteger kStreamPerformanceOverlayPositionCustom = 6;
     _virtualButtonEditorTouchSensitivityYValueLabel.text = [NSString stringWithFormat:@"%.0f%%", _virtualButtonEditorTouchSensitivityYSlider.value * 100.0f];
     _virtualButtonEditorView.hidden = NO;
     [self.view bringSubviewToFront:_virtualButtonEditorView];
+    [self refreshVirtualControlsEditingToolbarIfNeeded];
     [self layoutVirtualButtonEditorForCurrentBounds];
     [self updateStreamOverlayMouseInputSuppression];
 }
@@ -2886,14 +3561,12 @@ static const NSInteger kStreamPerformanceOverlayPositionCustom = 6;
     }
 
     if ([identifier isEqualToString:@"manage_virtual_gamepad"] && self->_streamView != nil) {
-        [self->_streamView setTemporaryVirtualGamepadEditingEnabled:![self->_streamView isTemporaryVirtualGamepadEditingEnabled]];
         if ([self->_streamView isTemporaryVirtualGamepadEditingEnabled]) {
-            [self->_streamView setTemporaryVirtualGamepadVisible:YES];
-            [self showTemporaryTipText:StreamMenuLocalized(@"stream.menu.manage_virtual_gamepad.tip")];
+            [self finishVirtualGamepadEditingModeRestoringPreviousVisibility:NO];
         }
         else {
-            self->_selectedVirtualGamepadIdentifier = nil;
-            self->_virtualButtonEditorView.hidden = YES;
+            [self enterVirtualGamepadEditingMode];
+            [self showTemporaryTipText:StreamMenuLocalized(@"stream.menu.manage_virtual_gamepad.tip")];
         }
         [self refreshVirtualButtonEditorForCurrentSelection];
         [self updateStreamOverlayMouseInputSuppression];
@@ -2926,6 +3599,10 @@ static const NSInteger kStreamPerformanceOverlayPositionCustom = 6;
 }
 
 - (void) startHUD {
+    if (self->_statsUpdateTimer != nil) {
+        return;
+    }
+
     self->_statsUpdateTimer = [NSTimer scheduledTimerWithTimeInterval:1.0f
                                                                target:self
                                                              selector:@selector(updateStatsOverlay)
@@ -2948,11 +3625,7 @@ static const NSInteger kStreamPerformanceOverlayPositionCustom = 6;
 #endif
         
         if (self->_settings.statsOverlay) {
-            self->_statsUpdateTimer = [NSTimer scheduledTimerWithTimeInterval:1.0f
-                                                                       target:self
-                                                                     selector:@selector(updateStatsOverlay)
-                                                                     userInfo:nil
-                                                                      repeats:YES];
+            [self startHUD];
         }
     });
 }
@@ -3402,6 +4075,11 @@ static const NSInteger kStreamPerformanceOverlayPositionCustom = 6;
     [self applyVideoAlignmentMarginToCurrentSession:(CGFloat)margin];
 }
 
+- (void)streamActionSheetHostingViewController:(StreamActionSheetHostingViewController *)controller didChangeStatsOverlayEnabled:(BOOL)enabled {
+    (void)controller;
+    [self applyPerformanceOverlayEnabledToCurrentSession:enabled];
+}
+
 - (void)streamActionSheetHostingViewController:(StreamActionSheetHostingViewController *)controller didChangeExtendedPerformanceMetricsEnabled:(BOOL)enabled {
     (void)controller;
     [self applyExtendedPerformanceMetricsEnabled:enabled];
@@ -3549,9 +4227,8 @@ static const NSInteger kStreamPerformanceOverlayPositionCustom = 6;
 }
 
 - (void)streamVirtualButtonsPanelHostingViewController:(StreamVirtualButtonsPanelHostingViewController *)controller didChangeEditingEnabled:(BOOL)enabled {
-    [_streamView setTemporaryVirtualButtonsEditingEnabled:enabled];
     if (enabled) {
-        [_streamView setTemporaryVirtualButtonsVisible:YES];
+        [self enterVirtualButtonsEditingMode];
         _streamVirtualButtonsPanelHostingViewController = nil;
         [controller dismissViewControllerAnimated:YES completion:^{
             [self updateStreamOverlayMouseInputSuppression];
@@ -3559,8 +4236,7 @@ static const NSInteger kStreamPerformanceOverlayPositionCustom = 6;
         [self showTemporaryTipText:StreamMenuLocalized(@"stream.virtual_buttons.editing_tip")];
     }
     else {
-        _selectedVirtualButtonIdentifier = nil;
-        _virtualButtonEditorView.hidden = YES;
+        [self finishVirtualButtonsEditingModeRestoringPreviousVisibility:NO];
     }
     [self refreshVirtualButtonsPanelIfNeeded];
     [self refreshVirtualButtonEditorForCurrentSelection];
@@ -3730,7 +4406,9 @@ static const NSInteger kStreamPerformanceOverlayPositionCustom = 6;
         return;
     }
 
-    _virtualGamepadDefinitions = [descriptors mutableCopy];
+    _virtualGamepadDefinitions = [[self normalizedVirtualGamepadDefinitions:descriptors
+                                                                   portrait:_currentSessionVirtualGamepadLayoutPortrait
+                                                                  didMutate:NULL] mutableCopy];
     [self refreshVirtualButtonEditorForCurrentSelection];
     [self persistCurrentVirtualGamepadScheme];
 }

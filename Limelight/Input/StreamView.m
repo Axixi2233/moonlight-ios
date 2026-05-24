@@ -953,6 +953,7 @@ typedef NS_OPTIONS(NSUInteger, StreamVirtualDirectionMask) {
     if ([role isEqualToString:@"y"]) return Y_FLAG;
     if ([role isEqualToString:@"select"]) return BACK_FLAG;
     if ([role isEqualToString:@"start"]) return PLAY_FLAG;
+    if ([role isEqualToString:@"special"] || [role isEqualToString:@"guide"] || [role isEqualToString:@"xbox"]) return SPECIAL_FLAG;
     if ([role isEqualToString:@"l1"]) return LB_FLAG;
     if ([role isEqualToString:@"r1"]) return RB_FLAG;
     if ([role isEqualToString:@"l3"]) return LS_CLK_FLAG;
@@ -976,9 +977,22 @@ typedef NS_OPTIONS(NSUInteger, StreamVirtualDirectionMask) {
     BOOL isCircle = [self isCircularVirtualGamepadDescriptor:descriptor];
     NSString *role = descriptor[@"role"];
     NSString *title = descriptor[@"title"] ?: @"";
+    NSString *systemImageName = descriptor[@"systemImage"];
+    if (![systemImageName isKindOfClass:[NSString class]] || systemImageName.length == 0) {
+        if ([role isEqualToString:@"select"]) {
+            systemImageName = @"square.on.circle";
+        }
+        else if ([role isEqualToString:@"start"]) {
+            systemImageName = @"line.3.horizontal.circle";
+        }
+        else if ([role isEqualToString:@"special"] || [role isEqualToString:@"guide"] || [role isEqualToString:@"xbox"]) {
+            systemImageName = @"xbox.logo";
+        }
+    }
     BOOL isSelected = selectedVirtualGamepadIdentifier != nil && [selectedVirtualGamepadIdentifier isEqualToString:descriptor[@"id"]];
     NSNumber *opacityNumber = descriptor[@"opacity"];
     CGFloat buttonOpacity = MIN(MAX(opacityNumber != nil ? opacityNumber.doubleValue : 0.52, 0.05), 1.0);
+    UIColor *foregroundColor = [[UIColor whiteColor] colorWithAlphaComponent:(0.28f + 0.72f * buttonOpacity)];
     button.bounds = CGRectMake(0, 0, size.width, size.height);
     button.layer.cornerRadius = isCircle ? size.width * 0.5f : MIN(size.height * 0.34f, 18.0f);
     button.layer.borderWidth = temporaryVirtualGamepadEditingEnabled ? (isSelected ? 2.0f : 1.3f) : 1.1f;
@@ -988,12 +1002,37 @@ typedef NS_OPTIONS(NSUInteger, StreamVirtualDirectionMask) {
     button.backgroundColor = temporaryVirtualGamepadEditingEnabled ?
         (isSelected ? [UIColor colorWithRed:0.18 green:0.18 blue:0.24 alpha:0.92] : [[UIColor blackColor] colorWithAlphaComponent:buttonOpacity]) :
         [[UIColor blackColor] colorWithAlphaComponent:(0.10f + 0.58f * buttonOpacity)];
-    [button setTitle:title forState:UIControlStateNormal];
-    [button setTitleColor:[[UIColor whiteColor] colorWithAlphaComponent:(0.28f + 0.72f * buttonOpacity)] forState:UIControlStateNormal];
+    UIImage *symbolImage = nil;
+    if (@available(iOS 13.0, *)) {
+        if ([systemImageName isKindOfClass:[NSString class]] && systemImageName.length > 0) {
+            CGFloat pointSize = isCircle ? MIN(size.width, size.height) * 0.46f : 16.0f;
+            UIImageSymbolConfiguration *configuration = [UIImageSymbolConfiguration configurationWithPointSize:pointSize weight:UIImageSymbolWeightSemibold];
+            symbolImage = [UIImage systemImageNamed:systemImageName withConfiguration:configuration];
+            if (symbolImage == nil && ([role isEqualToString:@"special"] || [role isEqualToString:@"guide"] || [role isEqualToString:@"xbox"])) {
+                symbolImage = [UIImage systemImageNamed:@"x.circle" withConfiguration:configuration];
+            }
+        }
+    }
+
+    if (symbolImage != nil) {
+        [button setTitle:nil forState:UIControlStateNormal];
+        [button setImage:symbolImage forState:UIControlStateNormal];
+        button.tintColor = foregroundColor;
+        button.contentEdgeInsets = UIEdgeInsetsZero;
+        button.imageView.contentMode = UIViewContentModeScaleAspectFit;
+        button.accessibilityLabel = title;
+    }
+    else {
+        [button setImage:nil forState:UIControlStateNormal];
+        [button setTitle:title forState:UIControlStateNormal];
+        [button setTitleColor:foregroundColor forState:UIControlStateNormal];
+        button.contentEdgeInsets = isCircle ? UIEdgeInsetsZero : UIEdgeInsetsMake(8.0f, 12.0f, 8.0f, 12.0f);
+        button.accessibilityLabel = title;
+    }
+
     button.titleLabel.font = [UIFont systemFontOfSize:(isCircle ? 15.0f : 13.0f) weight:UIFontWeightSemibold];
     button.titleLabel.adjustsFontSizeToFitWidth = YES;
     button.titleLabel.minimumScaleFactor = 0.60f;
-    button.contentEdgeInsets = isCircle ? UIEdgeInsetsZero : UIEdgeInsetsMake(8.0f, 12.0f, 8.0f, 12.0f);
     button.imageView.alpha = 0.28f + 0.72f * buttonOpacity;
     button.titleLabel.alpha = 0.28f + 0.72f * buttonOpacity;
 
@@ -1152,20 +1191,9 @@ typedef NS_OPTIONS(NSUInteger, StreamVirtualDirectionMask) {
     }
 
     virtualGamepadContainerView.frame = self.bounds;
-    CGFloat safeTop = 0.0f;
-    CGFloat safeBottom = 0.0f;
-    CGFloat safeLeft = 0.0f;
-    CGFloat safeRight = 0.0f;
-    if (@available(iOS 11.0, *)) {
-        safeTop = self.safeAreaInsets.top;
-        safeBottom = self.safeAreaInsets.bottom;
-        safeLeft = self.safeAreaInsets.left;
-        safeRight = self.safeAreaInsets.right;
-    }
-
     BOOL portrait = CGRectGetHeight(self.bounds) >= CGRectGetWidth(self.bounds);
-    CGFloat availableWidth = CGRectGetWidth(self.bounds) - safeLeft - safeRight;
-    CGFloat availableHeight = CGRectGetHeight(self.bounds) - safeTop - safeBottom;
+    CGFloat availableWidth = CGRectGetWidth(self.bounds);
+    CGFloat availableHeight = CGRectGetHeight(self.bounds);
 
     CGPoint (^defaultGamepadCenter)(NSDictionary<NSString *, id> *, CGSize, CGFloat, CGFloat, CGFloat, CGFloat) =
     ^CGPoint(NSDictionary<NSString *, id> *descriptor, CGSize size, CGFloat minCenterX, CGFloat maxCenterX, CGFloat minCenterY, CGFloat maxCenterY) {
@@ -1237,10 +1265,10 @@ typedef NS_OPTIONS(NSUInteger, StreamVirtualDirectionMask) {
             return;
         }
         CGSize size = [self virtualGamepadSizeForDescriptor:descriptor];
-        CGFloat minCenterX = safeLeft + 12.0f + size.width * 0.5f;
-        CGFloat maxCenterX = CGRectGetWidth(self.bounds) - safeRight - 12.0f - size.width * 0.5f;
-        CGFloat minCenterY = safeTop + 12.0f + size.height * 0.5f;
-        CGFloat maxCenterY = CGRectGetHeight(self.bounds) - safeBottom - 20.0f - size.height * 0.5f;
+        CGFloat minCenterX = 12.0f + size.width * 0.5f;
+        CGFloat maxCenterX = CGRectGetWidth(self.bounds) - 12.0f - size.width * 0.5f;
+        CGFloat minCenterY = 12.0f + size.height * 0.5f;
+        CGFloat maxCenterY = CGRectGetHeight(self.bounds) - 20.0f - size.height * 0.5f;
         CGFloat widthRange = MAX(maxCenterX - minCenterX, 0.0f);
         CGFloat heightRange = MAX(maxCenterY - minCenterY, 0.0f);
         CGFloat xRatio = MIN(MAX([descriptor[@"xRatio"] doubleValue], 0.0), 1.0);
@@ -1389,21 +1417,10 @@ typedef NS_OPTIONS(NSUInteger, StreamVirtualDirectionMask) {
     if (gestureRecognizer.state == UIGestureRecognizerStateChanged || gestureRecognizer.state == UIGestureRecognizerStateEnded) {
         CGFloat controlWidth = CGRectGetWidth(control.bounds);
         CGFloat controlHeight = CGRectGetHeight(control.bounds);
-        CGFloat safeTop = 0.0f;
-        CGFloat safeBottom = 0.0f;
-        CGFloat safeLeft = 0.0f;
-        CGFloat safeRight = 0.0f;
-        if (@available(iOS 11.0, *)) {
-            safeTop = self.safeAreaInsets.top;
-            safeBottom = self.safeAreaInsets.bottom;
-            safeLeft = self.safeAreaInsets.left;
-            safeRight = self.safeAreaInsets.right;
-        }
-
-        CGFloat minCenterX = safeLeft + 12.0f + controlWidth * 0.5f;
-        CGFloat maxCenterX = CGRectGetWidth(self.bounds) - safeRight - 12.0f - controlWidth * 0.5f;
-        CGFloat minCenterY = safeTop + 12.0f + controlHeight * 0.5f;
-        CGFloat maxCenterY = CGRectGetHeight(self.bounds) - safeBottom - 20.0f - controlHeight * 0.5f;
+        CGFloat minCenterX = 12.0f + controlWidth * 0.5f;
+        CGFloat maxCenterX = CGRectGetWidth(self.bounds) - 12.0f - controlWidth * 0.5f;
+        CGFloat minCenterY = 12.0f + controlHeight * 0.5f;
+        CGFloat maxCenterY = CGRectGetHeight(self.bounds) - 20.0f - controlHeight * 0.5f;
 
         CGPoint center = CGPointMake(location.x + touchOffset.x, location.y + touchOffset.y);
         center.x = MIN(MAX(center.x, minCenterX), maxCenterX);
@@ -1432,21 +1449,10 @@ typedef NS_OPTIONS(NSUInteger, StreamVirtualDirectionMask) {
         return;
     }
 
-    CGFloat safeTop = 0.0f;
-    CGFloat safeBottom = 0.0f;
-    CGFloat safeLeft = 0.0f;
-    CGFloat safeRight = 0.0f;
-    if (@available(iOS 11.0, *)) {
-        safeTop = self.safeAreaInsets.top;
-        safeBottom = self.safeAreaInsets.bottom;
-        safeLeft = self.safeAreaInsets.left;
-        safeRight = self.safeAreaInsets.right;
-    }
-
-    CGFloat minCenterX = safeLeft + 12.0f + controlSize.width * 0.5f;
-    CGFloat maxCenterX = CGRectGetWidth(self.bounds) - safeRight - 12.0f - controlSize.width * 0.5f;
-    CGFloat minCenterY = safeTop + 12.0f + controlSize.height * 0.5f;
-    CGFloat maxCenterY = CGRectGetHeight(self.bounds) - safeBottom - 20.0f - controlSize.height * 0.5f;
+    CGFloat minCenterX = 12.0f + controlSize.width * 0.5f;
+    CGFloat maxCenterX = CGRectGetWidth(self.bounds) - 12.0f - controlSize.width * 0.5f;
+    CGFloat minCenterY = 12.0f + controlSize.height * 0.5f;
+    CGFloat maxCenterY = CGRectGetHeight(self.bounds) - 20.0f - controlSize.height * 0.5f;
     CGFloat widthRange = MAX(maxCenterX - minCenterX, 1.0f);
     CGFloat heightRange = MAX(maxCenterY - minCenterY, 1.0f);
     CGFloat xRatio = MIN(MAX((center.x - minCenterX) / widthRange, 0.0f), 1.0f);
@@ -1981,17 +1987,6 @@ typedef NS_OPTIONS(NSUInteger, StreamVirtualDirectionMask) {
     NSInteger columnCount = 2;
     NSInteger rowCount = (NSInteger)ceil((double)virtualButtons.count / (double)columnCount);
 
-    CGFloat safeTop = 0.0f;
-    CGFloat safeBottom = 0.0f;
-    CGFloat safeLeft = 0.0f;
-    CGFloat safeRight = 0.0f;
-    if (@available(iOS 11.0, *)) {
-        safeTop = self.safeAreaInsets.top;
-        safeBottom = self.safeAreaInsets.bottom;
-        safeLeft = self.safeAreaInsets.left;
-        safeRight = self.safeAreaInsets.right;
-    }
-
     virtualButtonsContainerView.frame = self.bounds;
 
     [virtualButtons enumerateObjectsUsingBlock:^(UIView *button, NSUInteger idx, BOOL *stop) {
@@ -1999,10 +1994,10 @@ typedef NS_OPTIONS(NSUInteger, StreamVirtualDirectionMask) {
         CGSize buttonSize = [self virtualButtonSizeForDescriptor:descriptor ?: @{}];
         CGFloat buttonWidth = buttonSize.width;
         CGFloat buttonHeight = buttonSize.height;
-        CGFloat minCenterX = safeLeft + 12.0f + buttonWidth * 0.5f;
-        CGFloat maxCenterX = CGRectGetWidth(self.bounds) - safeRight - 12.0f - buttonWidth * 0.5f;
-        CGFloat minCenterY = safeTop + 12.0f + buttonHeight * 0.5f;
-        CGFloat maxCenterY = CGRectGetHeight(self.bounds) - safeBottom - 20.0f - buttonHeight * 0.5f;
+        CGFloat minCenterX = 12.0f + buttonWidth * 0.5f;
+        CGFloat maxCenterX = CGRectGetWidth(self.bounds) - 12.0f - buttonWidth * 0.5f;
+        CGFloat minCenterY = 12.0f + buttonHeight * 0.5f;
+        CGFloat maxCenterY = CGRectGetHeight(self.bounds) - 20.0f - buttonHeight * 0.5f;
 
         CGFloat centerX = 0.0f;
         CGFloat centerY = 0.0f;
@@ -2017,8 +2012,8 @@ typedef NS_OPTIONS(NSUInteger, StreamVirtualDirectionMask) {
             NSInteger column = (NSInteger)idx % columnCount;
             CGFloat containerWidth = columnCount * defaultButtonWidth + (columnCount - 1) * horizontalSpacing;
             CGFloat containerHeight = rowCount * defaultButtonHeight + MAX(rowCount - 1, 0) * verticalSpacing;
-            CGFloat originX = MAX(safeLeft + 12.0f, CGRectGetWidth(self.bounds) - safeRight - 16.0f - containerWidth) + column * (defaultButtonWidth + horizontalSpacing);
-            CGFloat originY = MAX(safeTop + 12.0f, CGRectGetHeight(self.bounds) - safeBottom - 24.0f - containerHeight) + row * (defaultButtonHeight + verticalSpacing);
+            CGFloat originX = MAX(12.0f, CGRectGetWidth(self.bounds) - 16.0f - containerWidth) + column * (defaultButtonWidth + horizontalSpacing);
+            CGFloat originY = MAX(12.0f, CGRectGetHeight(self.bounds) - 24.0f - containerHeight) + row * (defaultButtonHeight + verticalSpacing);
             centerX = originX + buttonWidth * 0.5f;
             centerY = originY + buttonHeight * 0.5f;
             [self updateVirtualButtonDescriptorAtIndex:idx center:CGPointMake(centerX, centerY) buttonSize:CGSizeMake(buttonWidth, buttonHeight) notify:NO];
@@ -2210,21 +2205,10 @@ typedef NS_OPTIONS(NSUInteger, StreamVirtualDirectionMask) {
     if (gestureRecognizer.state == UIGestureRecognizerStateChanged || gestureRecognizer.state == UIGestureRecognizerStateEnded) {
         CGFloat buttonWidth = CGRectGetWidth(button.bounds);
         CGFloat buttonHeight = CGRectGetHeight(button.bounds);
-        CGFloat safeTop = 0.0f;
-        CGFloat safeBottom = 0.0f;
-        CGFloat safeLeft = 0.0f;
-        CGFloat safeRight = 0.0f;
-        if (@available(iOS 11.0, *)) {
-            safeTop = self.safeAreaInsets.top;
-            safeBottom = self.safeAreaInsets.bottom;
-            safeLeft = self.safeAreaInsets.left;
-            safeRight = self.safeAreaInsets.right;
-        }
-
-        CGFloat minCenterX = safeLeft + 12.0f + buttonWidth * 0.5f;
-        CGFloat maxCenterX = CGRectGetWidth(self.bounds) - safeRight - 12.0f - buttonWidth * 0.5f;
-        CGFloat minCenterY = safeTop + 12.0f + buttonHeight * 0.5f;
-        CGFloat maxCenterY = CGRectGetHeight(self.bounds) - safeBottom - 20.0f - buttonHeight * 0.5f;
+        CGFloat minCenterX = 12.0f + buttonWidth * 0.5f;
+        CGFloat maxCenterX = CGRectGetWidth(self.bounds) - 12.0f - buttonWidth * 0.5f;
+        CGFloat minCenterY = 12.0f + buttonHeight * 0.5f;
+        CGFloat maxCenterY = CGRectGetHeight(self.bounds) - 20.0f - buttonHeight * 0.5f;
 
         CGPoint center = CGPointMake(button.center.x + translation.x, button.center.y + translation.y);
         center.x = MIN(MAX(center.x, minCenterX), maxCenterX);
@@ -2245,21 +2229,10 @@ typedef NS_OPTIONS(NSUInteger, StreamVirtualDirectionMask) {
         return;
     }
 
-    CGFloat safeTop = 0.0f;
-    CGFloat safeBottom = 0.0f;
-    CGFloat safeLeft = 0.0f;
-    CGFloat safeRight = 0.0f;
-    if (@available(iOS 11.0, *)) {
-        safeTop = self.safeAreaInsets.top;
-        safeBottom = self.safeAreaInsets.bottom;
-        safeLeft = self.safeAreaInsets.left;
-        safeRight = self.safeAreaInsets.right;
-    }
-
-    CGFloat minCenterX = safeLeft + 12.0f + buttonSize.width * 0.5f;
-    CGFloat maxCenterX = CGRectGetWidth(self.bounds) - safeRight - 12.0f - buttonSize.width * 0.5f;
-    CGFloat minCenterY = safeTop + 12.0f + buttonSize.height * 0.5f;
-    CGFloat maxCenterY = CGRectGetHeight(self.bounds) - safeBottom - 20.0f - buttonSize.height * 0.5f;
+    CGFloat minCenterX = 12.0f + buttonSize.width * 0.5f;
+    CGFloat maxCenterX = CGRectGetWidth(self.bounds) - 12.0f - buttonSize.width * 0.5f;
+    CGFloat minCenterY = 12.0f + buttonSize.height * 0.5f;
+    CGFloat maxCenterY = CGRectGetHeight(self.bounds) - 20.0f - buttonSize.height * 0.5f;
     CGFloat widthRange = MAX(maxCenterX - minCenterX, 1.0f);
     CGFloat heightRange = MAX(maxCenterY - minCenterY, 1.0f);
     CGFloat xRatio = MIN(MAX((center.x - minCenterX) / widthRange, 0.0f), 1.0f);

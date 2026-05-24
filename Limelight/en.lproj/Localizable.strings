@@ -248,6 +248,7 @@
 "stream.touch_mode.toast" = "Touch mode: %@";
 "stream.touch_mode.trackpad" = "Trackpad";
 "stream.video_alignment.title" = "Video Position";
+"stream.video_alignment_margin.title" = "Margin";
 "stream.video_alignment_margin.label" = "Video position margin %d";
 "stream.menu.manage_virtual_gamepad.tip" = "Tap a virtual gamepad control to adjust its position and size";
 "stream.menu.quit_stream.progress" = "Closing app...";
@@ -313,6 +314,8 @@
 "stream.virtual_buttons.empty_message" = "Tap the plus button in the top-right corner to add your own button set first.";
 "stream.virtual_buttons.empty_title" = "No virtual buttons yet";
 "stream.virtual_buttons.finish_editing" = "Done Editing";
+"stream.virtual_controls.exit" = "Exit";
+"stream.virtual_controls.exit_editing" = "Exit Editing";
 "stream.virtual_buttons.mouse.left" = "Mouse Left";
 "stream.virtual_buttons.mouse.left_lock" = "Mouse Left Lock";
 "stream.virtual_buttons.mouse.left_lock_subtitle" = "Tap to lock the left button";
@@ -472,6 +475,7 @@
 "stream.launch.not_paired" = "Device not paired to PC";
 "stream.connection.poor_slow" = "Connection to PC is slow. Lower the bitrate.";
 "stream.connection.poor" = "Poor connection to PC";
+"stream.performance.enabled.toggle" = "Enable Performance Overlay";
 "stream.performance.extended_metrics.toggle" = "Show jitter/encoding/client latency/dropped frames";
 "stream.stats.client" = " Client: %.1f ms";
 "stream.stats.audio" = " Audio: pend %.0f queue %.0f drop %d";
