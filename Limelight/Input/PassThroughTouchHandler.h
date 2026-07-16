@@ -14,6 +14,7 @@ NS_ASSUME_NONNULL_BEGIN
 
 - (id)initWithView:(StreamView *)view;
 - (id)initWithView:(StreamView *)view settings:(TemporarySettings *)settings;
+- (void)cancelActiveTouches;
 
 @end
 

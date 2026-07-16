@@ -129,7 +129,11 @@
 "settings.reset.title" = "Restore Default Settings";
 "settings.resolution.custom" = "Custom";
 "settings.resolution.full_screen" = "Full Screen";
+"settings.resolution.full_screen_landscape" = "Landscape Full Screen";
+"settings.resolution.full_screen_portrait" = "Portrait Full Screen";
 "settings.resolution.safe_area" = "Safe Area";
+"settings.resolution.safe_area_landscape" = "Landscape Safe Area";
+"settings.resolution.safe_area_portrait" = "Portrait Safe Area";
 "settings.resolution.title" = "Resolution";
 "settings.rumble_mode.title" = "Haptics";
 "stream.audio_haptics.title" = "Audio Haptics";

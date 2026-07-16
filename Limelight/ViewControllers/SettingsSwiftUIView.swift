@@ -323,7 +323,7 @@ private final class SettingsFormViewModel: ObservableObject {
 
     var customResolutionLabel: String {
         if customResolutionWidth > 0, customResolutionHeight > 0 {
-            return "\(customResolutionWidth) x \(customResolutionHeight)"
+            return "\(customResolutionWidth) × \(customResolutionHeight)"
         }
         return SettingsLocalized("common.not_set")
     }
@@ -383,7 +383,7 @@ private final class SettingsFormViewModel: ObservableObject {
         if !resolutionDetailTitles.isEmpty {
             let customIndex = resolutionDetailTitles.count - 1
             if resolutionDetailTitles.indices.contains(customIndex) {
-                resolutionDetailTitles[customIndex] = "\(width) x \(height)"
+                resolutionDetailTitles[customIndex] = "\(width) × \(height)"
             }
         }
         if !resolutionTitles.isEmpty {
@@ -393,7 +393,7 @@ private final class SettingsFormViewModel: ObservableObject {
 
     private func resolutionDetailTitle(for index: Int) -> String {
         if index == resolutionTitles.count - 1, customResolutionWidth > 0, customResolutionHeight > 0 {
-            return "\(customResolutionWidth) x \(customResolutionHeight)"
+            return "\(customResolutionWidth) × \(customResolutionHeight)"
         }
         guard resolutionDetailTitles.indices.contains(index) else {
             return ""
@@ -439,6 +439,7 @@ private struct ChoiceSelectionSheet: View {
     let title: String
     let subtitle: String
     let options: [(offset: Int, element: String)]
+    let detailOptions: [String]
     let selectedIndex: Int
     let onSelect: (Int) -> Void
     let isDisabled: (Int) -> Bool
@@ -453,14 +454,16 @@ private struct ChoiceSelectionSheet: View {
                 List {
                     Section(header: Text(subtitle)) {
                         ForEach(options, id: \.offset) { option in
+                            let detail = detailOptions.indices.contains(option.offset) ? detailOptions[option.offset] : ""
                             Button(action: {
                                 guard !isDisabled(option.offset) else { return }
                                 onSelect(option.offset)
                                 presentationMode.wrappedValue.dismiss()
                             }) {
                                 HStack {
-                                    Text(option.element)
+                                    Text(detail.isEmpty ? option.element : "\(option.element) (\(detail))")
                                         .foregroundColor(isDisabled(option.offset) ? .secondary : .primary)
+                                        .fixedSize(horizontal: false, vertical: true)
                                     Spacer()
                                     if selectedIndex == option.offset {
                                         Image(systemName: "checkmark")
@@ -494,6 +497,7 @@ private struct ChoiceSectionRow: View {
     let title: String
     let subtitle: String
     let options: [(offset: Int, element: String)]
+    let detailOptions: [String]
     let selectedIndex: Int
     let onSelect: (Int) -> Void
     let isDisabled: (Int) -> Bool
@@ -539,6 +543,7 @@ private struct ChoiceSectionRow: View {
                 title: title,
                 subtitle: subtitle,
                 options: options,
+                detailOptions: detailOptions,
                 selectedIndex: selectedIndex,
                 onSelect: { index in
                     pendingSelectionIndex = index
@@ -787,6 +792,7 @@ private struct SettingsRootView: View {
                         title: SettingsLocalized("settings.resolution.title"),
                         subtitle: model.selectedResolutionTitle,
                         options: Array(model.resolutionTitles.enumerated()),
+                        detailOptions: model.resolutionDetailTitles,
                         selectedIndex: model.selectedResolutionIndex
                     ) { index in
                         if index == model.resolutionTitles.count - 1 {
@@ -1199,11 +1205,12 @@ private struct SettingsRootView: View {
     }
 
     @ViewBuilder
-    private func choiceSection(title: String, subtitle: String, options: [(offset: Int, element: String)], selectedIndex: Int, onSelect: @escaping (Int) -> Void, isDisabled: @escaping (Int) -> Bool) -> some View {
+    private func choiceSection(title: String, subtitle: String, options: [(offset: Int, element: String)], detailOptions: [String] = [], selectedIndex: Int, onSelect: @escaping (Int) -> Void, isDisabled: @escaping (Int) -> Bool) -> some View {
         ChoiceSectionRow(
             title: title,
             subtitle: subtitle,
             options: options,
+            detailOptions: detailOptions,
             selectedIndex: selectedIndex,
             onSelect: onSelect,
             isDisabled: isDisabled

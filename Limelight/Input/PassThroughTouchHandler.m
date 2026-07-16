@@ -82,13 +82,21 @@
             return;
     }
 
-    CGPoint location = [self resolvedLocationForTouch:touch touchID:touchID];
     CGSize videoSize = [view getVideoAreaSize];
+    if (videoSize.width <= 0.0f || videoSize.height <= 0.0f) {
+        return;
+    }
+
+    CGPoint location = [self resolvedLocationForTouch:touch touchID:touchID];
     CGFloat altitudeSine = sin(touch.altitudeAngle);
     CGFloat pressure = 0.0f;
     if (touch.maximumPossibleForce > 0.0f && fabs(altitudeSine) > FLT_EPSILON) {
         pressure = (touch.force / touch.maximumPossibleForce) / altitudeSine;
     }
+    if (!isfinite(pressure)) {
+        pressure = 0.0f;
+    }
+    pressure = MAX(0.0f, MIN(pressure, 1.0f));
 
     LiSendTouchEvent(type,
                      touchID,
@@ -106,7 +114,8 @@
 }
 
 - (CGPoint)resolvedLocationForTouch:(UITouch *)touch touchID:(uint32_t)touchID {
-    CGPoint location = [view adjustCoordinatesForVideoArea:[touch locationInView:view]];
+    CGPoint location = [view adjustPreciseCoordinatesForVideoArea:[touch locationInView:view]];
+    CGSize videoSize = [view getVideoAreaSize];
 
     if (!settings.enableTouchSensitivity || settings.touchSensitivity.floatValue == 100.0f) {
         return location;
@@ -114,7 +123,7 @@
 
     CGFloat normalizedX = location.x;
     CGFloat normalizedY = location.y;
-    if (!settings.touchSensitivityGlobal && normalizedX < [UIScreen mainScreen].bounds.size.width / 2.0f) {
+    if (!settings.touchSensitivityGlobal && normalizedX < videoSize.width / 2.0f) {
         return location;
     }
 
@@ -142,9 +151,14 @@
         [sensitivityMap setObject:bean forKey:key];
     }
 
-    location.x = normalizedX;
-    location.y = normalizedY;
+    location.x = MAX(0.0f, MIN(normalizedX, videoSize.width));
+    location.y = MAX(0.0f, MIN(normalizedY, videoSize.height));
     return location;
+}
+
+- (void)cancelActiveTouches {
+    touchManager = [[TouchScreenManager alloc] init];
+    [sensitivityMap removeAllObjects];
 }
 
 @end

@@ -125,4 +125,13 @@
     [self touchesEnded:touches withEvent:event];
 }
 
+- (void)cancelActiveTouches {
+    [longPressTimer invalidate];
+    longPressTimer = nil;
+    lastTouchDown = nil;
+    lastTouchUp = nil;
+    LiSendMouseButtonEvent(BUTTON_ACTION_RELEASE, BUTTON_LEFT);
+    LiSendMouseButtonEvent(BUTTON_ACTION_RELEASE, BUTTON_RIGHT);
+}
+
 @end

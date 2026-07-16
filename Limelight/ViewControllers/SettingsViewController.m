@@ -46,11 +46,17 @@ typedef NS_ENUM(NSInteger, SettingsVirtualControlsDocumentOperation) {
 static const NSInteger minimumBitrateKbps = 10000;
 static const NSInteger maximumBitrateKbps = 500000;
 
-const int RESOLUTION_TABLE_SIZE = 9;
-const int RESOLUTION_TABLE_CUSTOM_INDEX = RESOLUTION_TABLE_SIZE - 1;
-CGSize resolutionTable[RESOLUTION_TABLE_SIZE];
+enum {
+    RESOLUTION_TABLE_LANDSCAPE_FULL_SCREEN_INDEX = 6,
+    RESOLUTION_TABLE_PORTRAIT_FULL_SCREEN_INDEX = 7,
+    RESOLUTION_TABLE_LANDSCAPE_SAFE_AREA_INDEX = 8,
+    RESOLUTION_TABLE_PORTRAIT_SAFE_AREA_INDEX = 9,
+    RESOLUTION_TABLE_SIZE = 11,
+    RESOLUTION_TABLE_CUSTOM_INDEX = RESOLUTION_TABLE_SIZE - 1
+};
+static CGSize resolutionTable[RESOLUTION_TABLE_SIZE];
 
-BOOL isCustomResolution(CGSize res) {
+static BOOL isCustomResolution(CGSize res) {
     if (res.width == 0 && res.height == 0) {
         return NO;
     }
@@ -536,11 +542,33 @@ static NSString *VirtualControlsBackupFilename(void) {
 }
 
 - (void)configureResolutionTableForSettings:(TemporarySettings *)currentSettings {
-    UIWindow *window = UIApplication.sharedApplication.windows.firstObject;
-    CGFloat screenScale = window.screen.scale;
-    CGFloat safeAreaWidth = (window.frame.size.width - window.safeAreaInsets.left - window.safeAreaInsets.right) * screenScale;
-    CGFloat fullScreenWidth = window.frame.size.width * screenScale;
-    CGFloat fullScreenHeight = window.frame.size.height * screenScale;
+    UIWindow *window = self.view.window;
+    if (window == nil) {
+        for (UIWindow *candidate in UIApplication.sharedApplication.windows) {
+            if (candidate.isKeyWindow) {
+                window = candidate;
+                break;
+            }
+        }
+    }
+    if (window == nil) {
+        window = UIApplication.sharedApplication.windows.firstObject;
+    }
+
+    UIScreen *screen = window.screen ?: UIScreen.mainScreen;
+    CGRect windowBounds = window != nil ? window.bounds : screen.bounds;
+    UIEdgeInsets safeAreaInsets = window != nil ? window.safeAreaInsets : UIEdgeInsetsZero;
+    CGFloat screenScale = screen.scale;
+    CGFloat fullWidth = CGRectGetWidth(windowBounds);
+    CGFloat fullHeight = CGRectGetHeight(windowBounds);
+    CGFloat safeWidth = MAX(fullWidth - safeAreaInsets.left - safeAreaInsets.right, 1.0f);
+    CGFloat safeHeight = MAX(fullHeight - safeAreaInsets.top - safeAreaInsets.bottom, 1.0f);
+
+    // Normalize dimensions so these choices have stable orientation semantics,
+    // regardless of the orientation used to open the settings page.
+    CGFloat fullLongEdge = round(MAX(fullWidth, fullHeight) * screenScale);
+    CGFloat fullShortEdge = round(MIN(fullWidth, fullHeight) * screenScale);
+    CGFloat safeLongEdge = round(MAX(safeWidth, safeHeight) * screenScale);
 
     resolutionTable[0] = CGSizeMake(640, 360);
     resolutionTable[1] = CGSizeMake(1280, 720);
@@ -548,12 +576,14 @@ static NSString *VirtualControlsBackupFilename(void) {
     resolutionTable[3] = CGSizeMake(2560, 1440);
     resolutionTable[4] = CGSizeMake(2560, 1600);
     resolutionTable[5] = CGSizeMake(3840, 2160);
-    resolutionTable[6] = CGSizeMake(safeAreaWidth, fullScreenHeight);
-    resolutionTable[7] = CGSizeMake(fullScreenWidth, fullScreenHeight);
-    resolutionTable[8] = CGSizeMake([currentSettings.width integerValue], [currentSettings.height integerValue]);
+    resolutionTable[RESOLUTION_TABLE_LANDSCAPE_FULL_SCREEN_INDEX] = CGSizeMake(fullLongEdge, fullShortEdge);
+    resolutionTable[RESOLUTION_TABLE_PORTRAIT_FULL_SCREEN_INDEX] = CGSizeMake(fullShortEdge, fullLongEdge);
+    resolutionTable[RESOLUTION_TABLE_LANDSCAPE_SAFE_AREA_INDEX] = CGSizeMake(safeLongEdge, fullShortEdge);
+    resolutionTable[RESOLUTION_TABLE_PORTRAIT_SAFE_AREA_INDEX] = CGSizeMake(fullShortEdge, safeLongEdge);
+    resolutionTable[RESOLUTION_TABLE_CUSTOM_INDEX] = CGSizeMake([currentSettings.width integerValue], [currentSettings.height integerValue]);
 
-    if (!isCustomResolution(resolutionTable[8])) {
-        resolutionTable[8] = CGSizeMake(0, 0);
+    if (!isCustomResolution(resolutionTable[RESOLUTION_TABLE_CUSTOM_INDEX])) {
+        resolutionTable[RESOLUTION_TABLE_CUSTOM_INDEX] = CGSizeMake(0, 0);
     }
 }
 
@@ -588,8 +618,10 @@ static NSString *VirtualControlsBackupFilename(void) {
         @"2K",
         @"2K 16:10",
         @"4K",
-        SettingsLocalized(@"settings.resolution.safe_area"),
-        SettingsLocalized(@"settings.resolution.full_screen"),
+        SettingsLocalized(@"settings.resolution.full_screen_landscape"),
+        SettingsLocalized(@"settings.resolution.full_screen_portrait"),
+        SettingsLocalized(@"settings.resolution.safe_area_landscape"),
+        SettingsLocalized(@"settings.resolution.safe_area_portrait"),
         SettingsLocalized(@"settings.resolution.custom")
     ];
     NSMutableArray<NSString *> *resolutionDetailTitles = [[NSMutableArray alloc] init];
@@ -600,7 +632,7 @@ static NSString *VirtualControlsBackupFilename(void) {
             [resolutionDetailTitles addObject:SettingsLocalized(@"common.not_set")];
         }
         else {
-            [resolutionDetailTitles addObject:[NSString stringWithFormat:@"%ld x %ld", (long)width, (long)height]];
+            [resolutionDetailTitles addObject:[NSString stringWithFormat:@"%ld × %ld", (long)width, (long)height]];
         }
     }
     snapshot.resolutionDetailTitles = resolutionDetailTitles;

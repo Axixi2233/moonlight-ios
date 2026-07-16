@@ -70,6 +70,7 @@ typedef NS_ENUM(NSInteger, StreamViewVideoAlignmentMode) {
 - (void) updateCursorLocation:(CGPoint)location isMouse:(BOOL)isMouse;
 - (CGSize) getVideoAreaSize;
 - (CGPoint) adjustCoordinatesForVideoArea:(CGPoint)point;
+- (CGPoint) adjustPreciseCoordinatesForVideoArea:(CGPoint)point;
 - (uint16_t) getRotationFromAzimuthAngle:(float)azimuthAngle;
 #endif
 

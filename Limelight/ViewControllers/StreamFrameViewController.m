@@ -1744,9 +1744,9 @@ static const NSInteger kStreamPerformanceOverlayPositionCustom = 6;
     _settings.touchModeSelection = normalizedSelection;
     [[[DataManager alloc] init] saveTouchModeSelection:normalizedSelection];
 
+    [_streamView resetAfterTemporaryTouchModeChange];
     [_streamView applyTemporaryTouchModeSelection:normalizedSelection];
     [self updateStreamingTouchModeLayout];
-    [_streamView resetAfterTemporaryTouchModeChange];
 }
 
 - (void)updateStreamingTouchModeLayout {
@@ -1762,6 +1762,19 @@ static const NSInteger kStreamPerformanceOverlayPositionCustom = 6;
             [_scrollView setMaximumZoomScale:10.0f];
             [_scrollView setMultipleTouchEnabled:YES];
             [_scrollView setBackgroundColor:[UIColor clearColor]];
+#if !TARGET_OS_TV
+            // Keep Pencil out of the local view-only pan/zoom recognizers so it
+            // continues to reach StreamView as remote pen input.
+            NSArray<NSNumber *> *localNavigationTouchTypes;
+            if (@available(iOS 13.4, *)) {
+                localNavigationTouchTypes = @[@(UITouchTypeDirect), @(UITouchTypeIndirectPointer)];
+            }
+            else {
+                localNavigationTouchTypes = @[@(UITouchTypeDirect)];
+            }
+            _scrollView.panGestureRecognizer.allowedTouchTypes = localNavigationTouchTypes;
+            _scrollView.pinchGestureRecognizer.allowedTouchTypes = localNavigationTouchTypes;
+#endif
         }
 
 #if !TARGET_OS_TV

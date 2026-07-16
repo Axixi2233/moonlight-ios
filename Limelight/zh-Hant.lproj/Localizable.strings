@@ -129,7 +129,11 @@
 "settings.reset.title" = "恢復初始化設定";
 "settings.resolution.custom" = "自定义";
 "settings.resolution.full_screen" = "全屏";
+"settings.resolution.full_screen_landscape" = "橫向全螢幕";
+"settings.resolution.full_screen_portrait" = "直向全螢幕";
 "settings.resolution.safe_area" = "安全区域";
+"settings.resolution.safe_area_landscape" = "橫向安全區域";
+"settings.resolution.safe_area_portrait" = "直向安全區域";
 "settings.resolution.title" = "解析度";
 "settings.rumble_mode.title" = "觸觉反馈";
 "stream.audio_haptics.title" = "音訊震動";

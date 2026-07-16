@@ -129,7 +129,11 @@
 "settings.reset.title" = "初期設定に戻す";
 "settings.resolution.custom" = "カスタム";
 "settings.resolution.full_screen" = "フルスクリーン";
+"settings.resolution.full_screen_landscape" = "横向きフルスクリーン";
+"settings.resolution.full_screen_portrait" = "縦向きフルスクリーン";
 "settings.resolution.safe_area" = "セーフエリア";
+"settings.resolution.safe_area_landscape" = "横向きセーフエリア";
+"settings.resolution.safe_area_portrait" = "縦向きセーフエリア";
 "settings.resolution.title" = "解像度";
 "settings.rumble_mode.title" = "振動オプション";
 "stream.audio_haptics.title" = "オーディオ触覚";

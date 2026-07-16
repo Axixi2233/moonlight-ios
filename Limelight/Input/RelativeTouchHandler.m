@@ -185,6 +185,16 @@ static const int REFERENCE_HEIGHT = 720;
     peakTouchCount = 0;
 }
 
+- (void)cancelActiveTouches {
+    [dragTimer invalidate];
+    dragTimer = nil;
+    touchMoved = YES;
+    isDragging = NO;
+    peakTouchCount = 0;
+    LiSendMouseButtonEvent(BUTTON_ACTION_RELEASE, BUTTON_LEFT);
+    LiSendMouseButtonEvent(BUTTON_ACTION_RELEASE, BUTTON_RIGHT);
+}
+
 #if TARGET_OS_TV
 - (void)remoteButtonPressed:(id)sender {
     dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_HIGH, 0), ^{

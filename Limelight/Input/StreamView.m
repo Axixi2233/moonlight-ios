@@ -7,6 +7,7 @@
 //
 
 #import "StreamView.h"
+#include <float.h>
 #include <Limelight.h>
 #import "DataManager.h"
 #import "ControllerSupport.h"
@@ -19,6 +20,13 @@
 static const double X1_MOUSE_SPEED_DIVISOR = 2.5;
 static const CGFloat kVirtualTouchpadReferenceWidth = 1280.0f;
 static const CGFloat kVirtualTouchpadReferenceHeight = 720.0f;
+
+static float StreamClampedUnitValue(CGFloat value) {
+    if (!isfinite(value)) {
+        return 0.0f;
+    }
+    return (float)MAX(0.0f, MIN(value, 1.0f));
+}
 NSString * const StreamViewBoundsDidChangeNotification = @"StreamViewBoundsDidChangeNotification";
 NSString * const StreamViewVirtualButtonsDidChangeNotification = @"StreamViewVirtualButtonsDidChangeNotification";
 NSString * const StreamViewVirtualButtonSelectionDidChangeNotification = @"StreamViewVirtualButtonSelectionDidChangeNotification";
@@ -35,6 +43,12 @@ typedef NS_OPTIONS(NSUInteger, StreamVirtualDirectionMask) {
     StreamVirtualDirectionMaskDown  = 1 << 1,
     StreamVirtualDirectionMaskLeft  = 1 << 2,
     StreamVirtualDirectionMaskRight = 1 << 3,
+};
+
+typedef NS_ENUM(NSUInteger, StreamPencilTransport) {
+    StreamPencilTransportNone = 0,
+    StreamPencilTransportPen,
+    StreamPencilTransportAbsoluteMouse,
 };
 
 @interface KeyboardAccessoryScrollView : UIScrollView
@@ -527,6 +541,11 @@ typedef NS_OPTIONS(NSUInteger, StreamVirtualDirectionMask) {
 
 @end
 
+@interface StreamView ()
+- (void)cancelActiveDirectFingerInput;
+- (void)cancelActiveRemotePointerInput;
+@end
+
 @implementation StreamView {
     KeyboardInputField* keyInputField;
     BOOL isInputingText;
@@ -540,6 +559,10 @@ typedef NS_OPTIONS(NSUInteger, StreamVirtualDirectionMask) {
     float lastMouseY;
     CGPoint lastScrollTranslation;
     BOOL mouseInputSuppressed;
+
+    // Apple Pencil input stays on one transport for the full hover/contact sequence.
+    StreamPencilTransport activePencilTransport;
+    StreamPencilTransport hoverPencilTransport;
     
     // Citrix X1 mouse support
     X1Mouse* x1mouse;
@@ -748,8 +771,49 @@ typedef NS_OPTIONS(NSUInteger, StreamVirtualDirectionMask) {
     return NO;
 }
 
+- (void)cancelActiveDirectFingerInput {
+#if !TARGET_OS_TV
+    LiSendTouchEvent(LI_TOUCH_EVENT_CANCEL_ALL,
+                     0,
+                     0.0f,
+                     0.0f,
+                     0.0f,
+                     0.0f,
+                     0.0f,
+                     LI_ROT_UNKNOWN);
+    if ([touchHandler respondsToSelector:@selector(cancelActiveTouches)]) {
+        [(id)touchHandler cancelActiveTouches];
+    }
+#endif
+}
+
+- (void)cancelActiveRemotePointerInput {
+#if !TARGET_OS_TV
+    if (activePencilTransport == StreamPencilTransportAbsoluteMouse) {
+        LiSendMouseButtonEvent(BUTTON_ACTION_RELEASE, BUTTON_LEFT);
+    }
+
+    LiSendPenEvent(LI_TOUCH_EVENT_CANCEL_ALL,
+                   LI_TOOL_TYPE_UNKNOWN,
+                   0,
+                   0.0f,
+                   0.0f,
+                   0.0f,
+                   0.0f,
+                   0.0f,
+                   LI_ROT_UNKNOWN,
+                   LI_TILT_UNKNOWN);
+    activePencilTransport = StreamPencilTransportNone;
+    hoverPencilTransport = StreamPencilTransportNone;
+
+    [self cancelActiveDirectFingerInput];
+#endif
+}
+
 - (void)resetAfterTemporaryTouchModeChange {
 #if !TARGET_OS_TV
+    [self cancelActiveRemotePointerInput];
+
     if (isInputingText) {
         [keyInputField resignFirstResponder];
         isInputingText = NO;
@@ -776,9 +840,14 @@ typedef NS_OPTIONS(NSUInteger, StreamVirtualDirectionMask) {
 
 - (void)setMouseInputSuppressed:(BOOL)suppressed {
 #if !TARGET_OS_TV
+    if (mouseInputSuppressed == suppressed) {
+        return;
+    }
+
     mouseInputSuppressed = suppressed;
 
     if (suppressed) {
+        [self cancelActiveRemotePointerInput];
         lastMouseButtonMask = 0;
         lastScrollTranslation = CGPointZero;
         accumulatedMouseDeltaX = 0;
@@ -2400,6 +2469,11 @@ typedef NS_OPTIONS(NSUInteger, StreamVirtualDirectionMask) {
 }
 
 - (void)setViewOnlyModeEnabled:(BOOL)enabled {
+    if (enabled && !viewOnlyModeEnabled) {
+        // View-only mode reserves finger touches for local pan/zoom, but Apple
+        // Pencil remains a remote input device.
+        [self cancelActiveDirectFingerInput];
+    }
     viewOnlyModeEnabled = enabled;
 }
 
@@ -2439,28 +2513,27 @@ typedef NS_OPTIONS(NSUInteger, StreamVirtualDirectionMask) {
     return CGPointMake(originX, originY);
 }
 
-- (CGPoint) adjustCoordinatesForVideoArea:(CGPoint)point {
+- (CGPoint)adjustCoordinatesForVideoArea:(CGPoint)point applyingEdgeExpansion:(BOOL)applyEdgeExpansion {
     // These are now relative to the StreamView, however we need to scale them
     // further to make them relative to the actual video portion.
     float x = point.x - self.bounds.origin.x;
     float y = point.y - self.bounds.origin.y;
     
-    // For some reason, we don't seem to always get to the bounds of the window
-    // so we'll subtract 1 pixel if we're to the left/below of the origin and
-    // and add 1 pixel if we're to the right/above. It should be imperceptible
-    // to the user but it will allow activation of gestures that require contact
-    // with the edge of the screen (like Aero Snap).
-    if (x < self.bounds.size.width / 2) {
-        x--;
-    }
-    else {
-        x++;
-    }
-    if (y < self.bounds.size.height / 2) {
-        y--;
-    }
-    else {
-        y++;
+    if (applyEdgeExpansion) {
+        // Mouse input gets a small outward bias so the remote pointer can reach
+        // desktop edges. Precision touch and Pencil input must not use this bias.
+        if (x < self.bounds.size.width / 2) {
+            x--;
+        }
+        else {
+            x++;
+        }
+        if (y < self.bounds.size.height / 2) {
+            y--;
+        }
+        else {
+            y++;
+        }
     }
     
     // This logic mimics what iOS does with AVLayerVideoGravityResizeAspect
@@ -2471,6 +2544,34 @@ typedef NS_OPTIONS(NSUInteger, StreamVirtualDirectionMask) {
     // the region because we won't always get one exactly when the mouse leaves the region.
     return CGPointMake(MIN(MAX(x, videoOrigin.x), videoOrigin.x + videoSize.width) - videoOrigin.x,
                        MIN(MAX(y, videoOrigin.y), videoOrigin.y + videoSize.height) - videoOrigin.y);
+}
+
+- (CGPoint)adjustCoordinatesForVideoArea:(CGPoint)point {
+    return [self adjustCoordinatesForVideoArea:point applyingEdgeExpansion:YES];
+}
+
+- (CGPoint)adjustPreciseCoordinatesForVideoArea:(CGPoint)point {
+    return [self adjustCoordinatesForVideoArea:point applyingEdgeExpansion:NO];
+}
+
+- (BOOL)shouldForwardPencilInput {
+    return !mouseInputSuppressed;
+}
+
+- (BOOL)shouldForwardDirectFingerInput {
+    return !viewOnlyModeEnabled &&
+           !mouseInputSuppressed &&
+           ![settings disablesDirectScreenTouchInput];
+}
+
+- (NSUInteger)directFingerCountForEvent:(UIEvent *)event {
+    NSUInteger count = 0;
+    for (UITouch *touch in event.allTouches) {
+        if (touch.type == UITouchTypeDirect) {
+            count++;
+        }
+    }
+    return count;
 }
 
 #if !TARGET_OS_TV
@@ -2495,16 +2596,97 @@ typedef NS_OPTIONS(NSUInteger, StreamVirtualDirectionMask) {
 }
 
 
-- (BOOL)sendStylusEvent:(UITouch*)event {
-    uint8_t type;
-    
-    // Don't touch stylus events if the host doesn't support them. We want to pass
-    // them as normal touches for legacy hosts that don't understand pen events.
-    if (!(LiGetHostFeatureFlags() & LI_FF_PEN_TOUCH_EVENTS)) {
+- (BOOL)sendPreciseAbsoluteMousePositionForViewPoint:(CGPoint)viewPoint {
+    CGSize videoSize = [self getVideoAreaSize];
+    if (videoSize.width <= 0.0f || videoSize.height <= 0.0f) {
         return NO;
     }
-    
-    switch (event.phase) {
+
+    CGPoint location = [self adjustPreciseCoordinatesForVideoArea:viewPoint];
+    return LiSendMousePositionEvent(location.x,
+                                    location.y,
+                                    videoSize.width,
+                                    videoSize.height) >= 0;
+}
+
+- (float)pressureForPencilTouch:(UITouch *)touch {
+    CGFloat altitudeSine = sin(touch.altitudeAngle);
+    if (touch.maximumPossibleForce <= 0.0f || fabs(altitudeSine) <= FLT_EPSILON) {
+        return 0.0f;
+    }
+    return StreamClampedUnitValue((touch.force / touch.maximumPossibleForce) / altitudeSine);
+}
+
+- (int)sendPenEventType:(uint8_t)type forPencilTouch:(UITouch *)touch {
+    if (type == LI_TOUCH_EVENT_CANCEL || type == LI_TOUCH_EVENT_CANCEL_ALL) {
+        return LiSendPenEvent(type,
+                              LI_TOOL_TYPE_PEN,
+                              0,
+                              0.0f,
+                              0.0f,
+                              0.0f,
+                              0.0f,
+                              0.0f,
+                              LI_ROT_UNKNOWN,
+                              LI_TILT_UNKNOWN);
+    }
+
+    CGSize videoSize = [self getVideoAreaSize];
+    if (videoSize.width <= 0.0f || videoSize.height <= 0.0f) {
+        return -1;
+    }
+
+    CGPoint location = [self adjustPreciseCoordinatesForVideoArea:[touch locationInView:self]];
+    return LiSendPenEvent(type,
+                          LI_TOOL_TYPE_PEN,
+                          0,
+                          location.x / videoSize.width,
+                          location.y / videoSize.height,
+                          [self pressureForPencilTouch:touch],
+                          0.0f,
+                          0.0f,
+                          [self getRotationFromAzimuthAngle:[touch azimuthAngleInView:self]],
+                          [self getTiltFromAltitudeAngle:touch.altitudeAngle]);
+}
+
+- (void)sendPencilTouchAsAbsoluteMouse:(UITouch *)touch eventType:(uint8_t)type {
+    if (type != LI_TOUCH_EVENT_CANCEL && type != LI_TOUCH_EVENT_CANCEL_ALL) {
+        [self sendPreciseAbsoluteMousePositionForViewPoint:[touch locationInView:self]];
+    }
+
+    if (type == LI_TOUCH_EVENT_DOWN) {
+        LiSendMouseButtonEvent(BUTTON_ACTION_PRESS, BUTTON_LEFT);
+    }
+    else if (type == LI_TOUCH_EVENT_UP ||
+             type == LI_TOUCH_EVENT_CANCEL ||
+             type == LI_TOUCH_EVENT_CANCEL_ALL) {
+        LiSendMouseButtonEvent(BUTTON_ACTION_RELEASE, BUTTON_LEFT);
+    }
+}
+
+- (void)endPencilHoverAtViewPoint:(CGPoint)viewPoint {
+    if (hoverPencilTransport == StreamPencilTransportPen) {
+        CGSize videoSize = [self getVideoAreaSize];
+        if (videoSize.width > 0.0f && videoSize.height > 0.0f) {
+            CGPoint location = [self adjustPreciseCoordinatesForVideoArea:viewPoint];
+            LiSendPenEvent(LI_TOUCH_EVENT_HOVER_LEAVE,
+                           LI_TOOL_TYPE_PEN,
+                           0,
+                           location.x / videoSize.width,
+                           location.y / videoSize.height,
+                           0.0f,
+                           0.0f,
+                           0.0f,
+                           LI_ROT_UNKNOWN,
+                           LI_TILT_UNKNOWN);
+        }
+    }
+    hoverPencilTransport = StreamPencilTransportNone;
+}
+
+- (BOOL)sendStylusEvent:(UITouch *)touch {
+    uint8_t type;
+    switch (touch.phase) {
         case UITouchPhaseBegan:
             type = LI_TOUCH_EVENT_DOWN;
             break;
@@ -2521,43 +2703,116 @@ typedef NS_OPTIONS(NSUInteger, StreamVirtualDirectionMask) {
             return YES;
     }
 
-    CGPoint location = [self adjustCoordinatesForVideoArea:[event locationInView:self]];
-    CGSize videoSize = [self getVideoAreaSize];
-    
-    return LiSendPenEvent(type, LI_TOOL_TYPE_PEN, 0, location.x / videoSize.width, location.y / videoSize.height,
-                          (event.force / event.maximumPossibleForce) / sin(event.altitudeAngle),
-                          0.0f, 0.0f,
-                          [self getRotationFromAzimuthAngle:[event azimuthAngleInView:self]],
-                          [self getTiltFromAltitudeAngle:event.altitudeAngle]) != LI_ERR_UNSUPPORTED;
+    if (type == LI_TOUCH_EVENT_DOWN) {
+        // UIKit may deliver Pencil contact before the hover recognizer's Ended
+        // callback. Close hover first so the host never sees overlapping states.
+        [self endPencilHoverAtViewPoint:[touch locationInView:self]];
+
+        if (activePencilTransport != StreamPencilTransportNone) {
+            // Recover an orphaned Pencil contact without cancelling unrelated
+            // finger touches that may still be active in multi-touch mode.
+            if (activePencilTransport == StreamPencilTransportPen) {
+                LiSendPenEvent(LI_TOUCH_EVENT_CANCEL_ALL,
+                               LI_TOOL_TYPE_UNKNOWN,
+                               0,
+                               0.0f,
+                               0.0f,
+                               0.0f,
+                               0.0f,
+                               0.0f,
+                               LI_ROT_UNKNOWN,
+                               LI_TILT_UNKNOWN);
+            }
+            else {
+                LiSendMouseButtonEvent(BUTTON_ACTION_RELEASE, BUTTON_LEFT);
+            }
+        }
+        activePencilTransport = (LiGetHostFeatureFlags() & LI_FF_PEN_TOUCH_EVENTS) ?
+            StreamPencilTransportPen : StreamPencilTransportAbsoluteMouse;
+    }
+    else if (activePencilTransport == StreamPencilTransportNone) {
+        // Consume unmatched move/up events after a mode or overlay transition.
+        return YES;
+    }
+
+    if (activePencilTransport == StreamPencilTransportPen) {
+        int result = [self sendPenEventType:type forPencilTouch:touch];
+        if (type == LI_TOUCH_EVENT_DOWN && result == LI_ERR_UNSUPPORTED) {
+            activePencilTransport = StreamPencilTransportAbsoluteMouse;
+            [self sendPencilTouchAsAbsoluteMouse:touch eventType:type];
+        }
+    }
+    else {
+        [self sendPencilTouchAsAbsoluteMouse:touch eventType:type];
+    }
+
+    if (type == LI_TOUCH_EVENT_UP || type == LI_TOUCH_EVENT_CANCEL) {
+        activePencilTransport = StreamPencilTransportNone;
+    }
+    return YES;
+}
+
+- (NSSet<UITouch *> *)handlePencilTouchesAndReturnRemainingTouches:(NSSet<UITouch *> *)touches
+                                                didForwardPencil:(BOOL *)didForwardPencil {
+    NSMutableSet<UITouch *> *remainingTouches = [NSMutableSet setWithCapacity:touches.count];
+    BOOL forwardedPencil = NO;
+    for (UITouch *touch in touches) {
+        if (touch.type == UITouchTypePencil) {
+            if ([self shouldForwardPencilInput]) {
+                [self sendStylusEvent:touch];
+                forwardedPencil = YES;
+            }
+        }
+        else {
+            [remainingTouches addObject:touch];
+        }
+    }
+    if (didForwardPencil != NULL) {
+        *didForwardPencil = forwardedPencil;
+    }
+    return remainingTouches;
 }
 
 - (void)sendStylusHoverEvent:(UIHoverGestureRecognizer*)gesture API_AVAILABLE(ios(13.0)) {
-    uint8_t type;
-    
-    switch (gesture.state) {
-        case UIGestureRecognizerStateBegan:
-        case UIGestureRecognizerStateChanged:
-            type = LI_TOUCH_EVENT_HOVER;
-            break;
+    BOOL isLeaving = gesture.state == UIGestureRecognizerStateEnded ||
+                     gesture.state == UIGestureRecognizerStateCancelled ||
+                     gesture.state == UIGestureRecognizerStateFailed;
 
-        case UIGestureRecognizerStateEnded:
-            type = LI_TOUCH_EVENT_HOVER_LEAVE;
-            break;
-
-        default:
-            return;
+    if (isLeaving) {
+        [self endPencilHoverAtViewPoint:[gesture locationInView:self]];
+        return;
     }
 
-    CGPoint location = [self adjustCoordinatesForVideoArea:[gesture locationInView:self]];
+    if ((gesture.state != UIGestureRecognizerStateBegan &&
+         gesture.state != UIGestureRecognizerStateChanged) ||
+        ![self shouldForwardPencilInput] ||
+        activePencilTransport != StreamPencilTransportNone) {
+        return;
+    }
+
     CGSize videoSize = [self getVideoAreaSize];
-    
+    if (videoSize.width <= 0.0f || videoSize.height <= 0.0f) {
+        return;
+    }
+
+    if (hoverPencilTransport == StreamPencilTransportNone) {
+        hoverPencilTransport = (LiGetHostFeatureFlags() & LI_FF_PEN_TOUCH_EVENTS) ?
+            StreamPencilTransportPen : StreamPencilTransportAbsoluteMouse;
+    }
+
+    CGPoint viewLocation = [gesture locationInView:self];
+    if (hoverPencilTransport == StreamPencilTransportAbsoluteMouse) {
+        [self sendPreciseAbsoluteMousePositionForViewPoint:viewLocation];
+        return;
+    }
+
     float distance = 0.0f;
 #if defined(__IPHONE_16_1) || defined(__TVOS_16_1)
     if (@available(iOS 16.1, *)) {
-        distance = gesture.zOffset;
+        distance = StreamClampedUnitValue(gesture.zOffset);
     }
 #endif
-    
+
     uint16_t rotationAngle = LI_ROT_UNKNOWN;
     uint8_t tiltAngle = LI_TILT_UNKNOWN;
 #if defined(__IPHONE_16_4) || defined(__TVOS_16_4)
@@ -2566,16 +2821,40 @@ typedef NS_OPTIONS(NSUInteger, StreamVirtualDirectionMask) {
         tiltAngle = [self getTiltFromAltitudeAngle:gesture.altitudeAngle];
     }
 #endif
-    
-    LiSendPenEvent(type, LI_TOOL_TYPE_PEN, 0, location.x / videoSize.width, location.y / videoSize.height,
-                   distance, 0.0f, 0.0f, rotationAngle, tiltAngle);
+
+    CGPoint location = [self adjustPreciseCoordinatesForVideoArea:viewLocation];
+    int result = LiSendPenEvent(LI_TOUCH_EVENT_HOVER,
+                                LI_TOOL_TYPE_PEN,
+                                0,
+                                location.x / videoSize.width,
+                                location.y / videoSize.height,
+                                distance,
+                                0.0f,
+                                0.0f,
+                                rotationAngle,
+                                tiltAngle);
+    if (result == LI_ERR_UNSUPPORTED) {
+        hoverPencilTransport = StreamPencilTransportAbsoluteMouse;
+        [self sendPreciseAbsoluteMousePositionForViewPoint:viewLocation];
+    }
 }
 
 #endif
 
 - (void)touchesBegan:(NSSet *)touches withEvent:(UIEvent *)event {
+    BOOL didForwardPencil = NO;
+#if !TARGET_OS_TV
+    touches = [self handlePencilTouchesAndReturnRemainingTouches:touches
+                                                didForwardPencil:&didForwardPencil];
+#endif
+
     if (viewOnlyModeEnabled) {
-        [super touchesBegan:touches withEvent:event];
+        if (touches.count > 0) {
+            [super touchesBegan:touches withEvent:event];
+        }
+        if (didForwardPencil) {
+            [self startInteractionTimer];
+        }
         return;
     }
 
@@ -2586,43 +2865,26 @@ typedef NS_OPTIONS(NSUInteger, StreamVirtualDirectionMask) {
         return;
     }
 
-    if ([settings disablesDirectScreenTouchInput]) {
+    BOOL shouldForwardFingers = [self shouldForwardDirectFingerInput];
+    if (!didForwardPencil && (!shouldForwardFingers || touches.count == 0)) {
         return;
     }
-    
+
     Log(LOG_D, @"Touch down");
-    
+
     // Notify of user interaction and start expiration timer
     [self startInteractionTimer];
-    
-#if !TARGET_OS_TV
-    if ([settings disablesDirectScreenTouchInput]) {
-        if (@available(iOS 13.4, *)) {
-            UITouch *touch = [touches anyObject];
-            if (touch.type == UITouchTypeIndirectPointer) {
-                if (@available(iOS 14.0, *)) {
-                    if ([GCMouse current] != nil) {
-                        // We'll handle this with GCMouse. Do nothing here.
-                        return;
-                    }
-                }
-
-                [self updateCursorLocation:[touch locationInView:self] isMouse:YES];
-            }
-        }
-        return;
-    }
-
-#endif
     
     // We still inform the touch handler even if we're going trigger the
     // keyboard activation gesture. This is important to ensure the touch
     // handler has a consistent view of touch events to correctly suppress
     // activation of one or two finger gestures when a three finger gesture
     // is triggered.
-    [touchHandler touchesBegan:touches withEvent:event];
+    if (shouldForwardFingers && touches.count > 0) {
+        [touchHandler touchesBegan:touches withEvent:event];
+    }
     
-    if ([[event allTouches] count] == 5) {
+    if (shouldForwardFingers && [self directFingerCountForEvent:event] == 5) {
         [self showKeyInputBoard];
     }
 }
@@ -3002,8 +3264,19 @@ typedef NS_OPTIONS(NSUInteger, StreamVirtualDirectionMask) {
 }
 
 - (void)touchesMoved:(NSSet *)touches withEvent:(UIEvent *)event {
+    BOOL didForwardPencil = NO;
+#if !TARGET_OS_TV
+    touches = [self handlePencilTouchesAndReturnRemainingTouches:touches
+                                                didForwardPencil:&didForwardPencil];
+#endif
+
     if (viewOnlyModeEnabled) {
-        [super touchesMoved:touches withEvent:event];
+        if (touches.count > 0) {
+            [super touchesMoved:touches withEvent:event];
+        }
+        if (didForwardPencil) {
+            hasUserInteracted = YES;
+        }
         return;
     }
 
@@ -3034,13 +3307,16 @@ typedef NS_OPTIONS(NSUInteger, StreamVirtualDirectionMask) {
     }
 #endif
 
-    if ([settings disablesDirectScreenTouchInput]) {
+    BOOL shouldForwardFingers = [self shouldForwardDirectFingerInput];
+    if (!didForwardPencil && (!shouldForwardFingers || touches.count == 0)) {
         return;
     }
 
     hasUserInteracted = YES;
-    
-    [touchHandler touchesMoved:touches withEvent:event];
+
+    if (shouldForwardFingers && touches.count > 0) {
+        [touchHandler touchesMoved:touches withEvent:event];
+    }
 }
 
 - (void)pressesBegan:(NSSet<UIPress *> *)presses withEvent:(UIPressesEvent *)event {
@@ -3092,8 +3368,19 @@ typedef NS_OPTIONS(NSUInteger, StreamVirtualDirectionMask) {
 }
 
 - (void)touchesEnded:(NSSet *)touches withEvent:(UIEvent *)event {
+    BOOL didForwardPencil = NO;
+#if !TARGET_OS_TV
+    touches = [self handlePencilTouchesAndReturnRemainingTouches:touches
+                                                didForwardPencil:&didForwardPencil];
+#endif
+
     if (viewOnlyModeEnabled) {
-        [super touchesEnded:touches withEvent:event];
+        if (touches.count > 0) {
+            [super touchesEnded:touches withEvent:event];
+        }
+        if (didForwardPencil) {
+            hasUserInteracted = YES;
+        }
         return;
     }
 
@@ -3104,39 +3391,46 @@ typedef NS_OPTIONS(NSUInteger, StreamVirtualDirectionMask) {
         return;
     }
 
-    if ([settings disablesDirectScreenTouchInput]) {
+    BOOL shouldForwardFingers = [self shouldForwardDirectFingerInput];
+    if (!didForwardPencil && (!shouldForwardFingers || touches.count == 0)) {
         return;
     }
-    
+
     Log(LOG_D, @"Touch up");
-    
+
     hasUserInteracted = YES;
-    
-#if !TARGET_OS_TV
-#endif
-    
-    [touchHandler touchesEnded:touches withEvent:event];
+
+    if (shouldForwardFingers && touches.count > 0) {
+        [touchHandler touchesEnded:touches withEvent:event];
+    }
 }
 
 - (void)touchesCancelled:(NSSet *)touches withEvent:(UIEvent *)event {
+#if !TARGET_OS_TV
+    touches = [self handlePencilTouchesAndReturnRemainingTouches:touches
+                                                didForwardPencil:NULL];
+#endif
+
     if (viewOnlyModeEnabled) {
-        [super touchesCancelled:touches withEvent:event];
+        if (touches.count > 0) {
+            [super touchesCancelled:touches withEvent:event];
+        }
         return;
     }
 
-    if ([settings disablesDirectScreenTouchInput]) {
+    if (![self shouldForwardDirectFingerInput]) {
         [self handleMouseButtonEvent:BUTTON_ACTION_RELEASE
                           forTouches:touches
                            withEvent:event];
         return;
     }
 
-    [touchHandler touchesCancelled:touches withEvent:event];
+    if (touches.count > 0) {
+        [touchHandler touchesCancelled:touches withEvent:event];
+    }
     [self handleMouseButtonEvent:BUTTON_ACTION_RELEASE
                       forTouches:touches
                        withEvent:event];
-#if !TARGET_OS_TV
-#endif
 }
 
 #if !TARGET_OS_TV
